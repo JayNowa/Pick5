@@ -282,6 +282,118 @@
 
   .fade-in { animation: pageFade 0.35s ease forwards; }
 
+  /* ── MY PICKS PAGE ── */
+  .picks-loading {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+    font-size: 15px;
+    letter-spacing: 0.1em;
+  }
+  .loading-spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .picks-error {
+    background: rgba(224,85,85,0.1);
+    border: 1px solid rgba(224,85,85,0.3);
+    border-radius: 6px;
+    padding: 16px 20px;
+    color: var(--error);
+    font-size: 15px;
+    letter-spacing: 0.04em;
+  }
+
+  .picks-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+    font-size: 16px;
+    letter-spacing: 0.08em;
+  }
+  .picks-empty .icon { font-size: 40px; margin-bottom: 16px; }
+
+  .week-group {
+    margin-bottom: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    opacity: 0;
+    animation: pageFade 0.4s ease forwards;
+  }
+
+  .week-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    background: rgba(200,169,74,0.07);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .week-group-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+  }
+
+  .week-group-count {
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .picks-submission {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .picks-submission:last-child { border-bottom: none; }
+
+  .submission-meta {
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .submission-picks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .pick-chip {
+    background: var(--hover);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: 0.04em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pick-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+  }
+
+
   .week-badge {
     font-family: 'Bebas Neue', sans-serif;
     font-size: 15px;
@@ -396,16 +508,25 @@
 <!-- ═══ MY PICKS PAGE ═══ -->
 <div class="page with-nav" id="myPicksPage">
   <div class="container">
-    <div class="placeholder-card">
-      <div class="icon">📋</div>
-      <h2>My Picks</h2>
-      <p>This is my picks page.<br>More coming soon.</p>
+    <div class="page-header">
+      <div class="page-title">My Picks</div>
+      <div class="page-subtitle">Your submissions by week</div>
+      <div class="page-divider"></div>
+    </div>
+    <div id="myPicksContent">
+      <div class="picks-loading" id="picksLoading">
+        <div class="loading-spinner"></div>
+        <p>Loading your picks…</p>
+      </div>
+      <div id="picksError" class="picks-error" style="display:none;"></div>
+      <div id="picksGroups"></div>
     </div>
   </div>
 </div>
 
 <script>
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRqX7XR41_5tR9RKRaMW7jokRKvxRCPtuxlSA5jUC8U9Btit3bq8G_K9EihipOzSGnwCVgmq8UHC3Hy/pub?gid=0&single=true&output=csv';
+const PICKS_DB_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS9-umRqGXfrl2flUZQ2pQaGaNT0FB8VsmjbFOs9Yjjh8PH2DaTGyAWEkEvWf5HUjHxgzyq7Z5XrvY2/pub?gid=0&single=true&output=csv';
 
 const NFL_TEAMS = [
   "Arizona Cardinals","Atlanta Falcons","Baltimore Ravens","Buffalo Bills",
@@ -558,6 +679,7 @@ function showPage(page) {
     void p.offsetWidth;
     p.classList.add('fade-in');
     document.getElementById('navMyPicks').classList.add('active');
+    loadMyPicks();
   }
 }
 
@@ -699,6 +821,103 @@ async function showResults() {
     }, 3000);
   }
 }
+
+// ── My Picks Loader ──
+async function loadMyPicks() {
+  const email = document.getElementById('navEmail').textContent.toLowerCase();
+  const loadingEl = document.getElementById('picksLoading');
+  const errorEl   = document.getElementById('picksError');
+  const groupsEl  = document.getElementById('picksGroups');
+
+  loadingEl.style.display = 'block';
+  errorEl.style.display   = 'none';
+  groupsEl.innerHTML      = '';
+
+  try {
+    const res = await fetch(PICKS_DB_URL);
+    if (!res.ok) throw new Error('Could not load picks.');
+    const text = await res.text();
+    const rows = parseCSV(text);
+
+    // Skip header row
+    const dataRows = rows[0][0].toLowerCase().includes('email') ? rows.slice(1) : rows;
+
+    // Filter to current user's rows
+    // Columns: Email(0), Date(1), Time(2), Week(3), Pick1(4), Pick2(5), Pick3(6), Pick4(7), Pick5(8)
+    const myRows = dataRows.filter(r => r[0] && r[0].toLowerCase() === email);
+
+    loadingEl.style.display = 'none';
+
+    if (myRows.length === 0) {
+      groupsEl.innerHTML = '<div class="picks-empty"><div class="icon">📋</div><p>No picks submitted yet.</p></div>';
+      return;
+    }
+
+    // Group by week
+    const grouped = {};
+    myRows.forEach(r => {
+      const week = r[3] || 'Unknown Week';
+      if (!grouped[week]) grouped[week] = [];
+      grouped[week].push(r);
+    });
+
+    // Sort weeks: Week 1, Week 2, ... then anything else
+    const sortedWeeks = Object.keys(grouped).sort((a, b) => {
+      const numA = parseInt(a.replace(/\D/g,'')) || 999;
+      const numB = parseInt(b.replace(/\D/g,'')) || 999;
+      return numA - numB;
+    });
+
+    sortedWeeks.forEach((week, wi) => {
+      const submissions = grouped[week];
+      const group = document.createElement('div');
+      group.className = 'week-group';
+      group.style.animationDelay = (wi * 0.08) + 's';
+
+      const header = document.createElement('div');
+      header.className = 'week-group-header';
+      header.innerHTML = `
+        <span class="week-group-title">${week}</span>
+        <span class="week-group-count">${submissions.length} submission${submissions.length !== 1 ? 's' : ''}</span>
+      `;
+      group.appendChild(header);
+
+      submissions.forEach(row => {
+        const date  = row[1] || '';
+        const time  = row[2] || '';
+        const picks = [row[4], row[5], row[6], row[7], row[8]].filter(p => p && p.trim());
+
+        const sub = document.createElement('div');
+        sub.className = 'picks-submission';
+
+        const meta = document.createElement('div');
+        meta.className = 'submission-meta';
+        meta.textContent = [date, time].filter(Boolean).join(' · ');
+        sub.appendChild(meta);
+
+        const chipsEl = document.createElement('div');
+        chipsEl.className = 'submission-picks';
+        picks.forEach((pick, pi) => {
+          const chip = document.createElement('div');
+          chip.className = 'pick-chip';
+          chip.innerHTML = `<span class="pick-num">${pi + 1}</span>${pick}`;
+          chipsEl.appendChild(chip);
+        });
+        sub.appendChild(chipsEl);
+        group.appendChild(sub);
+      });
+
+      groupsEl.appendChild(group);
+    });
+
+  } catch (err) {
+    loadingEl.style.display = 'none';
+    errorEl.style.display   = 'block';
+    errorEl.textContent     = 'Unable to load picks. Please try again later.';
+    console.error(err);
+  }
+}
+
 </script>
 </body>
 </html>
