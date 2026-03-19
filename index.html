@@ -366,6 +366,7 @@ text-transform: uppercase;
 
 .score-card-body {
 padding: 16px 14px;
+background: var(–surface);
 }
 
 .score-matchup {
@@ -1197,34 +1198,80 @@ async function fetchScores() {
       const awayRecord = away && away.records && away.records[0] ? away.records[0].summary : '';
       const homeRecord = home && home.records && home.records[0] ? home.records[0].summary : '';
 
-      card.innerHTML =
-        '<div class="score-card-header">' +
-          '<span class="game-status ' + (isLive ? 'live' : isFinal ? 'final' : 'scheduled') + '">' +
-            (isLive ? statusStr : isFinal ? 'Final' : 'Scheduled') +
-          '</span>' +
-          '<span class="game-network">' + network + '</span>' +
-        '</div>' +
-        '<div class="score-card-body">' +
-          '<div class="score-matchup">' +
-            '<div class="score-team">' +
-              '<div>' +
-                '<div class="score-team-name ' + (awayWins ? 'winner' : '') + '">' + awayName + '</div>' +
-                '<div class="score-team-record">' + awayRecord + '</div>' +
-              '</div>' +
-              '<div class="score-points ' + (awayWins ? 'winner' : '') + (isPre ? ' tbd' : '') + '">' + (isPre ? '&mdash;' : awayScore) + '</div>' +
-            '</div>' +
-            '<div class="score-divider"></div>' +
-            '<div class="score-team">' +
-              '<div>' +
-                '<div class="score-team-name ' + (homeWins ? 'winner' : '') + '">' + homeName + '</div>' +
-                '<div class="score-team-record">' + homeRecord + '</div>' +
-              '</div>' +
-              '<div class="score-points ' + (homeWins ? 'winner' : '') + (isPre ? ' tbd' : '') + '">' + (isPre ? '&mdash;' : homeScore) + '</div>' +
-            '</div>' +
-          '</div>' +
-          (isPre ? '<div class="game-time-info">' + gameDateStr + ' &bull; ' + gameTimeStr + '</div>' : '') +
-          (isLive ? '<div class="game-time-info">' + statusStr + '</div>' : '') +
-        '</div>';
+      // Build card safely using DOM methods
+      const cardHeader = document.createElement('div');
+      cardHeader.className = 'score-card-header';
+
+      const statusEl = document.createElement('span');
+      statusEl.className = 'game-status ' + (isLive ? 'live' : isFinal ? 'final' : 'scheduled');
+      statusEl.textContent = isLive ? statusStr : isFinal ? 'Final' : 'Scheduled';
+
+      const networkEl = document.createElement('span');
+      networkEl.className = 'game-network';
+      networkEl.textContent = network;
+
+      cardHeader.appendChild(statusEl);
+      cardHeader.appendChild(networkEl);
+
+      const cardBody = document.createElement('div');
+      cardBody.className = 'score-card-body';
+
+      const matchup = document.createElement('div');
+      matchup.className = 'score-matchup';
+
+      // Away team row
+      const awayRow = document.createElement('div');
+      awayRow.className = 'score-team';
+      const awayInfo = document.createElement('div');
+      const awayNameEl = document.createElement('div');
+      awayNameEl.className = 'score-team-name' + (awayWins ? ' winner' : '');
+      awayNameEl.textContent = awayName;
+      const awayRecordEl = document.createElement('div');
+      awayRecordEl.className = 'score-team-record';
+      awayRecordEl.textContent = awayRecord;
+      awayInfo.appendChild(awayNameEl);
+      awayInfo.appendChild(awayRecordEl);
+      const awayPts = document.createElement('div');
+      awayPts.className = 'score-points' + (awayWins ? ' winner' : '') + (isPre ? ' tbd' : '');
+      awayPts.textContent = isPre ? '—' : awayScore;
+      awayRow.appendChild(awayInfo);
+      awayRow.appendChild(awayPts);
+
+      const dividerEl = document.createElement('div');
+      dividerEl.className = 'score-divider';
+
+      // Home team row
+      const homeRow = document.createElement('div');
+      homeRow.className = 'score-team';
+      const homeInfo = document.createElement('div');
+      const homeNameEl = document.createElement('div');
+      homeNameEl.className = 'score-team-name' + (homeWins ? ' winner' : '');
+      homeNameEl.textContent = homeName;
+      const homeRecordEl = document.createElement('div');
+      homeRecordEl.className = 'score-team-record';
+      homeRecordEl.textContent = homeRecord;
+      homeInfo.appendChild(homeNameEl);
+      homeInfo.appendChild(homeRecordEl);
+      const homePts = document.createElement('div');
+      homePts.className = 'score-points' + (homeWins ? ' winner' : '') + (isPre ? ' tbd' : '');
+      homePts.textContent = isPre ? '—' : homeScore;
+      homeRow.appendChild(homeInfo);
+      homeRow.appendChild(homePts);
+
+      matchup.appendChild(awayRow);
+      matchup.appendChild(dividerEl);
+      matchup.appendChild(homeRow);
+      cardBody.appendChild(matchup);
+
+      if (isPre || isLive) {
+        const timeInfo = document.createElement('div');
+        timeInfo.className = 'game-time-info';
+        timeInfo.textContent = isPre ? (gameDateStr + ' · ' + gameTimeStr) : statusStr;
+        cardBody.appendChild(timeInfo);
+      }
+
+      card.appendChild(cardHeader);
+      card.appendChild(cardBody);
 
       grid.appendChild(card);
     });
