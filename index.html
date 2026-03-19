@@ -558,15 +558,22 @@ function clearAll() {
   document.getElementById('resultBanner').classList.remove('show');
 }
 
-function showResults() {
+const PICKS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwSRseA76KhYoGki33yQ7O5MEGVOBdKYzYTAYSef88VBgoi2ymcWRvz3sZg5sqeIw/exec';
+
+async function showResults() {
   const picks = [];
   for (let i = 0; i < 5; i++) {
     const val = document.getElementById(`team-${i}`).value;
     if (val) picks.push(val);
   }
-  const banner = document.getElementById('resultBanner');
+
+  const banner   = document.getElementById('resultBanner');
   const teamsDiv = document.getElementById('resultTeams');
+  const submitBtn = document.querySelector('.btn-submit');
+
   if (!picks.length) { banner.classList.remove('show'); return; }
+
+  // Build result chips immediately
   teamsDiv.innerHTML = '';
   picks.forEach(team => {
     const chip = document.createElement('div');
@@ -575,6 +582,50 @@ function showResults() {
     teamsDiv.appendChild(chip);
   });
   banner.classList.add('show');
+
+  // Save to Google Sheet
+  const now   = new Date();
+  const date  = now.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  const time  = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  const payload = {
+    email: document.getElementById('navEmail').textContent,
+    date,
+    time,
+    pick1: picks[0] || '',
+    pick2: picks[1] || '',
+    pick3: picks[2] || '',
+    pick4: picks[3] || '',
+    pick5: picks[4] || ''
+  };
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Saving…';
+
+  try {
+    await fetch(PICKS_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    submitBtn.textContent = 'Picks Saved ✓';
+    submitBtn.style.background = 'linear-gradient(135deg, #4caf7d 0%, #2e7d52 100%)';
+    setTimeout(() => {
+      submitBtn.textContent = 'Lock In Picks';
+      submitBtn.style.background = '';
+      submitBtn.disabled = false;
+    }, 3000);
+  } catch (err) {
+    console.error('Save failed:', err);
+    submitBtn.textContent = 'Save Failed — Retry';
+    submitBtn.style.background = 'linear-gradient(135deg, #e05555 0%, #a03030 100%)';
+    submitBtn.disabled = false;
+    setTimeout(() => {
+      submitBtn.textContent = 'Lock In Picks';
+      submitBtn.style.background = '';
+    }, 3000);
+  }
 }
 </script>
 </body>
