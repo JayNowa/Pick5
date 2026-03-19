@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NFL Team Selector</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #13171f;
+    --border: #2a3040;
+    --accent: #c8a94a;
+    --accent2: #e8c96a;
+    --text: #f0f2f5;
+    --muted: #6b7588;
+    --dropdown-bg: #1a1f2b;
+    --hover: #222840;
+    --error: #e05555;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow Condensed', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      repeating-linear-gradient(0deg,transparent,transparent 58px,rgba(255,255,255,0.015) 58px,rgba(255,255,255,0.015) 60px),
+      radial-gradient(ellipse at 50% 0%, #1a2a1a 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .page {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .container { width: 100%; max-width: 680px; }
+  header { text-align: center; margin-bottom: 48px; }
+  .shield {
+    display: inline-block;
+    font-size: 48px;
+    margin-bottom: 12px;
+    filter: drop-shadow(0 0 20px rgba(200,169,74,0.4));
+  }
+  h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(52px, 10vw, 88px);
+    letter-spacing: 0.06em;
+    line-height: 0.9;
+    background: linear-gradient(160deg, var(--accent2) 0%, var(--accent) 50%, #a07830 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-transform: uppercase;
+  }
+  .subtitle { font-size: 15px; letter-spacing: 0.25em; color: var(--muted); text-transform: uppercase; margin-top: 10px; }
+  .divider { width: 80px; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), transparent); margin: 18px auto 0; }
+
+  /* LOGIN */
+  #loginPage  { display: flex; flex-direction: column; align-items: center; }
+  #selectorPage { display: none; flex-direction: column; align-items: center; }
+
+  .login-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 36px 40px;
+    width: 100%;
+    max-width: 420px;
+  }
+  .login-card h2 { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 0.12em; color: var(--accent); margin-bottom: 6px; }
+  .login-card p  { font-size: 14px; color: var(--muted); letter-spacing: 0.05em; margin-bottom: 28px; }
+  .field { margin-bottom: 18px; }
+  .field label { display: block; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .field input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 14px 16px;
+    color: var(--text);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 17px;
+    letter-spacing: 0.05em;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(200,169,74,0.2); }
+  .pin-hint { font-size: 12px; color: var(--muted); margin-top: 6px; letter-spacing: 0.05em; }
+  .error-msg {
+    background: rgba(224,85,85,0.1);
+    border: 1px solid rgba(224,85,85,0.3);
+    border-radius: 4px;
+    padding: 10px 14px;
+    font-size: 14px;
+    color: var(--error);
+    letter-spacing: 0.04em;
+    margin-bottom: 18px;
+    display: none;
+  }
+  .error-msg.show { display: block; }
+  .status-msg { font-size: 13px; color: var(--muted); letter-spacing: 0.06em; text-align: center; margin-bottom: 14px; min-height: 18px; }
+
+  button {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: 0.12em;
+    padding: 14px 36px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: none;
+    transition: all 0.18s;
+  }
+  .btn-login { width: 100%; background: linear-gradient(135deg, var(--accent) 0%, #a07830 100%); color: #0a0c10; box-shadow: 0 4px 20px rgba(200,169,74,0.25); margin-top: 6px; }
+  .btn-login:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(200,169,74,0.4); }
+  .btn-login:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* SELECTOR */
+  .welcome-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .welcome-bar span { font-size: 14px; color: var(--muted); letter-spacing: 0.08em; }
+  .welcome-bar strong { color: var(--accent); }
+  .btn-logout { background: transparent; color: var(--muted); border: 1px solid var(--border); font-size: 13px; padding: 8px 18px; letter-spacing: 0.1em; }
+  .btn-logout:hover { border-color: var(--muted); color: var(--text); }
+  .selectors { display: flex; flex-direction: column; gap: 16px; }
+  .selector-row {
+    display: flex; align-items: center; gap: 16px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 0 20px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    position: relative; overflow: hidden;
+    opacity: 0; transform: translateX(-24px);
+    animation: slideIn 0.5s forwards;
+  }
+  .selector-row::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); opacity: 0; transition: opacity 0.2s; }
+  .selector-row:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(200,169,74,0.2), 0 4px 20px rgba(0,0,0,0.4); }
+  .selector-row:focus-within::before { opacity: 1; }
+  .selector-row:hover { border-color: #3a4555; }
+  .selector-row:nth-child(1) { animation-delay: 0.05s; }
+  .selector-row:nth-child(2) { animation-delay: 0.15s; }
+  .selector-row:nth-child(3) { animation-delay: 0.25s; }
+  .selector-row:nth-child(4) { animation-delay: 0.35s; }
+  .selector-row:nth-child(5) { animation-delay: 0.45s; }
+  @keyframes slideIn { to { opacity: 1; transform: translateX(0); } }
+  @keyframes fadeUp  { to { opacity: 1; } }
+  .slot-label { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 0.08em; color: var(--accent); white-space: nowrap; min-width: 72px; user-select: none; }
+  .sep { width: 1px; height: 32px; background: var(--border); flex-shrink: 0; }
+  select { flex: 1; background: transparent; border: none; outline: none; color: var(--text); font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 600; letter-spacing: 0.04em; padding: 20px 10px; cursor: pointer; appearance: none; -webkit-appearance: none; }
+  select option { background: var(--dropdown-bg); color: var(--text); font-size: 15px; }
+  select option:disabled { color: var(--muted); }
+  .arrow { color: var(--muted); pointer-events: none; font-size: 12px; transition: color 0.2s; }
+  .selector-row:focus-within .arrow { color: var(--accent); }
+  .action-row { margin-top: 28px; display: flex; gap: 12px; justify-content: flex-end; opacity: 0; animation: fadeUp 0.5s 0.6s forwards; }
+  .btn-clear { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .btn-clear:hover { border-color: var(--muted); color: var(--text); }
+  .btn-submit { background: linear-gradient(135deg, var(--accent) 0%, #a07830 100%); color: #0a0c10; box-shadow: 0 4px 20px rgba(200,169,74,0.25); }
+  .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(200,169,74,0.4); }
+  .result-banner { margin-top: 24px; background: var(--surface); border: 1px solid var(--accent); border-radius: 6px; padding: 18px 24px; display: none; }
+  .result-banner.show { display: block; }
+  .result-banner h3 { font-family: 'Bebas Neue', sans-serif; font-size: 14px; letter-spacing: 0.2em; color: var(--accent); margin-bottom: 10px; }
+  .result-teams { display: flex; flex-wrap: wrap; gap: 8px; }
+  .team-chip { background: var(--hover); border: 1px solid var(--border); border-radius: 4px; padding: 6px 14px; font-size: 15px; font-weight: 600; color: var(--text); letter-spacing: 0.04em; }
+  footer { margin-top: 40px; text-align: center; color: var(--muted); font-size: 13px; letter-spacing: 0.1em; opacity: 0; animation: fadeUp 0.5s 0.8s forwards; }
+  .fade-in { animation: pageFade 0.4s ease forwards; }
+  @keyframes pageFade { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+
+<!-- LOGIN PAGE -->
+<div class="page" id="loginPage">
+  <div class="container">
+    <header>
+      <div class="shield">🏈</div>
+      <h1>NFL Team<br>Selector</h1>
+      <p class="subtitle">Authorized Access Only</p>
+      <div class="divider"></div>
+    </header>
+    <div style="display:flex;justify-content:center;">
+      <div class="login-card">
+        <h2>Sign In</h2>
+        <p>Enter your approved email &amp; PIN to continue</p>
+        <div class="error-msg" id="errorMsg"></div>
+        <div class="status-msg" id="statusMsg"></div>
+        <div class="field">
+          <label>Email Address</label>
+          <input type="email" id="emailInput" placeholder="you@example.com" autocomplete="email" />
+        </div>
+        <div class="field">
+          <label>PIN</label>
+          <input type="password" id="pinInput" placeholder="••••" maxlength="10" />
+          <div class="pin-hint">Enter the PIN assigned to your email</div>
+        </div>
+        <button class="btn-login" id="loginBtn" onclick="handleLogin()">Enter</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SELECTOR PAGE -->
+<div class="page" id="selectorPage">
+  <div class="container">
+    <header>
+      <div class="shield">🏈</div>
+      <h1>NFL Team<br>Selector</h1>
+      <p class="subtitle">Pick your five favorites</p>
+      <div class="divider"></div>
+    </header>
+    <div class="welcome-bar">
+      <span>Welcome, <strong id="welcomeEmail"></strong></span>
+      <button class="btn-logout" onclick="logout()">Log Out</button>
+    </div>
+    <div class="selectors" id="selectors"></div>
+    <div class="action-row">
+      <button class="btn-clear" onclick="clearAll()">Clear All</button>
+      <button class="btn-submit" onclick="showResults()">Lock In Picks</button>
+    </div>
+    <div class="result-banner" id="resultBanner">
+      <h3>Your Selections</h3>
+      <div class="result-teams" id="resultTeams"></div>
+    </div>
+    <footer>32 NFL Teams &bull; 5 Slots &bull; Endless Debates</footer>
+  </div>
+</div>
+
+<script>
+const SHEET_CSV_URL = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://docs.google.com/spreadsheets/d/e/2PACX-1vRqX7XR41_5tR9RKRaMW7jokRKvxRCPtuxlSA5jUC8U9Btit3bq8G_K9EihipOzSGnwCVgmq8UHC3Hy/pub?gid=0&single=true&output=csv');
+
+const NFL_TEAMS = [
+  "Arizona Cardinals","Atlanta Falcons","Baltimore Ravens","Buffalo Bills",
+  "Carolina Panthers","Chicago Bears","Cincinnati Bengals","Cleveland Browns",
+  "Dallas Cowboys","Denver Broncos","Detroit Lions","Green Bay Packers",
+  "Houston Texans","Indianapolis Colts","Jacksonville Jaguars","Kansas City Chiefs",
+  "Las Vegas Raiders","Los Angeles Chargers","Los Angeles Rams","Miami Dolphins",
+  "Minnesota Vikings","New England Patriots","New Orleans Saints","New York Giants",
+  "New York Jets","Philadelphia Eagles","Pittsburgh Steelers","San Francisco 49ers",
+  "Seattle Seahawks","Tampa Bay Buccaneers","Tennessee Titans","Washington Commanders"
+];
+const LABELS = ["Slot 01","Slot 02","Slot 03","Slot 04","Slot 05"];
+
+function parseCSV(text) {
+  return text.trim().split('\n').map(line =>
+    line.split(',').map(cell => cell.trim().replace(/^"|"$/g, ''))
+  );
+}
+
+async function handleLogin() {
+  const email = document.getElementById('emailInput').value.trim().toLowerCase();
+  const pin   = document.getElementById('pinInput').value.trim();
+  const btn   = document.getElementById('loginBtn');
+  const errEl = document.getElementById('errorMsg');
+  const staEl = document.getElementById('statusMsg');
+
+  errEl.classList.remove('show');
+  if (!email || !pin) { showError('Please enter both your email and PIN.'); return; }
+
+  btn.disabled = true;
+  staEl.textContent = 'Checking credentials…';
+
+  try {
+    const res = await fetch(SHEET_CSV_URL);
+    if (!res.ok) throw new Error('Sheet unreachable');
+    const text = await res.text();
+    const rows = parseCSV(text);
+    const dataRows = rows[0][0].toLowerCase().includes('email') ? rows.slice(1) : rows;
+
+    const match = dataRows.find(r =>
+      r[0] && r[0].toLowerCase() === email &&
+      r[1] && r[1] === pin
+    );
+
+    if (match) {
+      staEl.textContent = '';
+      showSelectorPage(email);
+    } else {
+      const emailExists = dataRows.some(r => r[0] && r[0].toLowerCase() === email);
+      showError(emailExists ? 'Incorrect PIN. Please try again.' : 'This email is not on the approved list.');
+    }
+  } catch (err) {
+    showError('Unable to verify credentials. Please try again.');
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+    staEl.textContent = '';
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  ['emailInput','pinInput'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', e => {
+      if (e.key === 'Enter') handleLogin();
+    });
+  });
+});
+
+function showSelectorPage(email) {
+  document.getElementById('loginPage').style.display = 'none';
+  const sp = document.getElementById('selectorPage');
+  sp.style.display = 'flex';
+  sp.classList.add('fade-in');
+  document.getElementById('welcomeEmail').textContent = email;
+  buildSelectors();
+}
+
+function logout() {
+  document.getElementById('selectorPage').style.display = 'none';
+  document.getElementById('loginPage').style.display = 'flex';
+  document.getElementById('emailInput').value = '';
+  document.getElementById('pinInput').value = '';
+  document.getElementById('errorMsg').classList.remove('show');
+  document.getElementById('selectors').innerHTML = '';
+  document.getElementById('resultBanner').classList.remove('show');
+}
+
+function buildSelectors() {
+  const container = document.getElementById('selectors');
+  container.innerHTML = '';
+  LABELS.forEach((label, i) => {
+    const row = document.createElement('div');
+    row.className = 'selector-row';
+    const lbl = document.createElement('span');
+    lbl.className = 'slot-label';
+    lbl.textContent = label;
+    const sep = document.createElement('div');
+    sep.className = 'sep';
+    const sel = document.createElement('select');
+    sel.id = `team-${i}`;
+    const ph = document.createElement('option');
+    ph.value = ''; ph.textContent = 'Choose a team...';
+    ph.disabled = true; ph.selected = true;
+    sel.appendChild(ph);
+    NFL_TEAMS.forEach(team => {
+      const opt = document.createElement('option');
+      opt.value = team; opt.textContent = team;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener('change', syncDropdowns);
+    const arrow = document.createElement('span');
+    arrow.className = 'arrow';
+    arrow.innerHTML = '&#9660;';
+    row.appendChild(lbl); row.appendChild(sep); row.appendChild(sel); row.appendChild(arrow);
+    container.appendChild(row);
+  });
+}
+
+function syncDropdowns() {
+  const selected = [];
+  for (let i = 0; i < 5; i++) {
+    const val = document.getElementById(`team-${i}`).value;
+    if (val) selected.push({ val, slot: i });
+  }
+  for (let i = 0; i < 5; i++) {
+    const sel = document.getElementById(`team-${i}`);
+    Array.from(sel.options).forEach(opt => {
+      if (!opt.value) return;
+      opt.disabled = selected.some(s => s.val === opt.value && s.slot !== i);
+    });
+  }
+}
+
+function clearAll() {
+  for (let i = 0; i < 5; i++) document.getElementById(`team-${i}`).selectedIndex = 0;
+  syncDropdowns();
+  document.getElementById('resultBanner').classList.remove('show');
+}
+
+function showResults() {
+  const picks = [];
+  for (let i = 0; i < 5; i++) {
+    const val = document.getElementById(`team-${i}`).value;
+    if (val) picks.push(val);
+  }
+  const banner = document.getElementById('resultBanner');
+  const teamsDiv = document.getElementById('resultTeams');
+  if (!picks.length) { banner.classList.remove('show'); return; }
+  teamsDiv.innerHTML = '';
+  picks.forEach(team => {
+    const chip = document.createElement('div');
+    chip.className = 'team-chip';
+    chip.textContent = team;
+    teamsDiv.appendChild(chip);
+  });
+  banner.classList.add('show');
+}
+</script>
+</body>
+</html>
