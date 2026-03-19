@@ -676,6 +676,10 @@
 </div>
 
 <script>
+// ── Scores state (declared early to avoid reference errors) ──
+let scoresWeek = null;
+let scoresRefreshTimer = null;
+
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRqX7XR41_5tR9RKRaMW7jokRKvxRCPtuxlSA5jUC8U9Btit3bq8G_K9EihipOzSGnwCVgmq8UHC3Hy/pub?gid=0&single=true&output=csv';
 const PICKS_DB_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS9-umRqGXfrl2flUZQ2pQaGaNT0FB8VsmjbFOs9Yjjh8PH2DaTGyAWEkEvWf5HUjHxgzyq7Z5XrvY2/pub?gid=0&single=true&output=csv';
 
@@ -1079,6 +1083,133 @@ async function loadMyPicks() {
     console.error(err);
   }
 }
+
+// ── Scores ──
+function initScores() {
+  const cur = getCurrentNFLWeek();
+  scoresWeek = cur || 1;
+  updateScoresWeekLabel();
+  fetchScores();
+  clearInterval(scoresRefreshTimer);
+  scoresRefreshTimer = setInterval(fetchScores, 15 * 60 * 1000);
+}
+
+function updateScoresWeekLabel() {
+  document.getElementById('scoresWeekLabel').textContent = 'Week ' + scoresWeek;
+  document.getElementById('weekPrev').disabled = scoresWeek <= 1;
+  document.getElementById('weekNext').disabled = scoresWeek >= 18;
+}
+
+function changeScoresWeek(dir) {
+  scoresWeek = Math.min(18, Math.max(1, scoresWeek + dir));
+  updateScoresWeekLabel();
+  fetchScores();
+}
+
+async function fetchScores() {
+  const loadingEl = document.getElementById('scoresLoading');
+  const errorEl   = document.getElementById('scoresError');
+  const gridEl    = document.getElementById('scoresGrid');
+
+  loadingEl.style.display = 'block';
+  errorEl.style.display   = 'none';
+  gridEl.innerHTML        = '';
+
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  document.getElementById('scoresRefreshInfo').textContent = 'Last updated ' + timeStr + ' · Auto-refreshes every 15 min';
+
+  try {
+    const url = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=' + scoresWeek + '&seasontype=2';
+    const res  = await fetch(url);
+    if (!res.ok) throw new Error('ESPN API error');
+    const data = await res.json();
+    const events = data.events || [];
+
+    loadingEl.style.display = 'none';
+
+    if (events.length === 0) {
+      gridEl.innerHTML = '<div class="scores-empty"><div class="icon">🏈</div><p>No games found for this week.</p></div>';
+      return;
+    }
+
+    const grid = document.createElement('div');
+    grid.className = 'scores-grid';
+
+    events.forEach(function(event, ei) {
+      const comp      = event.competitions[0];
+      const status    = event.status;
+      const stateType = status.type.state;
+      const statusStr = status.type.shortDetail || '';
+      const broadcasts = comp.broadcasts || [];
+      const network   = broadcasts.length > 0 && broadcasts[0].names ? broadcasts[0].names[0] : '';
+
+      const home = comp.competitors.find(function(c) { return c.homeAway === 'home'; });
+      const away = comp.competitors.find(function(c) { return c.homeAway === 'away'; });
+
+      const homeScore = parseInt(home && home.score) || 0;
+      const awayScore = parseInt(away && away.score) || 0;
+      const isFinal   = stateType === 'post';
+      const isLive    = stateType === 'in';
+      const isPre     = stateType === 'pre';
+      const homeWins  = isFinal && homeScore > awayScore;
+      const awayWins  = isFinal && awayScore > homeScore;
+
+      const card = document.createElement('div');
+      card.className = 'score-card' + (isLive ? ' live' : '');
+      card.style.animationDelay = (ei * 0.04) + 's';
+
+      const gameDate    = new Date(event.date);
+      const gameDateStr = gameDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const gameTimeStr = gameDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+      const awayName   = away && away.team ? away.team.shortDisplayName : 'Away';
+      const homeName   = home && home.team ? home.team.shortDisplayName : 'Home';
+      const awayRecord = away && away.records && away.records[0] ? away.records[0].summary : '';
+      const homeRecord = home && home.records && home.records[0] ? home.records[0].summary : '';
+
+      card.innerHTML =
+        '<div class="score-card-header">' +
+          '<span class="game-status ' + (isLive ? 'live' : isFinal ? 'final' : 'scheduled') + '">' +
+            (isLive ? statusStr : isFinal ? 'Final' : 'Scheduled') +
+          '</span>' +
+          '<span class="game-network">' + network + '</span>' +
+        '</div>' +
+        '<div class="score-card-body">' +
+          '<div class="score-matchup">' +
+            '<div class="score-team">' +
+              '<div>' +
+                '<div class="score-team-name ' + (awayWins ? 'winner' : '') + '">' + awayName + '</div>' +
+                '<div class="score-team-record">' + awayRecord + '</div>' +
+              '</div>' +
+              '<div class="score-points ' + (awayWins ? 'winner' : '') + (isPre ? ' tbd' : '') + '">' + (isPre ? '&mdash;' : awayScore) + '</div>' +
+            '</div>' +
+            '<div class="score-divider"></div>' +
+            '<div class="score-team">' +
+              '<div>' +
+                '<div class="score-team-name ' + (homeWins ? 'winner' : '') + '">' + homeName + '</div>' +
+                '<div class="score-team-record">' + homeRecord + '</div>' +
+              '</div>' +
+              '<div class="score-points ' + (homeWins ? 'winner' : '') + (isPre ? ' tbd' : '') + '">' + (isPre ? '&mdash;' : homeScore) + '</div>' +
+            '</div>' +
+          '</div>' +
+          (isPre ? '<div class="game-time-info">' + gameDateStr + ' &bull; ' + gameTimeStr + '</div>' : '') +
+          (isLive ? '<div class="game-time-info">' + statusStr + '</div>' : '') +
+        '</div>';
+
+      grid.appendChild(card);
+    });
+
+    gridEl.appendChild(grid);
+
+  } catch(err) {
+    loadingEl.style.display = 'none';
+    errorEl.style.display   = 'block';
+    errorEl.textContent     = 'Unable to load scores. Please try again later.';
+    console.error(err);
+  }
+}
+
 
 </script>
 
