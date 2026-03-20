@@ -1018,20 +1018,20 @@
   const app = initializeApp(firebaseConfig);
   const db  = getFirestore(app);
 
-  // Expose to global scope so non-module scripts can call them
   window.fbSavePick = async function(payload) {
     await addDoc(collection(db, "picks"), {
-      email:  payload.email,
-      date:   payload.date,
-      time:   payload.time,
-      week:   payload.week,
-      pick1:  payload.pick1 || '',
-      pick2:  payload.pick2 || '',
-      pick3:  payload.pick3 || '',
-      pick4:  payload.pick4 || '',
-      pick5:  payload.pick5 || '',
-      timestamp: Date.now()
+      email: payload.email, date: payload.date, time: payload.time, week: payload.week,
+      pick1: payload.pick1 || '', pick2: payload.pick2 || '', pick3: payload.pick3 || '',
+      pick4: payload.pick4 || '', pick5: payload.pick5 || '', timestamp: Date.now()
     });
+  };
+
+  window.fbGetMyPicks = async function(email) {
+    const q = query(collection(db, "picks"), where("email", "==", email.toLowerCase()));
+    const snapshot = await getDocs(q);
+    const docs = snapshot.docs.map(d => d.data());
+    docs.sort(function(a, b) { return (b.timestamp || 0) - (a.timestamp || 0); });
+    return docs;
   };
 
   window.fbSaveSpreadsWeek = async function(value) {
@@ -1042,50 +1042,6 @@
     const snap = await getDoc(doc(db, "settings", "spreadsWeek"));
     return snap.exists() ? snap.data().value : null;
   };
-
-  window.fbSaveSpreadsWeek(val);
-    document.getElementById('adminCurrentSpreadsWeek').textContent = 'Week ' + val;
-    setSpreadsStatus('Now showing Week ' + val + ' spreads on home page!', 'success');
-  } catch(e) {
-    setSpreadsStatus('Failed to save. Please try again.', 'error');
-    console.error(e);
-  }
-}
-
-async function adminHideSpreads() {
-  try {
-    await window.fbSaveSpreadsWeek(null);
-    document.getElementById('adminCurrentSpreadsWeek').textContent = 'None (hidden)';
-    document.getElementById('adminSpreadsWeekSelect').value = '';
-    setSpreadsStatus('Spreads graphic hidden from home page.', 'success');
-    await updateWeekBadge();
-    document.getElementById('spreadsSection').style.display = 'none';
-    document.getElementById('spreadsGrid').innerHTML = '';
-    selectedPicks = [];
-    updatePicksCounter();
-  } catch(e) {
-    setSpreadsStatus('Failed to update. Please try again.', 'error');
-  }
-}
-
-function setSpreadsStatus(msg, type) {
-  const el = document.getElementById('adminSpreadsStatus');
-  el.textContent = msg;
-  el.className = 'admin-status ' + type;
-  setTimeout(() => { el.textContent = ''; el.className = 'admin-status'; }, 4000);
-}
-
-async function loadAdminSpreadsWeek() {
-  const el = document.getElementById('adminCurrentSpreadsWeek');
-  try {
-    const val = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
-    el.textContent = val ? 'Week ' + val : 'None (hidden)';
-    if (val) document.getElementById('adminSpreadsWeekSelect').value = val;
-  } catch(e) {
-    el.textContent = 'Unable to load';
-  }
-}
-
 </script>
 
 <script>
@@ -1764,15 +1720,15 @@ async function adminSetSpreadsWeek() {
   const val = sel.value;
   if (!val) { setSpreadsStatus('Please select a week first.', 'error'); return; }
   try {
+    if (!window.fbSaveSpreadsWeek) throw new Error('Firebase not ready');
     await window.fbSaveSpreadsWeek(val);
     document.getElementById('adminCurrentSpreadsWeek').textContent = 'Week ' + val;
     setSpreadsStatus('Week ' + val + ' saved! Updating home page…', 'success');
-    // Update badge and reload spread cards immediately
     await updateWeekBadge();
     await fetchAndRenderSpreads(val);
   } catch(e) {
-    setSpreadsStatus('Failed to save. Please try again.', 'error');
-    console.error(e);
+    setSpreadsStatus('Failed to save: ' + e.message, 'error');
+    console.error('adminSetSpreadsWeek error:', e);
   }
 }
 
