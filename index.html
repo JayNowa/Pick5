@@ -1206,13 +1206,13 @@ function afterLogin(email) {
   document.getElementById('navEmail').textContent = email;
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('topNav').classList.add('visible');
-  // Show admin button if admin
   if (email && ADMIN_EMAILS && ADMIN_EMAILS.includes(email.toLowerCase())) {
     document.getElementById('adminCorner').style.display = 'block';
   }
   buildSelectors();
   updateWeekBadge();
-  showPage('selector');
+  // Small delay to ensure Firebase module is fully initialized before loading spreads
+  setTimeout(() => showPage('selector'), 300);
 }
 
 // ── Page switching ──
@@ -1618,12 +1618,10 @@ function renderPickSelections() {
   const maxReached = selectedPicks.length >= 5;
 
   document.querySelectorAll('.spread-card').forEach(card => {
-    const gameIdx  = card.dataset.game;
     const awayAbbr = card.dataset.away;
     const homeAbbr = card.dataset.home;
     const gameHasPick = selectedPicks.includes(awayAbbr) || selectedPicks.includes(homeAbbr);
 
-    // Grey out entire card if 5 picked and this game has no pick
     card.classList.toggle('card-locked', maxReached && !gameHasPick);
 
     card.querySelectorAll('.team-pick-btn').forEach(btn => {
@@ -1632,15 +1630,20 @@ function renderPickSelections() {
       const otherAbbr = abbr === awayAbbr ? homeAbbr : awayAbbr;
       const otherSelected = selectedPicks.includes(otherAbbr);
 
-      // Reset all classes first
-      btn.classList.remove('selected', 'dimmed');
+      // Fully wipe the attribute and re-set to avoid any CSS sticking
+      btn.removeAttribute('data-state');
+      btn.classList.remove('selected');
+      btn.classList.remove('dimmed');
 
       if (isSelected) {
+        btn.setAttribute('data-state', 'selected');
         btn.classList.add('selected');
       } else if (otherSelected) {
+        btn.setAttribute('data-state', 'dimmed');
         btn.classList.add('dimmed');
+      } else {
+        btn.setAttribute('data-state', 'idle');
       }
-      // If max reached and this game has no pick, pointer-events handled by card-locked
     });
   });
 }
@@ -2232,6 +2235,6 @@ async function loadAdminSpreadsWeek() {
   </div>
 </div>
 
-<div class="version-badge">v0.5.5</div>
+<div class="version-badge">v0.5.6</div>
 </body>
 </html>
