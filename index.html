@@ -900,8 +900,108 @@
     text-align: center;
     line-height: 1.3;
   }
-
 </style>
+</head>
+<body>
+
+<!-- ═══ TOP NAV ═══ -->
+<nav id="topNav">
+  <div class="nav-logo">🏈 NFL Selector</div>
+  <div class="nav-links">
+    <button class="nav-link active" id="navSelector" onclick="showPage('selector')">Team Selector</button>
+    <button class="nav-link" id="navMyPicks" onclick="showPage('myPicks')">My Picks</button>
+    <button class="nav-link" id="navScores" onclick="showPage('scores')">Scores</button>
+  </div>
+  <div class="nav-right">
+    <span class="nav-user">Signed in as <strong id="navEmail"></strong></span>
+    <button class="btn-logout" onclick="logout()">Log Out</button>
+  </div>
+</nav>
+<div id="adminCorner" style="display:none;position:fixed;bottom:12px;left:16px;z-index:999;">
+  <button class="admin-corner-btn" onclick="showPage('admin')">⚙ Admin</button>
+</div>
+
+<!-- ═══ LOGIN PAGE ═══ -->
+<div class="page" id="loginPage">
+  <div class="container">
+    <header>
+      <div class="shield">🏈</div>
+      <h1>NFL Team<br>Selector</h1>
+      <p class="subtitle">Authorized Access Only</p>
+      <div class="divider"></div>
+    </header>
+    <div class="login-card">
+      <h2>Sign In</h2>
+      <p>Enter your approved email &amp; PIN to continue</p>
+      <div class="error-msg" id="errorMsg"></div>
+      <div class="status-msg" id="statusMsg"></div>
+      <div class="field">
+        <label>Email Address</label>
+        <input type="email" id="emailInput" placeholder="you@example.com" autocomplete="email" />
+      </div>
+      <div class="field">
+        <label>PIN</label>
+        <input type="password" id="pinInput" placeholder="••••" maxlength="10" />
+        <div class="pin-hint">Enter the PIN assigned to your email</div>
+      </div>
+      <button class="btn-login" id="loginBtn" onclick="handleLogin()">Enter</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TEAM SELECTOR PAGE ═══ -->
+<div class="page with-nav" id="selectorPage">
+  <div class="container">
+    <div class="page-header">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <div>
+          <div class="page-title">Team Selector</div>
+          <div class="page-subtitle">Pick your five favorites</div>
+          <div class="page-divider"></div>
+        </div>
+        <div class="week-badge" id="weekBadge">Week —</div>
+      </div>
+    </div>
+
+    <!-- Spreads Picks -->
+    <div id="spreadsSection" style="display:none;margin-bottom:32px;">
+      <div class="spreads-header">
+        <div>
+          <span class="spreads-title" id="spreadsTitle">Week — Matchups &amp; Spreads</span>
+          <div class="spreads-subtitle">Pick up to 5 teams against the spread · Lines subject to change</div>
+        </div>
+        <div class="picks-counter" id="picksCounter">0 / 5 picked</div>
+      </div>
+      <div id="spreadsGrid" class="spreads-grid"></div>
+      <div class="spreads-action-row">
+        <button class="btn-clear" onclick="clearSpreadsPicks()">Clear</button>
+        <button class="btn-submit" id="spreadsSubmitBtn" onclick="submitSpreadsPicks()" disabled>Lock In Picks</button>
+      </div>
+      <div class="spreads-save-status" id="spreadsSaveStatus"></div>
+    </div>
+
+    <footer style="opacity:0;animation:fadeUp 0.5s 0.6s forwards;">Pick 5 teams against the spread each week</footer>
+  </div>
+</div>
+
+<!-- ═══ MY PICKS PAGE ═══ -->
+<div class="page with-nav" id="myPicksPage">
+  <div class="container">
+    <div class="page-header">
+      <div class="page-title">My Picks</div>
+      <div class="page-subtitle">Your submissions by week</div>
+      <div class="page-divider"></div>
+    </div>
+    <div id="myPicksContent">
+      <div class="picks-loading" id="picksLoading">
+        <div class="loading-spinner"></div>
+        <p>Loading your picks…</p>
+      </div>
+      <div id="picksError" class="picks-error" style="display:none;"></div>
+      <div id="picksGroups"></div>
+    </div>
+  </div>
+</div>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, collection, addDoc, query, where, getDocs, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
