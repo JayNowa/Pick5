@@ -677,6 +677,90 @@
   .admin-status.success { color: #4caf7d; }
   .admin-status.error   { color: var(--error); }
 
+
+  /* ── SPREADS GRAPHIC ── */
+  .spreads-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .spreads-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+  }
+  .spreads-subtitle {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .spreads-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 10px;
+  }
+  .spread-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    opacity: 0;
+    animation: pageFade 0.4s ease forwards;
+  }
+  .spread-matchup {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .spread-team {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    gap: 2px;
+  }
+  .spread-team-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    letter-spacing: 0.08em;
+    color: var(--text);
+  }
+  .spread-team-line {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+    min-height: 18px;
+  }
+  .spread-at {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 14px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    flex-shrink: 0;
+  }
+  .spread-meta {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    text-transform: uppercase;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+  }
+  .spread-meta span { display: flex; align-items: center; gap: 4px; }
+
 </style>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -708,6 +792,15 @@
       pick5:  payload.pick5 || '',
       timestamp: Date.now()
     });
+  };
+
+  window.fbSaveSpreadsWeek = async function(value) {
+    await setDoc(doc(db, "settings", "spreadsWeek"), { value: value, updatedAt: Date.now() });
+  };
+
+  window.fbGetSpreadsWeek = async function() {
+    const snap = await getDoc(doc(db, "settings", "spreadsWeek"));
+    return snap.exists() ? snap.data().value : null;
   };
 
   window.fbSaveWeekOverride = async function(value) {
@@ -792,6 +885,15 @@
         <div class="week-badge" id="weekBadge">Week —</div>
       </div>
     </div>
+    <!-- Spreads Graphic -->
+    <div id="spreadsSection" style="display:none;margin-bottom:32px;">
+      <div class="spreads-header">
+        <span class="spreads-title" id="spreadsTitle">Week — Matchups &amp; Spreads</span>
+        <span class="spreads-subtitle">Lines subject to change</span>
+      </div>
+      <div id="spreadsGrid" class="spreads-grid"></div>
+    </div>
+
     <div class="selectors" id="selectors"></div>
     <div class="action-row">
       <button class="btn-clear" onclick="clearAll()">Clear All</button>
@@ -834,6 +936,7 @@ let scoresYear = null;
 let scoresRefreshTimer = null;
 
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRqX7XR41_5tR9RKRaMW7jokRKvxRCPtuxlSA5jUC8U9Btit3bq8G_K9EihipOzSGnwCVgmq8UHC3Hy/pub?gid=0&single=true&output=csv';
+const SPREADS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTCZp0JY_6F3IQ_Uv7pRTTLRymDJ6NG8t9nT6KrFZ5pru7yZykoa5h2prW91r0x9kbej0aCZKHrSxH8/pub?gid=1821550063&single=true&output=csv';
 const PICKS_DB_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS9-umRqGXfrl2flUZQ2pQaGaNT0FB8VsmjbFOs9Yjjh8PH2DaTGyAWEkEvWf5HUjHxgzyq7Z5XrvY2/pub?gid=0&single=true&output=csv';
 
 const NFL_TEAMS = [
@@ -1467,6 +1570,7 @@ async function fetchScores() {
 
 // ── Admin ──
 async function loadAdminWeekOverride() {
+  loadAdminSpreadsWeek();
   const el = document.getElementById('adminCurrentOverride');
   try {
     const val = window.fbGetWeekOverride ? await window.fbGetWeekOverride() : null;
@@ -1515,6 +1619,177 @@ function setAdminStatus(msg, type) {
   el.textContent = msg;
   el.className = 'admin-status ' + type;
   setTimeout(() => { el.textContent = ''; el.className = 'admin-status'; }, 4000);
+}
+
+// ── Spreads ──
+async function loadSpreadsOnHomePage() {
+  try {
+    const week = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
+    if (!week) {
+      document.getElementById('spreadsSection').style.display = 'none';
+      return;
+    }
+    await fetchAndRenderSpreads(week);
+  } catch(e) {
+    console.error('Spreads load error:', e);
+    document.getElementById('spreadsSection').style.display = 'none';
+  }
+}
+
+async function fetchAndRenderSpreads(week) {
+  const section = document.getElementById('spreadsSection');
+  const grid    = document.getElementById('spreadsGrid');
+  const title   = document.getElementById('spreadsTitle');
+
+  grid.innerHTML = '';
+  section.style.display = 'none';
+
+  try {
+    const res = await fetch(SPREADS_CSV_URL + '&cachebust=' + Date.now());
+    if (!res.ok) throw new Error('Sheet unreachable');
+    const text = await res.text();
+    const rows = parseCSV(text);
+
+    // Columns: Week(0), Date(1), Time(2), Home Team(3), Away Team(4), Odds(5)
+    // Skip header row
+    const dataRows = rows[0][0].toLowerCase().includes('week') ? rows.slice(1) : rows;
+
+    // Filter to selected week — sheet has "Week 1", "Week 2" etc.
+    const weekLabel = 'Week ' + week;
+    const weekRows = dataRows.filter(r => r[0] && r[0].trim().toLowerCase() === weekLabel.toLowerCase());
+
+    if (weekRows.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+
+    title.textContent = weekLabel + ' Matchups & Spreads';
+    section.style.display = 'block';
+
+    weekRows.forEach((row, i) => {
+      const date     = (row[1] || '').trim();
+      const gameTime = (row[2] || '').trim();
+      const home     = (row[3] || '').trim();
+      const away     = (row[4] || '').trim();
+      const odds     = (row[5] || '').trim();
+
+      if (!away && !home) return;
+
+      const card = document.createElement('div');
+      card.className = 'spread-card';
+      card.style.animationDelay = (i * 0.04) + 's';
+
+      const matchup = document.createElement('div');
+      matchup.className = 'spread-matchup';
+
+      // Away team
+      const awayEl = document.createElement('div');
+      awayEl.className = 'spread-team';
+      const awayName = document.createElement('div');
+      awayName.className = 'spread-team-name';
+      awayName.textContent = away;
+      // Show odds under whichever team is favored
+      const awayLine = document.createElement('div');
+      awayLine.className = 'spread-team-line';
+      awayLine.textContent = odds && odds.toUpperCase().startsWith(away.toUpperCase()) ? odds.replace(away, '').trim() : '';
+      awayEl.appendChild(awayName);
+      awayEl.appendChild(awayLine);
+
+      // @ symbol
+      const atEl = document.createElement('div');
+      atEl.className = 'spread-at';
+      atEl.textContent = '@';
+
+      // Home team
+      const homeEl = document.createElement('div');
+      homeEl.className = 'spread-team';
+      const homeName = document.createElement('div');
+      homeName.className = 'spread-team-name';
+      homeName.textContent = home;
+      const homeLine = document.createElement('div');
+      homeLine.className = 'spread-team-line';
+      homeLine.textContent = odds && odds.toUpperCase().startsWith(home.toUpperCase()) ? odds.replace(home, '').trim() : '';
+      homeEl.appendChild(homeName);
+      homeEl.appendChild(homeLine);
+
+      // Odds row — show full odds string centered if neither team prefix matched
+      const bothBlank = !awayLine.textContent && !homeLine.textContent;
+      if (bothBlank && odds) {
+        awayLine.textContent = '';
+        homeLine.textContent = odds;
+      }
+
+      matchup.appendChild(awayEl);
+      matchup.appendChild(atEl);
+      matchup.appendChild(homeEl);
+
+      // Meta row
+      const meta = document.createElement('div');
+      meta.className = 'spread-meta';
+      if (date) {
+        const dateEl = document.createElement('span');
+        dateEl.textContent = '📅 ' + date;
+        meta.appendChild(dateEl);
+      }
+      if (gameTime) {
+        const timeEl = document.createElement('span');
+        timeEl.textContent = '🕐 ' + gameTime;
+        meta.appendChild(timeEl);
+      }
+
+      card.appendChild(matchup);
+      if (date || gameTime) card.appendChild(meta);
+      grid.appendChild(card);
+    });
+
+  } catch(e) {
+    console.error('Spreads fetch error:', e);
+    section.style.display = 'none';
+  }
+}
+
+async function adminSetSpreadsWeek() {
+  const sel    = document.getElementById('adminSpreadsWeekSelect');
+  const status = document.getElementById('adminSpreadsStatus');
+  const val    = sel.value;
+  if (!val) { setSpreadsStatus('Please select a week first.', 'error'); return; }
+  try {
+    await window.fbSaveSpreadsWeek(val);
+    document.getElementById('adminCurrentSpreadsWeek').textContent = 'Week ' + val;
+    setSpreadsStatus('Now showing Week ' + val + ' spreads on home page!', 'success');
+  } catch(e) {
+    setSpreadsStatus('Failed to save. Please try again.', 'error');
+    console.error(e);
+  }
+}
+
+async function adminHideSpreads() {
+  try {
+    await window.fbSaveSpreadsWeek(null);
+    document.getElementById('adminCurrentSpreadsWeek').textContent = 'None (hidden)';
+    document.getElementById('adminSpreadsWeekSelect').value = '';
+    setSpreadsStatus('Spreads graphic hidden from home page.', 'success');
+  } catch(e) {
+    setSpreadsStatus('Failed to update. Please try again.', 'error');
+  }
+}
+
+function setSpreadsStatus(msg, type) {
+  const el = document.getElementById('adminSpreadsStatus');
+  el.textContent = msg;
+  el.className = 'admin-status ' + type;
+  setTimeout(() => { el.textContent = ''; el.className = 'admin-status'; }, 4000);
+}
+
+async function loadAdminSpreadsWeek() {
+  const el = document.getElementById('adminCurrentSpreadsWeek');
+  try {
+    const val = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
+    el.textContent = val ? 'Week ' + val : 'None (hidden)';
+    if (val) document.getElementById('adminSpreadsWeekSelect').value = val;
+  } catch(e) {
+    el.textContent = 'Unable to load';
+  }
 }
 
 </script>
@@ -1607,9 +1882,52 @@ function setAdminStatus(msg, type) {
 
       <div class="admin-status" id="adminStatus"></div>
     </div>
+
+    <!-- Spreads Week Picker -->
+    <div class="admin-card">
+      <div class="admin-card-title">📊 Home Page Spreads</div>
+      <p class="admin-card-desc">Choose which week's spreads to display on the Team Selector home page. The data is pulled from your spreads Google Sheet.</p>
+
+      <div class="admin-current-week">
+        Currently showing: <strong id="adminCurrentSpreadsWeek">Loading…</strong>
+      </div>
+
+      <div class="admin-controls">
+        <div class="field" style="margin-bottom:0;flex:1;">
+          <label>Select Week to Display</label>
+          <select id="adminSpreadsWeekSelect">
+            <option value="">— None (hide graphic) —</option>
+            <option value="1">Week 1</option>
+            <option value="2">Week 2</option>
+            <option value="3">Week 3</option>
+            <option value="4">Week 4</option>
+            <option value="5">Week 5</option>
+            <option value="6">Week 6</option>
+            <option value="7">Week 7</option>
+            <option value="8">Week 8</option>
+            <option value="9">Week 9</option>
+            <option value="10">Week 10</option>
+            <option value="11">Week 11</option>
+            <option value="12">Week 12</option>
+            <option value="13">Week 13</option>
+            <option value="14">Week 14</option>
+            <option value="15">Week 15</option>
+            <option value="16">Week 16</option>
+            <option value="17">Week 17</option>
+            <option value="18">Week 18</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:20px;">
+          <button class="btn-submit" style="flex:1;" onclick="adminSetSpreadsWeek()">Show This Week</button>
+          <button class="btn-clear" style="flex:1;" onclick="adminHideSpreads()">Hide Graphic</button>
+        </div>
+      </div>
+
+      <div class="admin-status" id="adminSpreadsStatus"></div>
+    </div>
   </div>
 </div>
 
-<div class="version-badge">v0.5.1</div>
+<div class="version-badge">v0.5.2</div>
 </body>
 </html>
