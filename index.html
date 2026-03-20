@@ -825,14 +825,24 @@
     user-select: none;
   }
   .team-pick-btn:hover { border-color: var(--accent); background: rgba(200,169,74,0.08); }
-  .team-pick-btn.selected {
-    border-color: var(--accent);
-    background: rgba(200,169,74,0.15);
+  .team-pick-btn[data-state="selected"] {
+    border-color: var(--accent) !important;
+    background: rgba(200,169,74,0.15) !important;
   }
-  .team-pick-btn.dimmed {
-    opacity: 0.35;
-    filter: grayscale(0.5);
+  .team-pick-btn[data-state="dimmed"] {
+    opacity: 0.35 !important;
+    filter: grayscale(0.5) !important;
+    border-color: transparent !important;
+    background: var(--hover) !important;
   }
+  .team-pick-btn[data-state="idle"] {
+    border-color: transparent !important;
+    background: var(--hover) !important;
+    opacity: 1 !important;
+    filter: none !important;
+  }
+  .team-pick-btn.selected { border-color: var(--accent); background: rgba(200,169,74,0.15); }
+  .team-pick-btn.dimmed { opacity: 0.35; filter: grayscale(0.5); }
 
   .team-logo {
     width: 32px;
@@ -1026,18 +1036,12 @@
       </div>
       <div id="spreadsGrid" class="spreads-grid"></div>
       <div class="spreads-action-row">
+        <button class="btn-clear" onclick="clearSpreadsPicks()">Clear</button>
         <button class="btn-submit" id="spreadsSubmitBtn" onclick="submitSpreadsPicks()" disabled>Lock In Picks</button>
       </div>
       <div class="spreads-save-status" id="spreadsSaveStatus"></div>
     </div>
-    <div class="action-row">
-      <button class="btn-clear" onclick="clearAll()">Clear All</button>
-      <button class="btn-submit" onclick="showResults()">Lock In Picks</button>
-    </div>
-    <div class="result-banner" id="resultBanner">
-      <h3>Your Selections</h3>
-      <div class="result-teams" id="resultTeams"></div>
-    </div>
+
     <footer>32 NFL Teams &bull; 5 Slots &bull; Endless Debates</footer>
   </div>
 </div>
@@ -1211,8 +1215,15 @@ function afterLogin(email) {
   }
   buildSelectors();
   updateWeekBadge();
-  // Small delay to ensure Firebase module is fully initialized before loading spreads
-  setTimeout(() => showPage('selector'), 300);
+  // Poll until Firebase is ready, then show page
+  (async function waitForFirebase() {
+    let tries = 0;
+    while (!window.fbGetSpreadsWeek && tries < 20) {
+      await new Promise(r => setTimeout(r, 150));
+      tries++;
+    }
+    showPage('selector');
+  })();
 }
 
 // ── Page switching ──
@@ -1646,6 +1657,12 @@ function renderPickSelections() {
       }
     });
   });
+}
+
+function clearSpreadsPicks() {
+  selectedPicks = [];
+  renderPickSelections();
+  updatePicksCounter();
 }
 
 function updatePicksCounter() {
@@ -2235,6 +2252,6 @@ async function loadAdminSpreadsWeek() {
   </div>
 </div>
 
-<div class="version-badge">v0.5.6</div>
+<div class="version-badge">v0.5.7</div>
 </body>
 </html>
