@@ -1058,7 +1058,11 @@ async function adminHideSpreads() {
     document.getElementById('adminCurrentSpreadsWeek').textContent = 'None (hidden)';
     document.getElementById('adminSpreadsWeekSelect').value = '';
     setSpreadsStatus('Spreads graphic hidden from home page.', 'success');
-    updateWeekBadge();
+    await updateWeekBadge();
+    document.getElementById('spreadsSection').style.display = 'none';
+    document.getElementById('spreadsGrid').innerHTML = '';
+    selectedPicks = [];
+    updatePicksCounter();
   } catch(e) {
     setSpreadsStatus('Failed to update. Please try again.', 'error');
   }
@@ -1756,14 +1760,16 @@ async function loadAdminWeekOverride() {
 }
 
 async function adminSetSpreadsWeek() {
-  const sel    = document.getElementById('adminSpreadsWeekSelect');
-  const val    = sel.value;
+  const sel = document.getElementById('adminSpreadsWeekSelect');
+  const val = sel.value;
   if (!val) { setSpreadsStatus('Please select a week first.', 'error'); return; }
   try {
     await window.fbSaveSpreadsWeek(val);
     document.getElementById('adminCurrentSpreadsWeek').textContent = 'Week ' + val;
-    setSpreadsStatus('Now showing Week ' + val + ' spreads on home page!', 'success');
-    updateWeekBadge();
+    setSpreadsStatus('Week ' + val + ' saved! Updating home page…', 'success');
+    // Update badge and reload spread cards immediately
+    await updateWeekBadge();
+    await fetchAndRenderSpreads(val);
   } catch(e) {
     setSpreadsStatus('Failed to save. Please try again.', 'error');
     console.error(e);
@@ -1776,7 +1782,11 @@ async function adminHideSpreads() {
     document.getElementById('adminCurrentSpreadsWeek').textContent = 'None (hidden)';
     document.getElementById('adminSpreadsWeekSelect').value = '';
     setSpreadsStatus('Spreads graphic hidden from home page.', 'success');
-    updateWeekBadge();
+    await updateWeekBadge();
+    document.getElementById('spreadsSection').style.display = 'none';
+    document.getElementById('spreadsGrid').innerHTML = '';
+    selectedPicks = [];
+    updatePicksCounter();
   } catch(e) {
     setSpreadsStatus('Failed to update. Please try again.', 'error');
   }
@@ -1902,6 +1912,6 @@ function setAdminStatus(msg, type) {
   </div>
 </div>
 
-<div class="version-badge">v0.5.9</div>
+<div class="version-badge">v0.6.0</div>
 </body>
 </html>
