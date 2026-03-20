@@ -1075,9 +1075,9 @@ function afterLogin(email) {
   if (email && ADMIN_EMAILS && ADMIN_EMAILS.includes(email.toLowerCase())) {
     document.getElementById('adminCorner').style.display = 'block';
   }
-  showPage('selector');
   buildSelectors();
   updateWeekBadge();
+  showPage('selector');
 }
 
 // ── Page switching ──
@@ -1099,6 +1099,8 @@ function showPage(page) {
     void p.offsetWidth; // reflow to re-trigger animation
     p.classList.add('fade-in');
     document.getElementById('navSelector').classList.add('active');
+    console.log('SPREADS: showPage selector called, loading spreads...');
+    loadSpreadsOnHomePage();
   } else if (page === 'scores') {
     const p = document.getElementById('scoresPage');
     p.style.display = 'flex';
