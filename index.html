@@ -138,7 +138,7 @@
   .container { width: 100%; max-width: 680px; }
 
   #loginPage  { display: flex; }
-  #selectorPage, #myPicksPage, #scoresPage { display: none; }
+  #selectorPage, #myPicksPage, #scoresPage, #adminPage { display: none; }
 
   /* ── LOGIN ── */
   header { text-align: center; margin-bottom: 48px; }
@@ -599,10 +599,88 @@
     z-index: 999;
     pointer-events: none;
   }
+
+  /* ── ADMIN PAGE ── */
+  .admin-corner-btn {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 6px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.18s;
+    opacity: 0.6;
+  }
+  .admin-corner-btn:hover { color: var(--accent); border-color: var(--accent); opacity: 1; }
+
+  .admin-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 28px 32px;
+    margin-bottom: 20px;
+    opacity: 0;
+    animation: pageFade 0.4s 0.1s ease forwards;
+  }
+  .admin-card-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+  .admin-card-desc {
+    font-size: 14px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    line-height: 1.6;
+    margin-bottom: 20px;
+  }
+  .admin-current-week {
+    font-size: 15px;
+    color: var(--text);
+    letter-spacing: 0.06em;
+    background: var(--hover);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 16px;
+    margin-bottom: 20px;
+  }
+  .admin-current-week strong { color: var(--accent); }
+  .admin-controls { display: flex; flex-direction: column; gap: 8px; }
+  .admin-controls select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 12px 16px;
+    color: var(--text);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 17px;
+    outline: none;
+    transition: border-color 0.2s;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+  }
+  .admin-controls select:focus { border-color: var(--accent); }
+  .admin-status {
+    margin-top: 14px;
+    font-size: 14px;
+    letter-spacing: 0.06em;
+    min-height: 20px;
+    text-align: center;
+  }
+  .admin-status.success { color: #4caf7d; }
+  .admin-status.error   { color: var(--error); }
+
 </style>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, collection, addDoc, query, where, getDocs, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyC6wED6bBvMNGiQFFEGHdQGSP7iKGSIdvk",
@@ -630,6 +708,15 @@
       pick5:  payload.pick5 || '',
       timestamp: Date.now()
     });
+  };
+
+  window.fbSaveWeekOverride = async function(value) {
+    await setDoc(doc(db, "settings", "weekOverride"), { value: value, updatedAt: Date.now() });
+  };
+
+  window.fbGetWeekOverride = async function() {
+    const snap = await getDoc(doc(db, "settings", "weekOverride"));
+    return snap.exists() ? snap.data().value : null;
   };
 
   window.fbGetMyPicks = async function(email) {
@@ -660,6 +747,9 @@
     <button class="btn-logout" onclick="logout()">Log Out</button>
   </div>
 </nav>
+<div id="adminCorner" style="display:none;position:fixed;bottom:12px;left:16px;z-index:999;">
+  <button class="admin-corner-btn" onclick="showPage('admin')">⚙ Admin</button>
+</div>
 
 <!-- ═══ LOGIN PAGE ═══ -->
 <div class="page" id="loginPage">
@@ -735,6 +825,9 @@
 </div>
 
 <script>
+// ── Admin emails ──
+const ADMIN_EMAILS = ["jenowakoski@gmail.com", "wcgriffiths14@gmail.com"];
+
 // ── Scores state (declared early to avoid reference errors) ──
 let scoresWeek = null;
 let scoresYear = null;
@@ -784,8 +877,16 @@ function getCurrentNFLWeek() {
   return match ? match.week : null;
 }
 
-function updateWeekBadge() {
+async function updateWeekBadge() {
   const badge = document.getElementById('weekBadge');
+  try {
+    const override = window.fbGetWeekOverride ? await window.fbGetWeekOverride() : null;
+    if (override) {
+      badge.textContent = override;
+      badge.classList.remove('week-offseason');
+      return;
+    }
+  } catch(e) { /* fall through to auto-detect */ }
   const week = getCurrentNFLWeek();
   if (week) {
     badge.textContent = 'Week ' + week;
@@ -867,6 +968,10 @@ function afterLogin(email) {
   document.getElementById('navEmail').textContent = email;
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('topNav').classList.add('visible');
+  // Show admin button if admin
+  if (ADMIN_EMAILS.includes(email.toLowerCase())) {
+    document.getElementById('adminCorner').style.display = 'block';
+  }
   showPage('selector');
   buildSelectors();
   updateWeekBadge();
@@ -877,6 +982,7 @@ function showPage(page) {
   document.getElementById('selectorPage').style.display = 'none';
   document.getElementById('myPicksPage').style.display = 'none';
   document.getElementById('scoresPage').style.display = 'none';
+  document.getElementById('adminPage').style.display = 'none';
 
   document.getElementById('navSelector').classList.remove('active');
   document.getElementById('navMyPicks').classList.remove('active');
@@ -898,6 +1004,13 @@ function showPage(page) {
     p.classList.add('fade-in');
     document.getElementById('navScores').classList.add('active');
     initScores();
+  } else if (page === 'admin') {
+    const p = document.getElementById('adminPage');
+    p.style.display = 'flex';
+    p.classList.remove('fade-in');
+    void p.offsetWidth;
+    p.classList.add('fade-in');
+    loadAdminWeekOverride();
   } else if (page === 'myPicks') {
     const p = document.getElementById('myPicksPage');
     p.style.display = 'flex';
@@ -1340,6 +1453,58 @@ async function fetchScores() {
 }
 
 
+// ── Admin ──
+async function loadAdminWeekOverride() {
+  const el = document.getElementById('adminCurrentOverride');
+  try {
+    const val = window.fbGetWeekOverride ? await window.fbGetWeekOverride() : null;
+    el.textContent = val ? val : 'None (auto-detect)';
+    if (val) {
+      const sel = document.getElementById('adminWeekSelect');
+      sel.value = val;
+    }
+  } catch(e) {
+    el.textContent = 'Unable to load';
+  }
+}
+
+async function adminSetWeek() {
+  const sel    = document.getElementById('adminWeekSelect');
+  const status = document.getElementById('adminStatus');
+  const val    = sel.value;
+  if (!val) { setAdminStatus('Please select a week first.', 'error'); return; }
+  try {
+    await window.fbSaveWeekOverride(val);
+    document.getElementById('adminCurrentOverride').textContent = val;
+    setAdminStatus('Week override set to ' + val + ' successfully!', 'success');
+    updateWeekBadge(); // refresh badge immediately
+  } catch(e) {
+    setAdminStatus('Failed to save. Please try again.', 'error');
+    console.error(e);
+  }
+}
+
+async function adminResetWeek() {
+  const status = document.getElementById('adminStatus');
+  try {
+    await window.fbSaveWeekOverride(null);
+    document.getElementById('adminCurrentOverride').textContent = 'None (auto-detect)';
+    document.getElementById('adminWeekSelect').value = '';
+    setAdminStatus('Reset to auto-detect successfully!', 'success');
+    updateWeekBadge();
+  } catch(e) {
+    setAdminStatus('Failed to reset. Please try again.', 'error');
+    console.error(e);
+  }
+}
+
+function setAdminStatus(msg, type) {
+  const el = document.getElementById('adminStatus');
+  el.textContent = msg;
+  el.className = 'admin-status ' + type;
+  setTimeout(() => { el.textContent = ''; el.className = 'admin-status'; }, 4000);
+}
+
 </script>
 
 <!-- ═══ SCORES PAGE ═══ -->
@@ -1379,6 +1544,60 @@ async function fetchScores() {
   </div>
 </div>
 
-<div class="version-badge">v0.5</div>
+
+<!-- ═══ ADMIN PAGE ═══ -->
+<div class="page with-nav" id="adminPage">
+  <div class="container">
+    <div class="page-header">
+      <div class="page-title">Admin</div>
+      <div class="page-subtitle">Site controls</div>
+      <div class="page-divider"></div>
+    </div>
+
+    <div class="admin-card">
+      <div class="admin-card-title">⚙ Week Override</div>
+      <p class="admin-card-desc">Override the auto-detected NFL week shown to all users on the Team Selector page. Use this to manually set the week during off-season or if the schedule detection is off.</p>
+
+      <div class="admin-current-week">
+        Current override: <strong id="adminCurrentOverride">Loading…</strong>
+      </div>
+
+      <div class="admin-controls">
+        <div class="field" style="margin-bottom:0;flex:1;">
+          <label>Set Week Manually</label>
+          <select id="adminWeekSelect">
+            <option value="">— Select a week —</option>
+            <option value="Week 1">Week 1</option>
+            <option value="Week 2">Week 2</option>
+            <option value="Week 3">Week 3</option>
+            <option value="Week 4">Week 4</option>
+            <option value="Week 5">Week 5</option>
+            <option value="Week 6">Week 6</option>
+            <option value="Week 7">Week 7</option>
+            <option value="Week 8">Week 8</option>
+            <option value="Week 9">Week 9</option>
+            <option value="Week 10">Week 10</option>
+            <option value="Week 11">Week 11</option>
+            <option value="Week 12">Week 12</option>
+            <option value="Week 13">Week 13</option>
+            <option value="Week 14">Week 14</option>
+            <option value="Week 15">Week 15</option>
+            <option value="Week 16">Week 16</option>
+            <option value="Week 17">Week 17</option>
+            <option value="Week 18">Week 18</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:20px;">
+          <button class="btn-submit" style="flex:1;" onclick="adminSetWeek()">Set Week</button>
+          <button class="btn-clear" style="flex:1;" onclick="adminResetWeek()">Reset to Auto</button>
+        </div>
+      </div>
+
+      <div class="admin-status" id="adminStatus"></div>
+    </div>
+  </div>
+</div>
+
+<div class="version-badge">v0.5.1</div>
 </body>
 </html>
