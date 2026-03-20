@@ -943,202 +943,62 @@
     return snap.exists() ? snap.data().value : null;
   };
 
-  window.fbSaveWeekOverride = async function(value) {
-    await setDoc(doc(db, "settings", "weekOverride"), { value: value, updatedAt: Date.now() });
-  };
+  window.fbSaveSpreadsWeek(val);
+    document.getElementById('adminCurrentSpreadsWeek').textContent = 'Week ' + val;
+    setSpreadsStatus('Now showing Week ' + val + ' spreads on home page!', 'success');
+  } catch(e) {
+    setSpreadsStatus('Failed to save. Please try again.', 'error');
+    console.error(e);
+  }
+}
 
-  window.fbGetWeekOverride = async function() {
-    const snap = await getDoc(doc(db, "settings", "weekOverride"));
-    return snap.exists() ? snap.data().value : null;
-  };
+async function adminHideSpreads() {
+  try {
+    await window.fbSaveSpreadsWeek(null);
+    document.getElementById('adminCurrentSpreadsWeek').textContent = 'None (hidden)';
+    document.getElementById('adminSpreadsWeekSelect').value = '';
+    setSpreadsStatus('Spreads graphic hidden from home page.', 'success');
+    updateWeekBadge();
+  } catch(e) {
+    setSpreadsStatus('Failed to update. Please try again.', 'error');
+  }
+}
 
-  window.fbGetMyPicks = async function(email) {
-    const q = query(
-      collection(db, "picks"),
-      where("email", "==", email.toLowerCase())
-    );
-    const snapshot = await getDocs(q);
-    const docs = snapshot.docs.map(d => d.data());
-    // Sort client-side by timestamp descending (avoids needing a composite index)
-    docs.sort(function(a, b) { return (b.timestamp || 0) - (a.timestamp || 0); });
-    return docs;
-  };
+function setSpreadsStatus(msg, type) {
+  const el = document.getElementById('adminSpreadsStatus');
+  el.textContent = msg;
+  el.className = 'admin-status ' + type;
+  setTimeout(() => { el.textContent = ''; el.className = 'admin-status'; }, 4000);
+}
+
+async function loadAdminSpreadsWeek() {
+  const el = document.getElementById('adminCurrentSpreadsWeek');
+  try {
+    const val = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
+    el.textContent = val ? 'Week ' + val : 'None (hidden)';
+    if (val) document.getElementById('adminSpreadsWeekSelect').value = val;
+  } catch(e) {
+    el.textContent = 'Unable to load';
+  }
+}
+
 </script>
-</head>
-<body>
-
-<!-- ═══ TOP NAV (hidden until login) ═══ -->
-<nav id="topNav">
-  <div class="nav-logo">🏈 NFL Selector</div>
-  <div class="nav-links">
-    <button class="nav-link active" id="navSelector" onclick="showPage('selector')">Team Selector</button>
-    <button class="nav-link" id="navMyPicks" onclick="showPage('myPicks')">My Picks</button>
-    <button class="nav-link" id="navScores" onclick="showPage('scores')">Scores</button>
-  </div>
-  <div class="nav-right">
-    <span class="nav-user">Signed in as <strong id="navEmail"></strong></span>
-    <button class="btn-logout" onclick="logout()">Log Out</button>
-  </div>
-</nav>
-<div id="adminCorner" style="display:none;position:fixed;bottom:12px;left:16px;z-index:999;">
-  <button class="admin-corner-btn" onclick="showPage('admin')">⚙ Admin</button>
-</div>
-
-<!-- ═══ LOGIN PAGE ═══ -->
-<div class="page" id="loginPage">
-  <div class="container">
-    <header>
-      <div class="shield">🏈</div>
-      <h1>NFL Team<br>Selector</h1>
-      <p class="subtitle">Authorized Access Only</p>
-      <div class="divider"></div>
-    </header>
-    <div class="login-card">
-      <h2>Sign In</h2>
-      <p>Enter your approved email &amp; PIN to continue</p>
-      <div class="error-msg" id="errorMsg"></div>
-      <div class="status-msg" id="statusMsg"></div>
-      <div class="field">
-        <label>Email Address</label>
-        <input type="email" id="emailInput" placeholder="you@example.com" autocomplete="email" />
-      </div>
-      <div class="field">
-        <label>PIN</label>
-        <input type="password" id="pinInput" placeholder="••••" maxlength="10" />
-        <div class="pin-hint">Enter the PIN assigned to your email</div>
-      </div>
-      <button class="btn-login" id="loginBtn" onclick="handleLogin()">Enter</button>
-    </div>
-  </div>
-</div>
-
-<!-- ═══ TEAM SELECTOR PAGE ═══ -->
-<div class="page with-nav" id="selectorPage">
-  <div class="container">
-    <div class="page-header">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
-        <div>
-          <div class="page-title">Team Selector</div>
-          <div class="page-subtitle">Pick your five favorites</div>
-          <div class="page-divider"></div>
-        </div>
-        <div class="week-badge" id="weekBadge">Week —</div>
-      </div>
-    </div>
-    <!-- Spreads Picks -->
-    <div id="spreadsSection" style="display:none;margin-bottom:32px;">
-      <div class="spreads-header">
-        <div>
-          <span class="spreads-title" id="spreadsTitle">Week — Matchups &amp; Spreads</span>
-          <div class="spreads-subtitle">Pick up to 5 teams against the spread · Lines subject to change</div>
-        </div>
-        <div class="picks-counter" id="picksCounter">0 / 5 picked</div>
-      </div>
-      <div id="spreadsGrid" class="spreads-grid"></div>
-      <div class="spreads-action-row">
-        <button class="btn-clear" onclick="clearSpreadsPicks()">Clear</button>
-        <button class="btn-submit" id="spreadsSubmitBtn" onclick="submitSpreadsPicks()" disabled>Lock In Picks</button>
-      </div>
-      <div class="spreads-save-status" id="spreadsSaveStatus"></div>
-    </div>
-
-    <footer>32 NFL Teams &bull; 5 Slots &bull; Endless Debates</footer>
-  </div>
-</div>
-
-<!-- ═══ MY PICKS PAGE ═══ -->
-<div class="page with-nav" id="myPicksPage">
-  <div class="container">
-    <div class="page-header">
-      <div class="page-title">My Picks</div>
-      <div class="page-subtitle">Your submissions by week</div>
-      <div class="page-divider"></div>
-    </div>
-    <div id="myPicksContent">
-      <div class="picks-loading" id="picksLoading">
-        <div class="loading-spinner"></div>
-        <p>Loading your picks…</p>
-      </div>
-      <div id="picksError" class="picks-error" style="display:none;"></div>
-      <div id="picksGroups"></div>
-    </div>
-  </div>
-</div>
 
 <script>
-// ── Admin emails ──
-const ADMIN_EMAILS = ["jenowakoski@gmail.com", "wcgriffiths14@gmail.com"];
+// ── Constants ──
+const ADMIN_EMAILS     = ["jenowakoski@gmail.com", "wcgriffiths14@gmail.com"];
+const SHEET_CSV_URL    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRqX7XR41_5tR9RKRaMW7jokRKvxRCPtuxlSA5jUC8U9Btit3bq8G_K9EihipOzSGnwCVgmq8UHC3Hy/pub?gid=0&single=true&output=csv';
+const PICKS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwSRseA76KhYoGki33yQ7O5MEGVOBdKYzYTAYSef88VBgoi2ymcWRvz3sZg5sqeIw/exec';
+const PICKS_DB_URL     = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS9-umRqGXfrl2flUZQ2pQaGaNT0FB8VsmjbFOs9Yjjh8PH2DaTGyAWEkEvWf5HUjHxgzyq7Z5XrvY2/pub?gid=0&single=true&output=csv';
+const SPREADS_CSV_URL  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTCZp0JY_6F3IQ_Uv7pRTTLRymDJ6NG8t9nT6KrFZ5pru7yZykoa5h2prW91r0x9kbej0aCZKHrSxH8/pub?gid=1821550063&single=true&output=csv';
 
-// ── Scores state (declared early to avoid reference errors) ──
+// ── Scores state ──
 let scoresWeek = null;
 let scoresYear = null;
 let scoresRefreshTimer = null;
 
-const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRqX7XR41_5tR9RKRaMW7jokRKvxRCPtuxlSA5jUC8U9Btit3bq8G_K9EihipOzSGnwCVgmq8UHC3Hy/pub?gid=0&single=true&output=csv';
-const SPREADS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTCZp0JY_6F3IQ_Uv7pRTTLRymDJ6NG8t9nT6KrFZ5pru7yZykoa5h2prW91r0x9kbej0aCZKHrSxH8/pub?gid=1821550063&single=true&output=csv';
-const PICKS_DB_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS9-umRqGXfrl2flUZQ2pQaGaNT0FB8VsmjbFOs9Yjjh8PH2DaTGyAWEkEvWf5HUjHxgzyq7Z5XrvY2/pub?gid=0&single=true&output=csv';
-
-const NFL_TEAMS = [
-  "Arizona Cardinals","Atlanta Falcons","Baltimore Ravens","Buffalo Bills",
-  "Carolina Panthers","Chicago Bears","Cincinnati Bengals","Cleveland Browns",
-  "Dallas Cowboys","Denver Broncos","Detroit Lions","Green Bay Packers",
-  "Houston Texans","Indianapolis Colts","Jacksonville Jaguars","Kansas City Chiefs",
-  "Las Vegas Raiders","Los Angeles Chargers","Los Angeles Rams","Miami Dolphins",
-  "Minnesota Vikings","New England Patriots","New Orleans Saints","New York Giants",
-  "New York Jets","Philadelphia Eagles","Pittsburgh Steelers","San Francisco 49ers",
-  "Seattle Seahawks","Tampa Bay Buccaneers","Tennessee Titans","Washington Commanders"
-];
-const LABELS = ["Slot 01","Slot 02","Slot 03","Slot 04","Slot 05"];
-
-// ── NFL Week Detection (2025 season) ──
-const NFL_WEEKS = [
-  { week: 1,  start: new Date('2025-09-04'), end: new Date('2025-09-08') },
-  { week: 2,  start: new Date('2025-09-09'), end: new Date('2025-09-15') },
-  { week: 3,  start: new Date('2025-09-16'), end: new Date('2025-09-22') },
-  { week: 4,  start: new Date('2025-09-23'), end: new Date('2025-09-29') },
-  { week: 5,  start: new Date('2025-09-30'), end: new Date('2025-10-06') },
-  { week: 6,  start: new Date('2025-10-07'), end: new Date('2025-10-13') },
-  { week: 7,  start: new Date('2025-10-14'), end: new Date('2025-10-20') },
-  { week: 8,  start: new Date('2025-10-21'), end: new Date('2025-10-27') },
-  { week: 9,  start: new Date('2025-10-28'), end: new Date('2025-11-03') },
-  { week: 10, start: new Date('2025-11-04'), end: new Date('2025-11-10') },
-  { week: 11, start: new Date('2025-11-11'), end: new Date('2025-11-17') },
-  { week: 12, start: new Date('2025-11-18'), end: new Date('2025-11-24') },
-  { week: 13, start: new Date('2025-11-25'), end: new Date('2025-12-01') },
-  { week: 14, start: new Date('2025-12-02'), end: new Date('2025-12-08') },
-  { week: 15, start: new Date('2025-12-09'), end: new Date('2025-12-15') },
-  { week: 16, start: new Date('2025-12-16'), end: new Date('2025-12-22') },
-  { week: 17, start: new Date('2025-12-23'), end: new Date('2025-12-29') },
-  { week: 18, start: new Date('2025-12-30'), end: new Date('2026-01-04') },
-];
-
-function getCurrentNFLWeek() {
-  const today = new Date();
-  today.setHours(0,0,0,0);
-  const match = NFL_WEEKS.find(w => today >= w.start && today <= w.end);
-  return match ? match.week : null;
-}
-
-async function updateWeekBadge() {
-  const badge = document.getElementById('weekBadge');
-  try {
-    const override = window.fbGetWeekOverride ? await window.fbGetWeekOverride() : null;
-    if (override) {
-      badge.textContent = override;
-      badge.classList.remove('week-offseason');
-      return;
-    }
-  } catch(e) { /* fall through to auto-detect */ }
-  const week = getCurrentNFLWeek();
-  if (week) {
-    badge.textContent = 'Week ' + week;
-    badge.classList.remove('week-offseason');
-  } else {
-    badge.textContent = 'Off Season';
-    badge.classList.add('week-offseason');
-  }
-}
-
+// ── Picks state ──
+let selectedPicks = [];
 
 // ── CSV Parser ──
 function parseCSV(text) {
@@ -1147,7 +1007,41 @@ function parseCSV(text) {
   );
 }
 
+// ── Team Logos ──
+function getTeamLogo(abbr) {
+  const slugs = {
+    'ARI':'ari','ATL':'atl','BAL':'bal','BUF':'buf','CAR':'car','CHI':'chi',
+    'CIN':'cin','CLE':'cle','DAL':'dal','DEN':'den','DET':'det','GB':'gb',
+    'HOU':'hou','IND':'ind','JAX':'jax','KC':'kc','LAC':'lac','LAR':'lar',
+    'LV':'lv','MIA':'mia','MIN':'min','NE':'ne','NO':'no','NYG':'nyg',
+    'NYJ':'nyj','PHI':'phi','PIT':'pit','SF':'sf','SEA':'sea','TB':'tb',
+    'TEN':'ten','WSH':'wsh'
+  };
+  const slug = slugs[abbr.toUpperCase()];
+  if (!slug) return '';
+  return 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/' + slug + '.png&w=40&h=40&transparent=true';
+}
+
+// ── Week Badge — reads spreadsWeek from Firebase ──
+async function updateWeekBadge() {
+  const badge = document.getElementById('weekBadge');
+  if (!badge) return;
+  try {
+    const week = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
+    badge.textContent = week ? 'Week ' + week : 'Week —';
+    badge.classList.toggle('week-offseason', !week);
+  } catch(e) {
+    badge.textContent = 'Week —';
+  }
+}
+
 // ── Login ──
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
 async function handleLogin() {
   const email = document.getElementById('emailInput').value.trim().toLowerCase();
   const pin   = document.getElementById('pinInput').value.trim();
@@ -1165,16 +1059,11 @@ async function handleLogin() {
     const res = await fetch(SHEET_CSV_URL);
     if (!res.ok) throw new Error('Sheet unreachable');
     const text = await res.text();
-    console.log("RAW CSV:", text);
     const rows = parseCSV(text);
     const dataRows = rows[0][0].toLowerCase().includes('email') ? rows.slice(1) : rows;
-    console.log("PARSED ROWS:", JSON.stringify(dataRows));
-
     const match = dataRows.find(r =>
-      r[0] && r[0].toLowerCase() === email &&
-      r[1] && r[1] === pin
+      r[0] && r[0].toLowerCase() === email && r[1] && r[1] === pin
     );
-
     if (match) {
       staEl.textContent = '';
       afterLogin(email);
@@ -1182,19 +1071,13 @@ async function handleLogin() {
       const emailExists = dataRows.some(r => r[0] && r[0].toLowerCase() === email);
       showError(emailExists ? 'Incorrect PIN. Please try again.' : 'This email is not on the approved list.');
     }
-  } catch (err) {
+  } catch(err) {
     showError('Unable to verify credentials. Please try again.');
     console.error(err);
   } finally {
     btn.disabled = false;
     staEl.textContent = '';
   }
-}
-
-function showError(msg) {
-  const el = document.getElementById('errorMsg');
-  el.textContent = msg;
-  el.classList.add('show');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1205,33 +1088,32 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// ── After login ──
+// ── After Login ──
 function afterLogin(email) {
   document.getElementById('navEmail').textContent = email;
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('topNav').classList.add('visible');
-  if (email && ADMIN_EMAILS && ADMIN_EMAILS.includes(email.toLowerCase())) {
+  if (email && ADMIN_EMAILS.includes(email.toLowerCase())) {
     document.getElementById('adminCorner').style.display = 'block';
   }
-  buildSelectors();
-  updateWeekBadge();
-  // Poll until Firebase is ready, then show page
+  // Wait for Firebase to be ready, then load everything
   (async function waitForFirebase() {
     let tries = 0;
-    while (!window.fbGetSpreadsWeek && tries < 20) {
-      await new Promise(r => setTimeout(r, 150));
+    while (!window.fbGetSpreadsWeek && tries < 30) {
+      await new Promise(r => setTimeout(r, 100));
       tries++;
     }
-    showPage('selector');
+    await updateWeekBadge();
+    await showPage('selector');
   })();
 }
 
-// ── Page switching ──
-function showPage(page) {
-  document.getElementById('selectorPage').style.display = 'none';
-  document.getElementById('myPicksPage').style.display = 'none';
-  document.getElementById('scoresPage').style.display = 'none';
-  document.getElementById('adminPage').style.display = 'none';
+// ── Page Switching ──
+async function showPage(page) {
+  document.getElementById('selectorPage').style.display  = 'none';
+  document.getElementById('myPicksPage').style.display   = 'none';
+  document.getElementById('scoresPage').style.display    = 'none';
+  document.getElementById('adminPage').style.display     = 'none';
 
   document.getElementById('navSelector').classList.remove('active');
   document.getElementById('navMyPicks').classList.remove('active');
@@ -1241,284 +1123,122 @@ function showPage(page) {
   if (page === 'selector') {
     const p = document.getElementById('selectorPage');
     p.style.display = 'flex';
-    p.classList.remove('fade-in');
-    void p.offsetWidth; // reflow to re-trigger animation
-    p.classList.add('fade-in');
+    p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
     document.getElementById('navSelector').classList.add('active');
-    console.log('SPREADS: showPage selector called, loading spreads...');
     loadSpreadsOnHomePage();
+  } else if (page === 'myPicks') {
+    const p = document.getElementById('myPicksPage');
+    p.style.display = 'flex';
+    p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
+    document.getElementById('navMyPicks').classList.add('active');
+    loadMyPicks();
   } else if (page === 'scores') {
     const p = document.getElementById('scoresPage');
     p.style.display = 'flex';
-    p.classList.remove('fade-in');
-    void p.offsetWidth;
-    p.classList.add('fade-in');
+    p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
     document.getElementById('navScores').classList.add('active');
     initScores();
   } else if (page === 'admin') {
     const p = document.getElementById('adminPage');
     p.style.display = 'flex';
-    p.classList.remove('fade-in');
-    void p.offsetWidth;
-    p.classList.add('fade-in');
+    p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
     loadAdminWeekOverride();
-  } else if (page === 'myPicks') {
-    const p = document.getElementById('myPicksPage');
-    p.style.display = 'flex';
-    p.classList.remove('fade-in');
-    void p.offsetWidth;
-    p.classList.add('fade-in');
-    document.getElementById('navMyPicks').classList.add('active');
-    loadMyPicks();
   }
 }
 
 // ── Logout ──
 function logout() {
   document.getElementById('topNav').classList.remove('visible');
+  document.getElementById('adminCorner').style.display  = 'none';
+  document.getElementById('loginPage').style.display    = 'flex';
   document.getElementById('selectorPage').style.display = 'none';
-  document.getElementById('myPicksPage').style.display = 'none';
-  document.getElementById('loginPage').style.display = 'flex';
+  document.getElementById('myPicksPage').style.display  = 'none';
+  document.getElementById('scoresPage').style.display   = 'none';
+  document.getElementById('adminPage').style.display    = 'none';
   document.getElementById('emailInput').value = '';
-  document.getElementById('pinInput').value = '';
+  document.getElementById('pinInput').value   = '';
   document.getElementById('errorMsg').classList.remove('show');
-  document.getElementById('selectors').innerHTML = '';
-  document.getElementById('resultBanner').classList.remove('show');
+  document.getElementById('spreadsSection').style.display = 'none';
+  selectedPicks = [];
+  clearInterval(scoresRefreshTimer);
 }
 
-// ── Selector ──
-function buildSelectors() {
-  const container = document.getElementById('selectors');
-  container.innerHTML = '';
-  LABELS.forEach((label, i) => {
-    const row = document.createElement('div');
-    row.className = 'selector-row';
-    const lbl = document.createElement('span');
-    lbl.className = 'slot-label';
-    lbl.textContent = label;
-    const sep = document.createElement('div');
-    sep.className = 'sep';
-    const sel = document.createElement('select');
-    sel.id = `team-${i}`;
-    const ph = document.createElement('option');
-    ph.value = ''; ph.textContent = 'Choose a team...';
-    ph.disabled = true; ph.selected = true;
-    sel.appendChild(ph);
-    NFL_TEAMS.forEach(team => {
-      const opt = document.createElement('option');
-      opt.value = team; opt.textContent = team;
-      sel.appendChild(opt);
+// ── Picks: toggle, render, counter ──
+function togglePick(abbr, gameIdx) {
+  const card     = document.querySelector('.spread-card[data-game="' + gameIdx + '"]');
+  const awayAbbr = card ? card.dataset.away : null;
+  const homeAbbr = card ? card.dataset.home : null;
+  const otherAbbr = abbr === awayAbbr ? homeAbbr : awayAbbr;
+  const alreadyIdx = selectedPicks.indexOf(abbr);
+
+  if (alreadyIdx >= 0) {
+    selectedPicks.splice(alreadyIdx, 1);
+  } else {
+    if (otherAbbr) {
+      const otherIdx = selectedPicks.indexOf(otherAbbr);
+      if (otherIdx >= 0) selectedPicks.splice(otherIdx, 1);
+    }
+    if (selectedPicks.length >= 5) { showPicksWarning(); return; }
+    selectedPicks.push(abbr);
+  }
+  renderPickSelections();
+  updatePicksCounter();
+}
+
+function showPicksWarning() {
+  const counter = document.getElementById('picksCounter');
+  if (!counter) return;
+  counter.classList.add('warn');
+  setTimeout(() => counter.classList.remove('warn'), 800);
+}
+
+function renderPickSelections() {
+  const maxReached = selectedPicks.length >= 5;
+  document.querySelectorAll('.spread-card').forEach(card => {
+    const awayAbbr   = card.dataset.away;
+    const homeAbbr   = card.dataset.home;
+    const gameHasPick = selectedPicks.includes(awayAbbr) || selectedPicks.includes(homeAbbr);
+    card.classList.toggle('card-locked', maxReached && !gameHasPick);
+
+    card.querySelectorAll('.team-pick-btn').forEach(btn => {
+      const abbr      = btn.dataset.abbr;
+      const otherAbbr = abbr === awayAbbr ? homeAbbr : awayAbbr;
+      const isSelected   = selectedPicks.includes(abbr);
+      const otherSelected = selectedPicks.includes(otherAbbr);
+
+      // Force full reset via attribute
+      btn.removeAttribute('data-state');
+      btn.classList.remove('selected', 'dimmed');
+
+      if (isSelected) {
+        btn.setAttribute('data-state', 'selected');
+        btn.classList.add('selected');
+      } else if (otherSelected) {
+        btn.setAttribute('data-state', 'dimmed');
+        btn.classList.add('dimmed');
+      } else {
+        btn.setAttribute('data-state', 'idle');
+      }
     });
-    sel.addEventListener('change', syncDropdowns);
-    const arrow = document.createElement('span');
-    arrow.className = 'arrow';
-    arrow.innerHTML = '&#9660;';
-    row.appendChild(lbl); row.appendChild(sep); row.appendChild(sel); row.appendChild(arrow);
-    container.appendChild(row);
   });
 }
 
-function syncDropdowns() {
-  const selected = [];
-  for (let i = 0; i < 5; i++) {
-    const val = document.getElementById(`team-${i}`).value;
-    if (val) selected.push({ val, slot: i });
-  }
-  for (let i = 0; i < 5; i++) {
-    const sel = document.getElementById(`team-${i}`);
-    Array.from(sel.options).forEach(opt => {
-      if (!opt.value) return;
-      opt.disabled = selected.some(s => s.val === opt.value && s.slot !== i);
-    });
-  }
+function updatePicksCounter() {
+  const counter   = document.getElementById('picksCounter');
+  const submitBtn = document.getElementById('spreadsSubmitBtn');
+  if (!counter) return;
+  counter.textContent = selectedPicks.length + ' / 5 picked';
+  counter.classList.toggle('full', selectedPicks.length === 5);
+  if (submitBtn) submitBtn.disabled = selectedPicks.length === 0;
 }
 
-function clearAll() {
-  for (let i = 0; i < 5; i++) document.getElementById(`team-${i}`).selectedIndex = 0;
-  syncDropdowns();
-  document.getElementById('resultBanner').classList.remove('show');
+function clearSpreadsPicks() {
+  selectedPicks = [];
+  renderPickSelections();
+  updatePicksCounter();
 }
 
-const PICKS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwSRseA76KhYoGki33yQ7O5MEGVOBdKYzYTAYSef88VBgoi2ymcWRvz3sZg5sqeIw/exec';
-
-async function showResults() {
-  const picks = [];
-  for (let i = 0; i < 5; i++) {
-    const val = document.getElementById(`team-${i}`).value;
-    if (val) picks.push(val);
-  }
-
-  const banner   = document.getElementById('resultBanner');
-  const teamsDiv = document.getElementById('resultTeams');
-  const submitBtn = document.querySelector('.btn-submit');
-
-  if (!picks.length) { banner.classList.remove('show'); return; }
-
-  // Build result chips immediately
-  teamsDiv.innerHTML = '';
-  picks.forEach(team => {
-    const chip = document.createElement('div');
-    chip.className = 'team-chip';
-    chip.textContent = team;
-    teamsDiv.appendChild(chip);
-  });
-  banner.classList.add('show');
-
-  // Build payload
-  const now   = new Date();
-  const date  = now.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
-  const time  = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  // Check Firebase override first, fall back to auto-detect
-  let weekLabel = 'Off Season';
-  try {
-    const override = window.fbGetWeekOverride ? await window.fbGetWeekOverride() : null;
-    if (override) {
-      weekLabel = override;
-    } else {
-      const currentWeek = getCurrentNFLWeek();
-      weekLabel = currentWeek ? 'Week ' + currentWeek : 'Off Season';
-    }
-  } catch(e) {
-    const currentWeek = getCurrentNFLWeek();
-    weekLabel = currentWeek ? 'Week ' + currentWeek : 'Off Season';
-  }
-  const payload = {
-    email: document.getElementById('navEmail').textContent,
-    date,
-    time,
-    week: weekLabel,
-    pick1: picks[0] || '',
-    pick2: picks[1] || '',
-    pick3: picks[2] || '',
-    pick4: picks[3] || '',
-    pick5: picks[4] || ''
-  };
-
-  submitBtn.disabled = true;
-  submitBtn.textContent = 'Saving…';
-
-  try {
-    // Save to Firebase (primary) and Google Sheets (backup) in parallel
-    const fbPromise = window.fbSavePick ? window.fbSavePick(payload) : Promise.resolve();
-    const sheetPromise = fetch(PICKS_SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    await Promise.all([fbPromise, sheetPromise]);
-
-    submitBtn.textContent = 'Picks Saved ✓';
-    submitBtn.style.background = 'linear-gradient(135deg, #4caf7d 0%, #2e7d52 100%)';
-    setTimeout(() => {
-      submitBtn.textContent = 'Lock In Picks';
-      submitBtn.style.background = '';
-      submitBtn.disabled = false;
-    }, 3000);
-  } catch (err) {
-    console.error('Save failed:', err);
-    submitBtn.textContent = 'Save Failed — Retry';
-    submitBtn.style.background = 'linear-gradient(135deg, #e05555 0%, #a03030 100%)';
-    submitBtn.disabled = false;
-    setTimeout(() => {
-      submitBtn.textContent = 'Lock In Picks';
-      submitBtn.style.background = '';
-    }, 3000);
-  }
-}
-
-// ── My Picks Loader ──
-async function loadMyPicks() {
-  const email     = document.getElementById('navEmail').textContent.toLowerCase();
-  const loadingEl = document.getElementById('picksLoading');
-  const errorEl   = document.getElementById('picksError');
-  const groupsEl  = document.getElementById('picksGroups');
-
-  loadingEl.style.display = 'block';
-  errorEl.style.display   = 'none';
-  groupsEl.innerHTML      = '';
-
-  try {
-    // Read from Firebase — always fresh, no caching
-    if (!window.fbGetMyPicks) throw new Error('Firebase not ready');
-    const myDocs = await window.fbGetMyPicks(email);
-
-    loadingEl.style.display = 'none';
-
-    if (myDocs.length === 0) {
-      groupsEl.innerHTML = '<div class="picks-empty"><div class="icon">📋</div><p>No picks submitted yet.</p></div>';
-      return;
-    }
-
-    // Group by week (already sorted desc by timestamp from Firebase query)
-    const grouped = {};
-    const weekOrder = [];
-    myDocs.forEach(doc => {
-      const week = doc.week || 'Unknown Week';
-      if (!grouped[week]) { grouped[week] = []; weekOrder.push(week); }
-      grouped[week].push(doc);
-    });
-
-    // Dedupe week order while preserving first-seen order (latest first)
-    const sortedWeeks = [...new Set(weekOrder)];
-
-    sortedWeeks.forEach((week, wi) => {
-      const submissions = grouped[week];
-      const group = document.createElement('div');
-      group.className = 'week-group';
-      group.style.animationDelay = (wi * 0.08) + 's';
-
-      const header = document.createElement('div');
-      header.className = 'week-group-header';
-      const titleEl = document.createElement('span');
-      titleEl.className = 'week-group-title';
-      titleEl.textContent = week;
-      const countEl = document.createElement('span');
-      countEl.className = 'week-group-count';
-      countEl.textContent = submissions.length + ' submission' + (submissions.length !== 1 ? 's' : '');
-      header.appendChild(titleEl);
-      header.appendChild(countEl);
-      group.appendChild(header);
-
-      submissions.forEach(doc => {
-        const picks = [doc.pick1, doc.pick2, doc.pick3, doc.pick4, doc.pick5].filter(p => p && p.trim());
-
-        const sub = document.createElement('div');
-        sub.className = 'picks-submission';
-
-        const meta = document.createElement('div');
-        meta.className = 'submission-meta';
-        meta.textContent = [doc.date, doc.time].filter(Boolean).join(' · ');
-        sub.appendChild(meta);
-
-        const chipsEl = document.createElement('div');
-        chipsEl.className = 'submission-picks';
-        picks.forEach((pick, pi) => {
-          const chip = document.createElement('div');
-          chip.className = 'pick-chip';
-          const numEl = document.createElement('span');
-          numEl.className = 'pick-num';
-          numEl.textContent = pi + 1;
-          chip.appendChild(numEl);
-          chip.appendChild(document.createTextNode(pick));
-          chipsEl.appendChild(chip);
-        });
-        sub.appendChild(chipsEl);
-        group.appendChild(sub);
-      });
-
-      groupsEl.appendChild(group);
-    });
-
-  } catch (err) {
-    loadingEl.style.display = 'none';
-    errorEl.style.display   = 'block';
-    errorEl.textContent     = 'Unable to load picks. Please try again later.';
-    console.error(err);
-  }
-}
-
-// ── Submit Spread Picks ──
+// ── Submit Picks ──
 async function submitSpreadsPicks() {
   if (selectedPicks.length === 0) return;
   const btn    = document.getElementById('spreadsSubmitBtn');
@@ -1530,20 +1250,18 @@ async function submitSpreadsPicks() {
   const now  = new Date();
   const date = now.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
   const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
   let weekLabel = 'Off Season';
   try {
-    const override = window.fbGetWeekOverride ? await window.fbGetWeekOverride() : null;
-    if (override) { weekLabel = override; }
-    else { const w = getCurrentNFLWeek(); weekLabel = w ? 'Week ' + w : 'Off Season'; }
+    const w = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
+    weekLabel = w ? 'Week ' + w : 'Off Season';
   } catch(e) {}
 
   const payload = {
     email: document.getElementById('navEmail').textContent,
     date, time, week: weekLabel,
-    pick1: selectedPicks[0] || '',
-    pick2: selectedPicks[1] || '',
-    pick3: selectedPicks[2] || '',
-    pick4: selectedPicks[3] || '',
+    pick1: selectedPicks[0] || '', pick2: selectedPicks[1] || '',
+    pick3: selectedPicks[2] || '', pick4: selectedPicks[3] || '',
     pick5: selectedPicks[4] || ''
   };
 
@@ -1573,130 +1291,223 @@ async function submitSpreadsPicks() {
   }
 }
 
-
-// ── NFL Team Logos (ESPN CDN) ──
-function getTeamLogo(abbr) {
-  // Map abbr to ESPN's slug used in their public CDN
-  const slugs = {
-    'ARI':'ari','ATL':'atl','BAL':'bal','BUF':'buf','CAR':'car','CHI':'chi',
-    'CIN':'cin','CLE':'cle','DAL':'dal','DEN':'den','DET':'det','GB':'gb',
-    'HOU':'hou','IND':'ind','JAX':'jax','KC':'kc','LAC':'lac','LAR':'lar',
-    'LV':'lv','MIA':'mia','MIN':'min','NE':'ne','NO':'no','NYG':'nyg',
-    'NYJ':'nyj','PHI':'phi','PIT':'pit','SF':'sf','SEA':'sea','TB':'tb',
-    'TEN':'ten','WSH':'wsh'
-  };
-  const slug = slugs[abbr.toUpperCase()];
-  if (!slug) return '';
-  return 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/' + slug + '.png&w=40&h=40&transparent=true';
+// ── Spreads ──
+async function loadSpreadsOnHomePage() {
+  try {
+    const week = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
+    if (!week) { document.getElementById('spreadsSection').style.display = 'none'; return; }
+    await fetchAndRenderSpreads(week);
+  } catch(e) {
+    console.error('Spreads load error:', e);
+    document.getElementById('spreadsSection').style.display = 'none';
+  }
 }
 
-// ── Picks State ──
-let selectedPicks = []; // array of abbr strings, max 5
+async function fetchAndRenderSpreads(week) {
+  const section = document.getElementById('spreadsSection');
+  const grid    = document.getElementById('spreadsGrid');
+  const title   = document.getElementById('spreadsTitle');
 
-function togglePick(abbr, gameIdx) {
-  const alreadyIdx = selectedPicks.indexOf(abbr);
-  const card = document.querySelector('.spread-card[data-game="' + gameIdx + '"]');
-  const awayAbbr = card ? card.dataset.away : null;
-  const homeAbbr = card ? card.dataset.home : null;
-  const otherAbbr = abbr === awayAbbr ? homeAbbr : awayAbbr;
+  grid.innerHTML = '';
+  section.style.display = 'none';
+  selectedPicks = [];
+  updatePicksCounter();
 
-  if (alreadyIdx >= 0) {
-    // Deselect
-    selectedPicks.splice(alreadyIdx, 1);
-  } else {
-    // Remove the other team from this game if selected
-    if (otherAbbr) {
-      const otherIdx = selectedPicks.indexOf(otherAbbr);
-      if (otherIdx >= 0) selectedPicks.splice(otherIdx, 1);
-    }
-    if (selectedPicks.length >= 5) {
-      showPicksWarning();
+  try {
+    const res = await fetch(SPREADS_CSV_URL + '&cachebust=' + Date.now());
+    if (!res.ok) throw new Error('Sheet unreachable');
+    const text = await res.text();
+    const rows = parseCSV(text);
+    const dataRows = rows[0][0].toLowerCase().includes('week') ? rows.slice(1) : rows;
+    const weekLabel = 'Week ' + week;
+    const weekRows = dataRows.filter(r => r[0] && r[0].trim().toLowerCase() === weekLabel.toLowerCase());
+
+    if (weekRows.length === 0) { section.style.display = 'none'; return; }
+
+    title.textContent = weekLabel + ' Matchups & Spreads';
+    section.style.display = 'block';
+
+    weekRows.forEach((row, i) => {
+      const date     = (row[1] || '').trim();
+      const gameTime = (row[2] || '').trim();
+      const home     = (row[3] || '').trim();
+      const away     = (row[4] || '').trim();
+      const odds     = (row[5] || '').trim();
+      if (!away && !home) return;
+
+      const oddsUpper = odds.toUpperCase();
+      let awaySpread = '', homeSpread = '';
+      if (oddsUpper === 'EVEN' || oddsUpper === 'PK') {
+        awaySpread = 'EVEN'; homeSpread = 'EVEN';
+      } else if (oddsUpper.startsWith(away.toUpperCase())) {
+        awaySpread = odds.substring(away.length).trim();
+        const num = parseFloat(awaySpread);
+        if (!isNaN(num)) homeSpread = (num > 0 ? '-' : '+') + Math.abs(num);
+      } else if (oddsUpper.startsWith(home.toUpperCase())) {
+        homeSpread = odds.substring(home.length).trim();
+        const num = parseFloat(homeSpread);
+        if (!isNaN(num)) awaySpread = (num > 0 ? '-' : '+') + Math.abs(num);
+      } else { homeSpread = odds; }
+
+      const awayLogo = getTeamLogo(away);
+      const homeLogo = getTeamLogo(home);
+
+      const card = document.createElement('div');
+      card.className = 'spread-card';
+      card.dataset.game = i;
+      card.dataset.away = away;
+      card.dataset.home = home;
+      card.style.animationDelay = (i * 0.04) + 's';
+
+      const awayBtn = document.createElement('div');
+      awayBtn.className = 'team-pick-btn';
+      awayBtn.dataset.abbr = away;
+      awayBtn.dataset.game = i;
+      awayBtn.setAttribute('data-state', 'idle');
+      awayBtn.onclick = () => togglePick(away, i);
+      awayBtn.innerHTML = (awayLogo ? '<img class="team-logo" src="' + awayLogo + '" alt="' + away + '">' : '') +
+        '<div class="team-pick-info"><div class="team-pick-abbr">' + away + '</div>' +
+        '<div class="team-pick-spread">' + (awaySpread || '') + '</div></div>';
+
+      const vsEl = document.createElement('div');
+      vsEl.className = 'spread-vs';
+      vsEl.innerHTML = '<span>@</span><div class="spread-meta-inline">' +
+        (date ? '<span>' + date + '</span>' : '') +
+        (gameTime ? '<span>' + gameTime + '</span>' : '') + '</div>';
+
+      const homeBtn = document.createElement('div');
+      homeBtn.className = 'team-pick-btn';
+      homeBtn.dataset.abbr = home;
+      homeBtn.dataset.game = i;
+      homeBtn.setAttribute('data-state', 'idle');
+      homeBtn.onclick = () => togglePick(home, i);
+      homeBtn.innerHTML = (homeLogo ? '<img class="team-logo" src="' + homeLogo + '" alt="' + home + '">' : '') +
+        '<div class="team-pick-info"><div class="team-pick-abbr">' + home + '</div>' +
+        '<div class="team-pick-spread">' + (homeSpread || '') + '</div></div>';
+
+      card.appendChild(awayBtn);
+      card.appendChild(vsEl);
+      card.appendChild(homeBtn);
+      grid.appendChild(card);
+    });
+
+  } catch(e) {
+    console.error('Spreads fetch error:', e);
+    section.style.display = 'none';
+  }
+}
+
+// ── My Picks ──
+async function loadMyPicks() {
+  const email     = document.getElementById('navEmail').textContent.toLowerCase();
+  const loadingEl = document.getElementById('picksLoading');
+  const errorEl   = document.getElementById('picksError');
+  const groupsEl  = document.getElementById('picksGroups');
+
+  loadingEl.style.display = 'block';
+  errorEl.style.display   = 'none';
+  groupsEl.innerHTML      = '';
+
+  try {
+    if (!window.fbGetMyPicks) throw new Error('Firebase not ready');
+    const myDocs = await window.fbGetMyPicks(email);
+    loadingEl.style.display = 'none';
+
+    if (myDocs.length === 0) {
+      groupsEl.innerHTML = '<div class="picks-empty"><div class="icon">📋</div><p>No picks submitted yet.</p></div>';
       return;
     }
-    selectedPicks.push(abbr);
-  }
-  renderPickSelections();
-  updatePicksCounter();
-}
 
-function showPicksWarning() {
-  const counter = document.getElementById('picksCounter');
-  counter.classList.add('warn');
-  setTimeout(() => counter.classList.remove('warn'), 800);
-}
-
-function renderPickSelections() {
-  const maxReached = selectedPicks.length >= 5;
-
-  document.querySelectorAll('.spread-card').forEach(card => {
-    const awayAbbr = card.dataset.away;
-    const homeAbbr = card.dataset.home;
-    const gameHasPick = selectedPicks.includes(awayAbbr) || selectedPicks.includes(homeAbbr);
-
-    card.classList.toggle('card-locked', maxReached && !gameHasPick);
-
-    card.querySelectorAll('.team-pick-btn').forEach(btn => {
-      const abbr = btn.dataset.abbr;
-      const isSelected = selectedPicks.includes(abbr);
-      const otherAbbr = abbr === awayAbbr ? homeAbbr : awayAbbr;
-      const otherSelected = selectedPicks.includes(otherAbbr);
-
-      // Fully wipe the attribute and re-set to avoid any CSS sticking
-      btn.removeAttribute('data-state');
-      btn.classList.remove('selected');
-      btn.classList.remove('dimmed');
-
-      if (isSelected) {
-        btn.setAttribute('data-state', 'selected');
-        btn.classList.add('selected');
-      } else if (otherSelected) {
-        btn.setAttribute('data-state', 'dimmed');
-        btn.classList.add('dimmed');
-      } else {
-        btn.setAttribute('data-state', 'idle');
-      }
+    const grouped = {};
+    const weekOrder = [];
+    myDocs.forEach(doc => {
+      const week = doc.week || 'Unknown Week';
+      if (!grouped[week]) { grouped[week] = []; weekOrder.push(week); }
+      grouped[week].push(doc);
     });
-  });
+
+    const sortedWeeks = [...new Set(weekOrder)];
+    sortedWeeks.forEach((week, wi) => {
+      const submissions = grouped[week];
+      const group = document.createElement('div');
+      group.className = 'week-group';
+      group.style.animationDelay = (wi * 0.08) + 's';
+
+      const header = document.createElement('div');
+      header.className = 'week-group-header';
+      const titleEl = document.createElement('span');
+      titleEl.className = 'week-group-title';
+      titleEl.textContent = week;
+      const countEl = document.createElement('span');
+      countEl.className = 'week-group-count';
+      countEl.textContent = submissions.length + ' submission' + (submissions.length !== 1 ? 's' : '');
+      header.appendChild(titleEl);
+      header.appendChild(countEl);
+      group.appendChild(header);
+
+      submissions.forEach(doc => {
+        const picks = [doc.pick1, doc.pick2, doc.pick3, doc.pick4, doc.pick5].filter(p => p && p.trim());
+        const sub = document.createElement('div');
+        sub.className = 'picks-submission';
+        const meta = document.createElement('div');
+        meta.className = 'submission-meta';
+        meta.textContent = [doc.date, doc.time].filter(Boolean).join(' · ');
+        sub.appendChild(meta);
+        const chipsEl = document.createElement('div');
+        chipsEl.className = 'submission-picks';
+        picks.forEach((pick, pi) => {
+          const chip = document.createElement('div');
+          chip.className = 'pick-chip';
+          const numEl = document.createElement('span');
+          numEl.className = 'pick-num';
+          numEl.textContent = pi + 1;
+          chip.appendChild(numEl);
+          chip.appendChild(document.createTextNode(pick));
+          chipsEl.appendChild(chip);
+        });
+        sub.appendChild(chipsEl);
+        group.appendChild(sub);
+      });
+      groupsEl.appendChild(group);
+    });
+  } catch(err) {
+    loadingEl.style.display = 'none';
+    errorEl.style.display   = 'block';
+    errorEl.textContent     = 'Unable to load picks. Please try again later.';
+    console.error(err);
+  }
 }
 
-function clearSpreadsPicks() {
-  selectedPicks = [];
-  renderPickSelections();
-  updatePicksCounter();
-}
-
-function updatePicksCounter() {
-  const counter = document.getElementById('picksCounter');
-  const submitBtn = document.getElementById('spreadsSubmitBtn');
-  if (!counter) return;
-  counter.textContent = selectedPicks.length + ' / 5 picked';
-  counter.classList.toggle('full', selectedPicks.length === 5);
-  if (submitBtn) submitBtn.disabled = selectedPicks.length === 0;
-}
 // ── Scores ──
 function initScores() {
-  const cur = getCurrentNFLWeek();
-  scoresWeek = cur || 1;
-  // Default year: if we're Jan-Aug 2026, upcoming season is 2026; current season is 2025
   const now = new Date();
-  scoresYear = now.getFullYear();
-  // NFL season year = the year the season starts (e.g. 2025 season = Sep 2025 - Jan 2026)
-  // If we're in Jan-Aug, the current season started last year
-  if (now.getMonth() < 8) scoresYear = scoresYear - 1;
-  updateScoresYearLabel();
+  scoresYear = now.getMonth() < 8 ? now.getFullYear() - 1 : now.getFullYear();
+  scoresWeek = scoresWeek || 1;
   updateScoresWeekLabel();
+  updateScoresYearLabel();
   fetchScores();
   clearInterval(scoresRefreshTimer);
   scoresRefreshTimer = setInterval(fetchScores, 15 * 60 * 1000);
 }
 
+function updateScoresWeekLabel() {
+  document.getElementById('scoresWeekLabel').textContent = 'Week ' + scoresWeek;
+  document.getElementById('weekPrev').disabled = scoresWeek <= 1;
+  document.getElementById('weekNext').disabled = scoresWeek >= 18;
+}
+
 function updateScoresYearLabel() {
   document.getElementById('scoresYearLabel').textContent = scoresYear;
-  // ESPN has NFL data back to ~2000, cap future at 1 year ahead
   const now = new Date();
   const maxYear = now.getMonth() >= 8 ? now.getFullYear() + 1 : now.getFullYear();
   document.getElementById('yearPrev').disabled = scoresYear <= 2000;
   document.getElementById('yearNext').disabled = scoresYear >= maxYear;
+}
+
+function changeScoresWeek(dir) {
+  scoresWeek = Math.min(18, Math.max(1, scoresWeek + dir));
+  updateScoresWeekLabel();
+  fetchScores();
 }
 
 function changeScoresYear(dir) {
@@ -1707,24 +1518,10 @@ function changeScoresYear(dir) {
   fetchScores();
 }
 
-function updateScoresWeekLabel() {
-  document.getElementById('scoresWeekLabel').textContent = 'Week ' + scoresWeek;
-  document.getElementById('weekPrev').disabled = scoresWeek <= 1;
-  document.getElementById('weekNext').disabled = scoresWeek >= 18;
-  if (scoresYear) updateScoresYearLabel();
-}
-
-function changeScoresWeek(dir) {
-  scoresWeek = Math.min(18, Math.max(1, scoresWeek + dir));
-  updateScoresWeekLabel();
-  fetchScores();
-}
-
 async function fetchScores() {
   const loadingEl = document.getElementById('scoresLoading');
   const errorEl   = document.getElementById('scoresError');
   const gridEl    = document.getElementById('scoresGrid');
-
   loadingEl.style.display = 'block';
   errorEl.style.display   = 'none';
   gridEl.innerHTML        = '';
@@ -1737,9 +1534,8 @@ async function fetchScores() {
     const url = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=' + scoresYear + '&seasontype=2&week=' + scoresWeek;
     const res  = await fetch(url);
     if (!res.ok) throw new Error('ESPN API error');
-    const data = await res.json();
+    const data   = await res.json();
     const events = data.events || [];
-
     loadingEl.style.display = 'none';
 
     if (events.length === 0) {
@@ -1763,11 +1559,11 @@ async function fetchScores() {
 
       const homeScore = parseInt(home && home.score) || 0;
       const awayScore = parseInt(away && away.score) || 0;
-      const isFinal   = stateType === 'post';
-      const isLive    = stateType === 'in';
-      const isPre     = stateType === 'pre';
-      const homeWins  = isFinal && homeScore > awayScore;
-      const awayWins  = isFinal && awayScore > homeScore;
+      const isFinal = stateType === 'post';
+      const isLive  = stateType === 'in';
+      const isPre   = stateType === 'pre';
+      const homeWins = isFinal && homeScore > awayScore;
+      const awayWins = isFinal && awayScore > homeScore;
 
       const card = document.createElement('div');
       card.className = 'score-card' + (isLive ? ' live' : '');
@@ -1782,28 +1578,22 @@ async function fetchScores() {
       const awayRecord = away && away.records && away.records[0] ? away.records[0].summary : '';
       const homeRecord = home && home.records && home.records[0] ? home.records[0].summary : '';
 
-      // Build card safely using DOM methods
       const cardHeader = document.createElement('div');
       cardHeader.className = 'score-card-header';
-
       const statusEl = document.createElement('span');
       statusEl.className = 'game-status ' + (isLive ? 'live' : isFinal ? 'final' : 'scheduled');
       statusEl.textContent = isLive ? statusStr : isFinal ? 'Final' : 'Scheduled';
-
       const networkEl = document.createElement('span');
       networkEl.className = 'game-network';
       networkEl.textContent = network;
-
       cardHeader.appendChild(statusEl);
       cardHeader.appendChild(networkEl);
 
       const cardBody = document.createElement('div');
       cardBody.className = 'score-card-body';
-
       const matchup = document.createElement('div');
       matchup.className = 'score-matchup';
 
-      // Away team row
       const awayRow = document.createElement('div');
       awayRow.className = 'score-team';
       const awayInfo = document.createElement('div');
@@ -1813,18 +1603,15 @@ async function fetchScores() {
       const awayRecordEl = document.createElement('div');
       awayRecordEl.className = 'score-team-record';
       awayRecordEl.textContent = awayRecord;
-      awayInfo.appendChild(awayNameEl);
-      awayInfo.appendChild(awayRecordEl);
+      awayInfo.appendChild(awayNameEl); awayInfo.appendChild(awayRecordEl);
       const awayPts = document.createElement('div');
       awayPts.className = 'score-points' + (awayWins ? ' winner' : '') + (isPre ? ' tbd' : '');
       awayPts.textContent = isPre ? '—' : awayScore;
-      awayRow.appendChild(awayInfo);
-      awayRow.appendChild(awayPts);
+      awayRow.appendChild(awayInfo); awayRow.appendChild(awayPts);
 
       const dividerEl = document.createElement('div');
       dividerEl.className = 'score-divider';
 
-      // Home team row
       const homeRow = document.createElement('div');
       homeRow.className = 'score-team';
       const homeInfo = document.createElement('div');
@@ -1834,17 +1621,13 @@ async function fetchScores() {
       const homeRecordEl = document.createElement('div');
       homeRecordEl.className = 'score-team-record';
       homeRecordEl.textContent = homeRecord;
-      homeInfo.appendChild(homeNameEl);
-      homeInfo.appendChild(homeRecordEl);
+      homeInfo.appendChild(homeNameEl); homeInfo.appendChild(homeRecordEl);
       const homePts = document.createElement('div');
       homePts.className = 'score-points' + (homeWins ? ' winner' : '') + (isPre ? ' tbd' : '');
       homePts.textContent = isPre ? '—' : homeScore;
-      homeRow.appendChild(homeInfo);
-      homeRow.appendChild(homePts);
+      homeRow.appendChild(homeInfo); homeRow.appendChild(homePts);
 
-      matchup.appendChild(awayRow);
-      matchup.appendChild(dividerEl);
-      matchup.appendChild(homeRow);
+      matchup.appendChild(awayRow); matchup.appendChild(dividerEl); matchup.appendChild(homeRow);
       cardBody.appendChild(matchup);
 
       if (isPre || isLive) {
@@ -1854,14 +1637,11 @@ async function fetchScores() {
         cardBody.appendChild(timeInfo);
       }
 
-      card.appendChild(cardHeader);
-      card.appendChild(cardBody);
-
+      card.appendChild(cardHeader); card.appendChild(cardBody);
       grid.appendChild(card);
     });
 
     gridEl.appendChild(grid);
-
   } catch(err) {
     loadingEl.style.display = 'none';
     errorEl.style.display   = 'block';
@@ -1870,217 +1650,20 @@ async function fetchScores() {
   }
 }
 
-
 // ── Admin ──
 async function loadAdminWeekOverride() {
   loadAdminSpreadsWeek();
-  const el = document.getElementById('adminCurrentOverride');
-  try {
-    const val = window.fbGetWeekOverride ? await window.fbGetWeekOverride() : null;
-    el.textContent = val ? val : 'None (auto-detect)';
-    if (val) {
-      const sel = document.getElementById('adminWeekSelect');
-      sel.value = val;
-    }
-  } catch(e) {
-    el.textContent = 'Unable to load';
-  }
-}
-
-async function adminSetWeek() {
-  const sel    = document.getElementById('adminWeekSelect');
-  const status = document.getElementById('adminStatus');
-  const val    = sel.value;
-  if (!val) { setAdminStatus('Please select a week first.', 'error'); return; }
-  try {
-    await window.fbSaveWeekOverride(val);
-    document.getElementById('adminCurrentOverride').textContent = val;
-    setAdminStatus('Week override set to ' + val + ' successfully!', 'success');
-    updateWeekBadge(); // refresh badge immediately
-  } catch(e) {
-    setAdminStatus('Failed to save. Please try again.', 'error');
-    console.error(e);
-  }
-}
-
-async function adminResetWeek() {
-  const status = document.getElementById('adminStatus');
-  try {
-    await window.fbSaveWeekOverride(null);
-    document.getElementById('adminCurrentOverride').textContent = 'None (auto-detect)';
-    document.getElementById('adminWeekSelect').value = '';
-    setAdminStatus('Reset to auto-detect successfully!', 'success');
-    updateWeekBadge();
-  } catch(e) {
-    setAdminStatus('Failed to reset. Please try again.', 'error');
-    console.error(e);
-  }
-}
-
-function setAdminStatus(msg, type) {
-  const el = document.getElementById('adminStatus');
-  el.textContent = msg;
-  el.className = 'admin-status ' + type;
-  setTimeout(() => { el.textContent = ''; el.className = 'admin-status'; }, 4000);
-}
-
-// ── Spreads ──
-async function loadSpreadsOnHomePage() {
-  // Wait up to 3 seconds for Firebase module to be ready
-  let attempts = 0;
-  while (!window.fbGetSpreadsWeek && attempts < 15) {
-    await new Promise(r => setTimeout(r, 200));
-    attempts++;
-  }
-  try {
-    const week = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
-    console.log('SPREADS week from Firebase:', week);
-    if (!week) {
-      document.getElementById('spreadsSection').style.display = 'none';
-      return;
-    }
-    await fetchAndRenderSpreads(week);
-  } catch(e) {
-    console.error('Spreads load error:', e);
-    document.getElementById('spreadsSection').style.display = 'none';
-  }
-}
-
-async function fetchAndRenderSpreads(week) {
-  const section = document.getElementById('spreadsSection');
-  const grid    = document.getElementById('spreadsGrid');
-  const title   = document.getElementById('spreadsTitle');
-
-  grid.innerHTML = '';
-  section.style.display = 'none';
-
-  try {
-    const res = await fetch(SPREADS_CSV_URL + '&cachebust=' + Date.now());
-    if (!res.ok) throw new Error('Sheet unreachable');
-    const text = await res.text();
-    console.log('SPREADS RAW (first 500 chars):', text.substring(0, 500));
-    const rows = parseCSV(text);
-    console.log('SPREADS TOTAL ROWS:', rows.length);
-    console.log('SPREADS HEADER ROW:', rows[0]);
-    console.log('SPREADS FIRST DATA ROW:', rows[1]);
-
-    // Columns: Week(0), Date(1), Time(2), Home Team(3), Away Team(4), Odds(5)
-    // Skip header row
-    const dataRows = rows[0][0].toLowerCase().includes('week') ? rows.slice(1) : rows;
-
-    // Filter to selected week — sheet has "Week 1", "Week 2" etc.
-    const weekLabel = 'Week ' + week;
-    console.log('SPREADS looking for week label:', weekLabel);
-    console.log('SPREADS unique weeks found:', [...new Set(dataRows.map(r => r[0]))]);
-    const weekRows = dataRows.filter(r => r[0] && r[0].trim().toLowerCase() === weekLabel.toLowerCase());
-    console.log('SPREADS matching rows:', weekRows.length);
-
-    if (weekRows.length === 0) {
-      section.style.display = 'none';
-      return;
-    }
-
-    title.textContent = weekLabel + ' Matchups & Spreads';
-    section.style.display = 'block';
-
-    // Reset picks when new week loads
-    selectedPicks = [];
-    updatePicksCounter();
-
-    weekRows.forEach((row, i) => {
-      const date     = (row[1] || '').trim();
-      const gameTime = (row[2] || '').trim();
-      const home     = (row[3] || '').trim();
-      const away     = (row[4] || '').trim();
-      const odds     = (row[5] || '').trim();
-
-      if (!away && !home) return;
-
-      // Parse spread — odds column like "PHI -6.5" or "EVEN"
-      const oddsUpper = odds.toUpperCase();
-      let awaySpread = '', homeSpread = '';
-      if (oddsUpper === 'EVEN' || oddsUpper === 'PK') {
-        awaySpread = 'EVEN'; homeSpread = 'EVEN';
-      } else if (oddsUpper.startsWith(away.toUpperCase())) {
-        awaySpread = odds.substring(away.length).trim();
-        // Calculate home spread as opposite
-        const num = parseFloat(awaySpread);
-        if (!isNaN(num)) homeSpread = (num > 0 ? '-' : '+') + Math.abs(num);
-      } else if (oddsUpper.startsWith(home.toUpperCase())) {
-        homeSpread = odds.substring(home.length).trim();
-        const num = parseFloat(homeSpread);
-        if (!isNaN(num)) awaySpread = (num > 0 ? '-' : '+') + Math.abs(num);
-      } else {
-        homeSpread = odds;
-      }
-
-      const awayLogo = getTeamLogo(away);
-      const homeLogo = getTeamLogo(home);
-
-      const card = document.createElement('div');
-      card.className = 'spread-card';
-      card.dataset.game = i;
-      card.dataset.away = away;
-      card.dataset.home = home;
-      card.style.animationDelay = (i * 0.04) + 's';
-
-      // Away team button
-      const awayBtn = document.createElement('div');
-      awayBtn.className = 'team-pick-btn';
-      awayBtn.dataset.abbr = away;
-      awayBtn.dataset.game = i;
-      awayBtn.onclick = () => togglePick(away, i);
-      awayBtn.innerHTML =
-        (awayLogo ? '<img class="team-logo" src="' + awayLogo + '" alt="' + away + '">' : '') +
-        '<div class="team-pick-info">' +
-          '<div class="team-pick-abbr">' + away + '</div>' +
-          '<div class="team-pick-spread">' + (awaySpread || '') + '</div>' +
-        '</div>';
-
-      // VS divider
-      const vsEl = document.createElement('div');
-      vsEl.className = 'spread-vs';
-      vsEl.innerHTML = '<span>@</span><div class="spread-meta-inline">' +
-        (date ? '<span>' + date + '</span>' : '') +
-        (gameTime ? '<span>' + gameTime + '</span>' : '') +
-        '</div>';
-
-      // Home team button
-      const homeBtn = document.createElement('div');
-      homeBtn.className = 'team-pick-btn';
-      homeBtn.dataset.abbr = home;
-      homeBtn.dataset.game = i;
-      homeBtn.onclick = () => togglePick(home, i);
-      homeBtn.innerHTML =
-        (homeLogo ? '<img class="team-logo" src="' + homeLogo + '" alt="' + home + '">' : '') +
-        '<div class="team-pick-info">' +
-          '<div class="team-pick-abbr">' + home + '</div>' +
-          '<div class="team-pick-spread">' + (homeSpread || '') + '</div>' +
-        '</div>';
-
-      card.appendChild(awayBtn);
-      card.appendChild(vsEl);
-      card.appendChild(homeBtn);
-      grid.appendChild(card);
-    });
-
-    renderPickSelections();
-
-  } catch(e) {
-    console.error('Spreads fetch error:', e);
-    section.style.display = 'none';
-  }
 }
 
 async function adminSetSpreadsWeek() {
   const sel    = document.getElementById('adminSpreadsWeekSelect');
-  const status = document.getElementById('adminSpreadsStatus');
   const val    = sel.value;
   if (!val) { setSpreadsStatus('Please select a week first.', 'error'); return; }
   try {
     await window.fbSaveSpreadsWeek(val);
     document.getElementById('adminCurrentSpreadsWeek').textContent = 'Week ' + val;
     setSpreadsStatus('Now showing Week ' + val + ' spreads on home page!', 'success');
+    updateWeekBadge();
   } catch(e) {
     setSpreadsStatus('Failed to save. Please try again.', 'error');
     console.error(e);
@@ -2093,6 +1676,7 @@ async function adminHideSpreads() {
     document.getElementById('adminCurrentSpreadsWeek').textContent = 'None (hidden)';
     document.getElementById('adminSpreadsWeekSelect').value = '';
     setSpreadsStatus('Spreads graphic hidden from home page.', 'success');
+    updateWeekBadge();
   } catch(e) {
     setSpreadsStatus('Failed to update. Please try again.', 'error');
   }
@@ -2116,7 +1700,15 @@ async function loadAdminSpreadsWeek() {
   }
 }
 
+function setAdminStatus(msg, type) {
+  const el = document.getElementById('adminStatus');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'admin-status ' + type;
+  setTimeout(() => { el.textContent = ''; el.className = 'admin-status'; }, 4000);
+}
 </script>
+
 
 <!-- ═══ SCORES PAGE ═══ -->
 <div class="page with-nav" id="scoresPage">
@@ -2165,48 +1757,6 @@ async function loadAdminSpreadsWeek() {
       <div class="page-divider"></div>
     </div>
 
-    <div class="admin-card">
-      <div class="admin-card-title">⚙ Week Override</div>
-      <p class="admin-card-desc">Override the auto-detected NFL week shown to all users on the Team Selector page. Use this to manually set the week during off-season or if the schedule detection is off.</p>
-
-      <div class="admin-current-week">
-        Current override: <strong id="adminCurrentOverride">Loading…</strong>
-      </div>
-
-      <div class="admin-controls">
-        <div class="field" style="margin-bottom:0;flex:1;">
-          <label>Set Week Manually</label>
-          <select id="adminWeekSelect">
-            <option value="">— Select a week —</option>
-            <option value="Week 1">Week 1</option>
-            <option value="Week 2">Week 2</option>
-            <option value="Week 3">Week 3</option>
-            <option value="Week 4">Week 4</option>
-            <option value="Week 5">Week 5</option>
-            <option value="Week 6">Week 6</option>
-            <option value="Week 7">Week 7</option>
-            <option value="Week 8">Week 8</option>
-            <option value="Week 9">Week 9</option>
-            <option value="Week 10">Week 10</option>
-            <option value="Week 11">Week 11</option>
-            <option value="Week 12">Week 12</option>
-            <option value="Week 13">Week 13</option>
-            <option value="Week 14">Week 14</option>
-            <option value="Week 15">Week 15</option>
-            <option value="Week 16">Week 16</option>
-            <option value="Week 17">Week 17</option>
-            <option value="Week 18">Week 18</option>
-          </select>
-        </div>
-        <div style="display:flex;gap:10px;margin-top:20px;">
-          <button class="btn-submit" style="flex:1;" onclick="adminSetWeek()">Set Week</button>
-          <button class="btn-clear" style="flex:1;" onclick="adminResetWeek()">Reset to Auto</button>
-        </div>
-      </div>
-
-      <div class="admin-status" id="adminStatus"></div>
-    </div>
-
     <!-- Spreads Week Picker -->
     <div class="admin-card">
       <div class="admin-card-title">📊 Home Page Spreads</div>
@@ -2252,6 +1802,6 @@ async function loadAdminSpreadsWeek() {
   </div>
 </div>
 
-<div class="version-badge">v0.5.7</div>
+<div class="version-badge">v0.5.9</div>
 </body>
 </html>
