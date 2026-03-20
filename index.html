@@ -761,6 +761,126 @@
   }
   .spread-meta span { display: flex; align-items: center; gap: 4px; }
 
+
+  /* ── SPREAD PICK CARDS ── */
+  .picks-counter {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 16px;
+    transition: color 0.2s, border-color 0.2s;
+    white-space: nowrap;
+  }
+  .picks-counter.full { color: var(--accent); border-color: var(--accent); }
+  .picks-counter.warn { color: var(--error); border-color: var(--error); }
+
+  .spreads-action-row {
+    margin-top: 20px;
+    display: flex;
+    justify-content: flex-end;
+  }
+  .spreads-save-status {
+    text-align: right;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    margin-top: 8px;
+    min-height: 18px;
+  }
+
+  .spreads-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+  }
+
+  .spread-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    opacity: 0;
+    animation: pageFade 0.4s ease forwards;
+  }
+
+  .team-pick-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    background: var(--hover);
+    transition: all 0.18s;
+    user-select: none;
+  }
+  .team-pick-btn:hover { border-color: var(--accent); background: rgba(200,169,74,0.08); }
+  .team-pick-btn.selected {
+    border-color: var(--accent);
+    background: rgba(200,169,74,0.15);
+  }
+  .team-pick-btn.dimmed {
+    opacity: 0.35;
+    filter: grayscale(0.5);
+  }
+
+  .team-logo {
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+  }
+  .team-pick-info { text-align: center; }
+  .team-pick-abbr {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    letter-spacing: 0.08em;
+    color: var(--text);
+  }
+  .team-pick-btn.selected .team-pick-abbr { color: var(--accent); }
+  .team-pick-spread {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+    min-height: 16px;
+  }
+  .team-pick-btn.dimmed .team-pick-spread { color: var(--muted); }
+
+  .spread-vs {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    padding: 0 4px;
+  }
+  .spread-vs span {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 16px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+  .spread-meta-inline {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    text-transform: uppercase;
+    text-align: center;
+  }
+
 </style>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -885,16 +1005,21 @@
         <div class="week-badge" id="weekBadge">Week —</div>
       </div>
     </div>
-    <!-- Spreads Graphic -->
+    <!-- Spreads Picks -->
     <div id="spreadsSection" style="display:none;margin-bottom:32px;">
       <div class="spreads-header">
-        <span class="spreads-title" id="spreadsTitle">Week — Matchups &amp; Spreads</span>
-        <span class="spreads-subtitle">Lines subject to change</span>
+        <div>
+          <span class="spreads-title" id="spreadsTitle">Week — Matchups &amp; Spreads</span>
+          <div class="spreads-subtitle">Pick up to 5 teams against the spread · Lines subject to change</div>
+        </div>
+        <div class="picks-counter" id="picksCounter">0 / 5 picked</div>
       </div>
       <div id="spreadsGrid" class="spreads-grid"></div>
+      <div class="spreads-action-row">
+        <button class="btn-submit" id="spreadsSubmitBtn" onclick="submitSpreadsPicks()" disabled>Lock In Picks</button>
+      </div>
+      <div class="spreads-save-status" id="spreadsSaveStatus"></div>
     </div>
-
-    <div class="selectors" id="selectors"></div>
     <div class="action-row">
       <button class="btn-clear" onclick="clearAll()">Clear All</button>
       <button class="btn-submit" onclick="showResults()">Lock In Picks</button>
@@ -1372,6 +1497,140 @@ async function loadMyPicks() {
   }
 }
 
+// ── Submit Spread Picks ──
+async function submitSpreadsPicks() {
+  if (selectedPicks.length === 0) return;
+  const btn    = document.getElementById('spreadsSubmitBtn');
+  const status = document.getElementById('spreadsSaveStatus');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  status.textContent = '';
+
+  const now  = new Date();
+  const date = now.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  let weekLabel = 'Off Season';
+  try {
+    const override = window.fbGetWeekOverride ? await window.fbGetWeekOverride() : null;
+    if (override) { weekLabel = override; }
+    else { const w = getCurrentNFLWeek(); weekLabel = w ? 'Week ' + w : 'Off Season'; }
+  } catch(e) {}
+
+  const payload = {
+    email: document.getElementById('navEmail').textContent,
+    date, time, week: weekLabel,
+    pick1: selectedPicks[0] || '',
+    pick2: selectedPicks[1] || '',
+    pick3: selectedPicks[2] || '',
+    pick4: selectedPicks[3] || '',
+    pick5: selectedPicks[4] || ''
+  };
+
+  try {
+    const fbPromise = window.fbSavePick ? window.fbSavePick(payload) : Promise.resolve();
+    const sheetPromise = fetch(PICKS_SCRIPT_URL, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    await Promise.all([fbPromise, sheetPromise]);
+    btn.textContent = 'Picks Saved ✓';
+    btn.style.background = 'linear-gradient(135deg, #4caf7d 0%, #2e7d52 100%)';
+    status.textContent = 'Your picks have been saved!';
+    status.style.color = '#4caf7d';
+    setTimeout(() => {
+      btn.textContent = 'Lock In Picks';
+      btn.style.background = '';
+      btn.disabled = selectedPicks.length === 0;
+      status.textContent = '';
+    }, 3000);
+  } catch(err) {
+    btn.textContent = 'Save Failed — Retry';
+    btn.style.background = 'linear-gradient(135deg, #e05555 0%, #a03030 100%)';
+    btn.disabled = false;
+    console.error(err);
+  }
+}
+
+
+// ── NFL Team Logos (ESPN CDN) ──
+function getTeamLogo(abbr) {
+  const map = {
+    'ARI':'cardinals','ATL':'falcons','BAL':'ravens','BUF':'bills',
+    'CAR':'panthers','CHI':'bears','CIN':'bengals','CLE':'browns',
+    'DAL':'cowboys','DEN':'broncos','DET':'lions','GB':'packers',
+    'HOU':'texans','IND':'colts','JAX':'jaguars','KC':'chiefs',
+    'LAC':'chargers','LAR':'rams','LV':'raiders','MIA':'dolphins',
+    'MIN':'vikings','NE':'patriots','NO':'saints','NYG':'giants',
+    'NYJ':'jets','PHI':'eagles','PIT':'steelers','SF':'49ers',
+    'SEA':'seahawks','TB':'buccaneers','TEN':'titans','WSH':'commanders'
+  };
+  const slug = map[abbr.toUpperCase()];
+  if (!slug) return '';
+  return 'https://a.espncdn.com/i/teamlogos/nfl/500/' + slug + '.png';
+}
+
+// ── Picks State ──
+let selectedPicks = []; // array of abbr strings, max 5
+
+function togglePick(abbr, gameIdx) {
+  const alreadyIdx = selectedPicks.indexOf(abbr);
+  const card = document.querySelector('.spread-card[data-game="' + gameIdx + '"]');
+  const awayAbbr = card ? card.dataset.away : null;
+  const homeAbbr = card ? card.dataset.home : null;
+  const otherAbbr = abbr === awayAbbr ? homeAbbr : awayAbbr;
+
+  if (alreadyIdx >= 0) {
+    // Deselect
+    selectedPicks.splice(alreadyIdx, 1);
+  } else {
+    // Remove the other team from this game if selected
+    if (otherAbbr) {
+      const otherIdx = selectedPicks.indexOf(otherAbbr);
+      if (otherIdx >= 0) selectedPicks.splice(otherIdx, 1);
+    }
+    if (selectedPicks.length >= 5) {
+      showPicksWarning();
+      return;
+    }
+    selectedPicks.push(abbr);
+  }
+  renderPickSelections();
+  updatePicksCounter();
+}
+
+function showPicksWarning() {
+  const counter = document.getElementById('picksCounter');
+  counter.classList.add('warn');
+  setTimeout(() => counter.classList.remove('warn'), 800);
+}
+
+function renderPickSelections() {
+  // Update all team buttons visually
+  document.querySelectorAll('.team-pick-btn').forEach(btn => {
+    const abbr     = btn.dataset.abbr;
+    const gameIdx  = btn.dataset.game;
+    const card     = document.querySelector('.spread-card[data-game="' + gameIdx + '"]');
+    const awayAbbr = card ? card.dataset.away : null;
+    const homeAbbr = card ? card.dataset.home : null;
+    const otherAbbr = abbr === awayAbbr ? homeAbbr : awayAbbr;
+
+    const isSelected = selectedPicks.includes(abbr);
+    const otherSelected = otherAbbr && selectedPicks.includes(otherAbbr);
+
+    btn.classList.toggle('selected', isSelected);
+    btn.classList.toggle('dimmed', otherSelected && !isSelected);
+  });
+}
+
+function updatePicksCounter() {
+  const counter = document.getElementById('picksCounter');
+  const submitBtn = document.getElementById('spreadsSubmitBtn');
+  if (!counter) return;
+  counter.textContent = selectedPicks.length + ' / 5 picked';
+  counter.classList.toggle('full', selectedPicks.length === 5);
+  if (submitBtn) submitBtn.disabled = selectedPicks.length === 0;
+}
 // ── Scores ──
 function initScores() {
   const cur = getCurrentNFLWeek();
@@ -1682,6 +1941,10 @@ async function fetchAndRenderSpreads(week) {
     title.textContent = weekLabel + ' Matchups & Spreads';
     section.style.display = 'block';
 
+    // Reset picks when new week loads
+    selectedPicks = [];
+    updatePicksCounter();
+
     weekRows.forEach((row, i) => {
       const date     = (row[1] || '').trim();
       const gameTime = (row[2] || '').trim();
@@ -1691,72 +1954,75 @@ async function fetchAndRenderSpreads(week) {
 
       if (!away && !home) return;
 
+      // Parse spread — odds column like "PHI -6.5" or "EVEN"
+      const oddsUpper = odds.toUpperCase();
+      let awaySpread = '', homeSpread = '';
+      if (oddsUpper === 'EVEN' || oddsUpper === 'PK') {
+        awaySpread = 'EVEN'; homeSpread = 'EVEN';
+      } else if (oddsUpper.startsWith(away.toUpperCase())) {
+        awaySpread = odds.substring(away.length).trim();
+        // Calculate home spread as opposite
+        const num = parseFloat(awaySpread);
+        if (!isNaN(num)) homeSpread = (num > 0 ? '-' : '+') + Math.abs(num);
+      } else if (oddsUpper.startsWith(home.toUpperCase())) {
+        homeSpread = odds.substring(home.length).trim();
+        const num = parseFloat(homeSpread);
+        if (!isNaN(num)) awaySpread = (num > 0 ? '-' : '+') + Math.abs(num);
+      } else {
+        homeSpread = odds;
+      }
+
+      const awayLogo = getTeamLogo(away);
+      const homeLogo = getTeamLogo(home);
+
       const card = document.createElement('div');
       card.className = 'spread-card';
+      card.dataset.game = i;
+      card.dataset.away = away;
+      card.dataset.home = home;
       card.style.animationDelay = (i * 0.04) + 's';
 
-      const matchup = document.createElement('div');
-      matchup.className = 'spread-matchup';
+      // Away team button
+      const awayBtn = document.createElement('div');
+      awayBtn.className = 'team-pick-btn';
+      awayBtn.dataset.abbr = away;
+      awayBtn.dataset.game = i;
+      awayBtn.onclick = () => togglePick(away, i);
+      awayBtn.innerHTML =
+        (awayLogo ? '<img class="team-logo" src="' + awayLogo + '" alt="' + away + '">' : '') +
+        '<div class="team-pick-info">' +
+          '<div class="team-pick-abbr">' + away + '</div>' +
+          '<div class="team-pick-spread">' + (awaySpread || '') + '</div>' +
+        '</div>';
 
-      // Away team
-      const awayEl = document.createElement('div');
-      awayEl.className = 'spread-team';
-      const awayName = document.createElement('div');
-      awayName.className = 'spread-team-name';
-      awayName.textContent = away;
-      // Show odds under whichever team is favored
-      const awayLine = document.createElement('div');
-      awayLine.className = 'spread-team-line';
-      awayLine.textContent = odds && odds.toUpperCase().startsWith(away.toUpperCase()) ? odds.replace(away, '').trim() : '';
-      awayEl.appendChild(awayName);
-      awayEl.appendChild(awayLine);
+      // VS divider
+      const vsEl = document.createElement('div');
+      vsEl.className = 'spread-vs';
+      vsEl.innerHTML = '<span>@</span><div class="spread-meta-inline">' +
+        (date ? '<span>' + date + '</span>' : '') +
+        (gameTime ? '<span>' + gameTime + '</span>' : '') +
+        '</div>';
 
-      // @ symbol
-      const atEl = document.createElement('div');
-      atEl.className = 'spread-at';
-      atEl.textContent = '@';
+      // Home team button
+      const homeBtn = document.createElement('div');
+      homeBtn.className = 'team-pick-btn';
+      homeBtn.dataset.abbr = home;
+      homeBtn.dataset.game = i;
+      homeBtn.onclick = () => togglePick(home, i);
+      homeBtn.innerHTML =
+        (homeLogo ? '<img class="team-logo" src="' + homeLogo + '" alt="' + home + '">' : '') +
+        '<div class="team-pick-info">' +
+          '<div class="team-pick-abbr">' + home + '</div>' +
+          '<div class="team-pick-spread">' + (homeSpread || '') + '</div>' +
+        '</div>';
 
-      // Home team
-      const homeEl = document.createElement('div');
-      homeEl.className = 'spread-team';
-      const homeName = document.createElement('div');
-      homeName.className = 'spread-team-name';
-      homeName.textContent = home;
-      const homeLine = document.createElement('div');
-      homeLine.className = 'spread-team-line';
-      homeLine.textContent = odds && odds.toUpperCase().startsWith(home.toUpperCase()) ? odds.replace(home, '').trim() : '';
-      homeEl.appendChild(homeName);
-      homeEl.appendChild(homeLine);
-
-      // Odds row — show full odds string centered if neither team prefix matched
-      const bothBlank = !awayLine.textContent && !homeLine.textContent;
-      if (bothBlank && odds) {
-        awayLine.textContent = '';
-        homeLine.textContent = odds;
-      }
-
-      matchup.appendChild(awayEl);
-      matchup.appendChild(atEl);
-      matchup.appendChild(homeEl);
-
-      // Meta row
-      const meta = document.createElement('div');
-      meta.className = 'spread-meta';
-      if (date) {
-        const dateEl = document.createElement('span');
-        dateEl.textContent = '📅 ' + date;
-        meta.appendChild(dateEl);
-      }
-      if (gameTime) {
-        const timeEl = document.createElement('span');
-        timeEl.textContent = '🕐 ' + gameTime;
-        meta.appendChild(timeEl);
-      }
-
-      card.appendChild(matchup);
-      if (date || gameTime) card.appendChild(meta);
+      card.appendChild(awayBtn);
+      card.appendChild(vsEl);
+      card.appendChild(homeBtn);
       grid.appendChild(card);
     });
+
+    renderPickSelections();
 
   } catch(e) {
     console.error('Spreads fetch error:', e);
@@ -1944,6 +2210,6 @@ async function loadAdminSpreadsWeek() {
   </div>
 </div>
 
-<div class="version-badge">v0.5.2</div>
+<div class="version-badge">v0.5.3</div>
 </body>
 </html>
