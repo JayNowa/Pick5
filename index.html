@@ -138,7 +138,7 @@
   .container { width: 100%; max-width: 680px; }
 
   #loginPage  { display: flex; }
-  #selectorPage, #myPicksPage, #scoresPage, #adminPage { display: none; }
+  #selectorPage, #myPicksPage, #scoresPage, #adminPage, #weeklyPicksPage { display: none; }
 
   /* ── LOGIN ── */
   header { text-align: center; margin-bottom: 48px; }
@@ -900,6 +900,75 @@
     text-align: center;
     line-height: 1.3;
   }
+
+  /* ── WEEKLY PICKS TABLE ── */
+  .wp-table-wrap {
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .wp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 15px;
+    letter-spacing: 0.03em;
+  }
+  .wp-table th {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 14px;
+    letter-spacing: 0.14em;
+    color: var(--accent);
+    background: rgba(200,169,74,0.07);
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .wp-table td {
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    vertical-align: middle;
+  }
+  .wp-table tr:last-child td { border-bottom: none; }
+  .wp-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .wp-email {
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: 0.04em;
+  }
+  .wp-pick {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--hover);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-weight: 700;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  .wp-pick img {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+  }
+  .wp-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+    font-size: 16px;
+    letter-spacing: 0.08em;
+  }
+  .wp-submitted {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    display: block;
+    margin-top: 2px;
+  }
+
 </style>
 </head>
 <body>
@@ -911,6 +980,7 @@
     <button class="nav-link active" id="navSelector" onclick="showPage('selector')">Team Selector</button>
     <button class="nav-link" id="navMyPicks" onclick="showPage('myPicks')">My Picks</button>
     <button class="nav-link" id="navScores" onclick="showPage('scores')">Scores</button>
+    <button class="nav-link" id="navWeeklyPicks" onclick="showPage('weeklyPicks')">Weekly Picks</button>
   </div>
   <div class="nav-right">
     <span class="nav-user">Signed in as <strong id="navEmail"></strong></span>
@@ -1031,6 +1101,14 @@
     const snapshot = await getDocs(q);
     const docs = snapshot.docs.map(d => d.data());
     docs.sort(function(a, b) { return (b.timestamp || 0) - (a.timestamp || 0); });
+    return docs;
+  };
+
+  window.fbGetWeeklyPicks = async function(weekLabel) {
+    const q = query(collection(db, "picks"), where("week", "==", weekLabel));
+    const snapshot = await getDocs(q);
+    const docs = snapshot.docs.map(d => d.data());
+    docs.sort(function(a, b) { return (a.email || '').localeCompare(b.email || ''); });
     return docs;
   };
 
@@ -1170,14 +1248,16 @@ function afterLogin(email) {
 
 // ── Page Switching ──
 async function showPage(page) {
-  document.getElementById('selectorPage').style.display  = 'none';
-  document.getElementById('myPicksPage').style.display   = 'none';
-  document.getElementById('scoresPage').style.display    = 'none';
-  document.getElementById('adminPage').style.display     = 'none';
+  document.getElementById('selectorPage').style.display     = 'none';
+  document.getElementById('myPicksPage').style.display      = 'none';
+  document.getElementById('scoresPage').style.display       = 'none';
+  document.getElementById('adminPage').style.display        = 'none';
+  document.getElementById('weeklyPicksPage').style.display  = 'none';
 
   document.getElementById('navSelector').classList.remove('active');
   document.getElementById('navMyPicks').classList.remove('active');
   document.getElementById('navScores').classList.remove('active');
+  document.getElementById('navWeeklyPicks').classList.remove('active');
   clearInterval(scoresRefreshTimer);
 
   if (page === 'selector') {
@@ -1186,6 +1266,12 @@ async function showPage(page) {
     p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
     document.getElementById('navSelector').classList.add('active');
     loadSpreadsOnHomePage();
+  } else if (page === 'weeklyPicks') {
+    const p = document.getElementById('weeklyPicksPage');
+    p.style.display = 'flex';
+    p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
+    document.getElementById('navWeeklyPicks').classList.add('active');
+    loadWeeklyPicks();
   } else if (page === 'myPicks') {
     const p = document.getElementById('myPicksPage');
     p.style.display = 'flex';
@@ -1214,7 +1300,8 @@ function logout() {
   document.getElementById('selectorPage').style.display = 'none';
   document.getElementById('myPicksPage').style.display  = 'none';
   document.getElementById('scoresPage').style.display   = 'none';
-  document.getElementById('adminPage').style.display    = 'none';
+  document.getElementById('adminPage').style.display        = 'none';
+  document.getElementById('weeklyPicksPage').style.display  = 'none';
   document.getElementById('emailInput').value = '';
   document.getElementById('pinInput').value   = '';
   document.getElementById('errorMsg').classList.remove('show');
@@ -1773,8 +1860,138 @@ function setAdminStatus(msg, type) {
   el.className = 'admin-status ' + type;
   setTimeout(() => { el.textContent = ''; el.className = 'admin-status'; }, 4000);
 }
+
+// ── Weekly Picks ──
+async function loadWeeklyPicks() {
+  const loadingEl  = document.getElementById('weeklyPicksLoading');
+  const errorEl    = document.getElementById('weeklyPicksError');
+  const tableEl    = document.getElementById('weeklyPicksTable');
+  const subtitleEl = document.getElementById('weeklyPicksSubtitle');
+
+  loadingEl.style.display = 'block';
+  errorEl.style.display   = 'none';
+  tableEl.innerHTML       = '';
+
+  try {
+    const week = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
+    const weekLabel = week ? 'Week ' + week : null;
+
+    if (!weekLabel) {
+      loadingEl.style.display = 'none';
+      subtitleEl.textContent = 'No active week set';
+      tableEl.innerHTML = '<div class="wp-empty">No active week selected. Set a week in the Admin console.</div>';
+      return;
+    }
+
+    subtitleEl.textContent = weekLabel + " · Everyone's Picks";
+
+    if (!window.fbGetWeeklyPicks) throw new Error('Firebase not ready');
+    const allPicks = await window.fbGetWeeklyPicks(weekLabel);
+    loadingEl.style.display = 'none';
+
+    if (allPicks.length === 0) {
+      tableEl.innerHTML = '<div class="wp-empty">No picks submitted yet for ' + weekLabel + '.</div>';
+      return;
+    }
+
+    // Keep only latest submission per user
+    const byUser = {};
+    allPicks.forEach(function(doc) {
+      const email = doc.email || 'unknown';
+      if (!byUser[email] || (doc.timestamp || 0) > (byUser[email].timestamp || 0)) {
+        byUser[email] = doc;
+      }
+    });
+
+    const users = Object.values(byUser).sort(function(a, b) {
+      return (a.email || '').localeCompare(b.email || '');
+    });
+
+    const wrap = document.createElement('div');
+    wrap.className = 'wp-table-wrap';
+
+    const table = document.createElement('table');
+    table.className = 'wp-table';
+
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    ['User', 'Pick 1', 'Pick 2', 'Pick 3', 'Pick 4', 'Pick 5', 'Submitted'].forEach(function(h) {
+      const th = document.createElement('th');
+      th.textContent = h;
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    users.forEach(function(doc) {
+      const tr = document.createElement('tr');
+
+      const emailTd = document.createElement('td');
+      emailTd.className = 'wp-email';
+      emailTd.textContent = doc.email || '—';
+      tr.appendChild(emailTd);
+
+      [doc.pick1, doc.pick2, doc.pick3, doc.pick4, doc.pick5].forEach(function(pick) {
+        const td = document.createElement('td');
+        if (pick && pick.trim()) {
+          const chip = document.createElement('span');
+          chip.className = 'wp-pick';
+          const logo = getTeamLogo(pick);
+          if (logo) {
+            const img = document.createElement('img');
+            img.src = logo; img.alt = pick;
+            chip.appendChild(img);
+          }
+          chip.appendChild(document.createTextNode(pick));
+          td.appendChild(chip);
+        } else {
+          td.textContent = '—';
+          td.style.color = 'var(--muted)';
+        }
+        tr.appendChild(td);
+      });
+
+      const subTd = document.createElement('td');
+      subTd.className = 'wp-email';
+      subTd.textContent = [doc.date, doc.time].filter(Boolean).join(' ');
+      tr.appendChild(subTd);
+
+      tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    tableEl.appendChild(wrap);
+
+  } catch(err) {
+    loadingEl.style.display = 'none';
+    errorEl.style.display   = 'block';
+    errorEl.textContent     = 'Unable to load weekly picks. Please try again.';
+    console.error(err);
+  }
+}
+
 </script>
 
+
+
+<!-- ═══ WEEKLY PICKS PAGE ═══ -->
+<div class="page with-nav" id="weeklyPicksPage">
+  <div class="container" style="max-width:900px;">
+    <div class="page-header">
+      <div class="page-title">Weekly Picks</div>
+      <div class="page-subtitle" id="weeklyPicksSubtitle">Loading…</div>
+      <div class="page-divider"></div>
+    </div>
+    <div id="weeklyPicksLoading" class="picks-loading">
+      <div class="loading-spinner"></div>
+      <p>Loading picks…</p>
+    </div>
+    <div id="weeklyPicksError" class="picks-error" style="display:none;"></div>
+    <div id="weeklyPicksTable"></div>
+  </div>
+</div>
 
 <!-- ═══ SCORES PAGE ═══ -->
 <div class="page with-nav" id="scoresPage">
@@ -1868,6 +2085,6 @@ function setAdminStatus(msg, type) {
   </div>
 </div>
 
-<div class="version-badge">v0.6.0</div>
+<div class="version-badge">v0.6.1</div>
 </body>
 </html>
