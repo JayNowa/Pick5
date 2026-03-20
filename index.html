@@ -1117,8 +1117,20 @@ async function showResults() {
   const now   = new Date();
   const date  = now.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
   const time  = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const currentWeek = getCurrentNFLWeek();
-  const weekLabel = currentWeek ? 'Week ' + currentWeek : 'Off Season';
+  // Check Firebase override first, fall back to auto-detect
+  let weekLabel = 'Off Season';
+  try {
+    const override = window.fbGetWeekOverride ? await window.fbGetWeekOverride() : null;
+    if (override) {
+      weekLabel = override;
+    } else {
+      const currentWeek = getCurrentNFLWeek();
+      weekLabel = currentWeek ? 'Week ' + currentWeek : 'Off Season';
+    }
+  } catch(e) {
+    const currentWeek = getCurrentNFLWeek();
+    weekLabel = currentWeek ? 'Week ' + currentWeek : 'Off Season';
+  }
   const payload = {
     email: document.getElementById('navEmail').textContent,
     date,
