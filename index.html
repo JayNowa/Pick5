@@ -52,9 +52,31 @@
     z-index: 100;
     align-items: center;
     justify-content: space-between;
-    padding: 0 32px;
+    padding: 0 16px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 12px;
+    flex-wrap: nowrap;
   }
+  #topNav::-webkit-scrollbar { display: none; }
   #topNav.visible { display: flex; }
+
+  .nav-links {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .nav-logo { flex-shrink: 0; }
 
   .nav-logo {
     font-family: 'Bebas Neue', sans-serif;
@@ -69,11 +91,7 @@
     gap: 8px;
   }
 
-  .nav-links {
-    display: flex;
-    gap: 4px;
-    align-items: center;
-  }
+
 
   .nav-link {
     font-family: 'Bebas Neue', sans-serif;
@@ -91,11 +109,7 @@
   .nav-link:hover { color: var(--text); background: var(--hover); }
   .nav-link.active { color: var(--accent); background: rgba(200,169,74,0.08); }
 
-  .nav-right {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
+
 
   .nav-user {
     font-size: 13px;
@@ -2137,6 +2151,6 @@ async function loadWeeklyPicks() {
   </div>
 </div>
 
-<div class="version-badge">v0.6.2</div>
+<div class="version-badge">v0.6.3</div>
 </body>
 </html>
