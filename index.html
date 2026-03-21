@@ -1135,6 +1135,10 @@ let scoresWeek = null;
 let scoresYear = null;
 let scoresRefreshTimer = null;
 
+// ── Week polling ──
+let weekPollTimer = null;
+let currentActiveWeek = null;
+
 // ── Picks state ──
 let selectedPicks = [];
 
@@ -1243,6 +1247,7 @@ function afterLogin(email) {
     }
     await updateWeekBadge();
     await showPage('selector');
+    startWeekPolling();
   })();
 }
 
@@ -1302,6 +1307,8 @@ function logout() {
   document.getElementById('scoresPage').style.display   = 'none';
   document.getElementById('adminPage').style.display        = 'none';
   document.getElementById('weeklyPicksPage').style.display  = 'none';
+  stopWeekPolling();
+  currentActiveWeek = null;
   document.getElementById('emailInput').value = '';
   document.getElementById('pinInput').value   = '';
   document.getElementById('errorMsg').classList.remove('show');
@@ -1811,6 +1818,7 @@ async function adminSetSpreadsWeek() {
     await window.fbSaveSpreadsWeek(val);
     document.getElementById('adminCurrentSpreadsWeek').textContent = 'Week ' + val;
     setSpreadsStatus('Week ' + val + ' saved! Updating home page…', 'success');
+    currentActiveWeek = val;
     await updateWeekBadge();
     await fetchAndRenderSpreads(val);
   } catch(e) {
@@ -1862,6 +1870,50 @@ function setAdminStatus(msg, type) {
 }
 
 // ── Weekly Picks ──
+// ── Week Polling ──
+function startWeekPolling() {
+  stopWeekPolling();
+  weekPollTimer = setInterval(async function() {
+    try {
+      const week = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
+      const newWeek = week ? String(week) : null;
+      const oldWeek = currentActiveWeek ? String(currentActiveWeek) : null;
+
+      if (newWeek !== oldWeek) {
+        currentActiveWeek = newWeek;
+        // Update badge regardless of which page user is on
+        await updateWeekBadge();
+        // If user is on selector page, reload spreads
+        const selectorVisible = document.getElementById('selectorPage').style.display !== 'none';
+        if (selectorVisible) {
+          if (newWeek) {
+            await fetchAndRenderSpreads(newWeek);
+          } else {
+            document.getElementById('spreadsSection').style.display = 'none';
+            document.getElementById('spreadsGrid').innerHTML = '';
+            selectedPicks = [];
+            updatePicksCounter();
+          }
+        }
+        // If user is on weekly picks page, reload that too
+        const weeklyVisible = document.getElementById('weeklyPicksPage').style.display !== 'none';
+        if (weeklyVisible) {
+          loadWeeklyPicks();
+        }
+      }
+    } catch(e) {
+      console.error('Week poll error:', e);
+    }
+  }, 30000); // poll every 30 seconds
+}
+
+function stopWeekPolling() {
+  if (weekPollTimer) {
+    clearInterval(weekPollTimer);
+    weekPollTimer = null;
+  }
+}
+
 async function loadWeeklyPicks() {
   const loadingEl  = document.getElementById('weeklyPicksLoading');
   const errorEl    = document.getElementById('weeklyPicksError');
@@ -2085,6 +2137,6 @@ async function loadWeeklyPicks() {
   </div>
 </div>
 
-<div class="version-badge">v0.6.1</div>
+<div class="version-badge">v0.6.2</div>
 </body>
 </html>
