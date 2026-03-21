@@ -1344,6 +1344,11 @@ function afterLogin(email) {
       await new Promise(r => setTimeout(r, 100));
       tries++;
     }
+    // Set currentActiveWeek before polling starts so first poll doesn't false-trigger
+    try {
+      const w = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
+      currentActiveWeek = w ? String(w) : null;
+    } catch(e) {}
     await updateWeekBadge();
     await showPage('selector');
     startWeekPolling();
