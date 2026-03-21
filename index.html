@@ -2055,14 +2055,34 @@ async function submitAccessRequest() {
   }
 
   btn.disabled = true;
-  staEl.textContent = 'Submitting request…';
+  staEl.textContent = 'Checking email…';
 
   try {
+    // Check if email already exists on approved list
+    const res = await fetch(SHEET_CSV_URL + '&cachebust=' + Date.now());
+    if (res.ok) {
+      const text = await res.text();
+      const rows = parseCSV(text);
+      const dataRows = rows[0][0].toLowerCase().includes('email') ? rows.slice(1) : rows;
+      const alreadyApproved = dataRows.some(r => r[0] && r[0].toLowerCase() === email);
+      if (alreadyApproved) {
+        errEl.textContent = 'This email already has an approved account. Try logging in!';
+        errEl.classList.add('show');
+        btn.disabled = false;
+        staEl.textContent = '';
+        return;
+      }
+    }
+
+    staEl.textContent = 'Submitting request…';
+
+    // Force PIN to be sent as a string with a tab prefix trick to preserve leading zeros
+    // We prefix with an apostrophe so Apps Script writes it as text
     await fetch(ACCESS_SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, pin, teamName })
+      body: JSON.stringify({ email, pin: String(pin), teamName })
     });
 
     staEl.textContent = '';
