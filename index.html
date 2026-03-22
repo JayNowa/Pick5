@@ -1348,7 +1348,8 @@ async function handleLogin() {
     );
     if (match) {
       staEl.textContent = '';
-      afterLogin(email);
+      const teamName = (match[2] || '').trim();
+      afterLogin(email, teamName);
     } else {
       const emailExists = dataRows.some(r => r[0] && r[0].toLowerCase() === email);
       showError(emailExists ? 'Incorrect PIN. Please try again.' : 'This email is not on the approved list.');
@@ -1371,8 +1372,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── After Login ──
-function afterLogin(email) {
-  document.getElementById('navEmail').textContent = email;
+function afterLogin(email, teamName) {
+  const displayName = teamName ? teamName + ' (' + email + ')' : email;
+  document.getElementById('navEmail').textContent = displayName;
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('topNav').classList.add('visible');
   if (email && ADMIN_EMAILS.includes(email.toLowerCase())) {
