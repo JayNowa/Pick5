@@ -865,6 +865,11 @@
     flex-shrink: 0;
   }
   .team-pick-info { text-align: left; }
+  .team-pick-btn.away-btn {
+    flex-direction: row-reverse;
+    text-align: right;
+  }
+  .team-pick-btn.away-btn .team-pick-info { text-align: right; }
   .team-pick-abbr {
     font-family: 'Bebas Neue', sans-serif;
     font-size: 18px;
@@ -1707,7 +1712,7 @@ async function fetchAndRenderSpreads(week) {
       card.style.animationDelay = (i * 0.04) + 's';
 
       const awayBtn = document.createElement('div');
-      awayBtn.className = 'team-pick-btn';
+      awayBtn.className = 'team-pick-btn away-btn';
       awayBtn.dataset.abbr = away;
       awayBtn.dataset.game = i;
       awayBtn.setAttribute('data-state', 'idle');
