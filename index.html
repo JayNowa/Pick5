@@ -1079,7 +1079,7 @@
     <button class="nav-link" id="navWeeklyPicks" onclick="showPage('weeklyPicks')">Weekly Picks</button>
   </div>
   <div class="nav-right">
-    <span class="nav-user">Signed in as <strong id="navEmail"></strong></span>
+    <span class="nav-user">Signed in as <strong id="navEmail" data-email="" data-teamname=""></strong></span>
     <button class="btn-logout" onclick="logout()">Log Out</button>
   </div>
 </nav>
@@ -1225,7 +1225,8 @@
 
   window.fbSavePick = async function(payload) {
     await addDoc(collection(db, "picks"), {
-      email: payload.email, date: payload.date, time: payload.time, week: payload.week,
+      email: payload.email, teamName: payload.teamName || '',
+      date: payload.date, time: payload.time, week: payload.week,
       pick1: payload.pick1 || '', pick2: payload.pick2 || '', pick3: payload.pick3 || '',
       pick4: payload.pick4 || '', pick5: payload.pick5 || '',
       spread1: payload.spread1 || '', spread2: payload.spread2 || '', spread3: payload.spread3 || '',
@@ -1374,7 +1375,10 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── After Login ──
 function afterLogin(email, teamName) {
   const displayName = teamName ? teamName + ' (' + email + ')' : email;
-  document.getElementById('navEmail').textContent = displayName;
+  const navEl = document.getElementById('navEmail');
+  navEl.textContent = displayName;
+  navEl.dataset.email = email;
+  navEl.dataset.teamname = teamName || '';
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('topNav').classList.add('visible');
   if (email && ADMIN_EMAILS.includes(email.toLowerCase())) {
@@ -1562,8 +1566,10 @@ async function submitSpreadsPicks() {
     weekLabel = w ? 'Week ' + w : 'Off Season';
   } catch(e) {}
 
+  const navEl = document.getElementById('navEmail');
   const payload = {
-    email: document.getElementById('navEmail').textContent,
+    email: navEl.dataset.email || navEl.textContent,
+    teamName: navEl.dataset.teamname || '',
     date, time, week: weekLabel,
     pick1: selectedPicks[0] ? selectedPicks[0].abbr : '',
     pick2: selectedPicks[1] ? selectedPicks[1].abbr : '',
@@ -1744,7 +1750,8 @@ async function fetchAndRenderSpreads(week) {
 
 // ── My Picks ──
 async function loadMyPicks() {
-  const email     = document.getElementById('navEmail').textContent.toLowerCase();
+  const navEl2 = document.getElementById('navEmail');
+  const email = (navEl2.dataset.email || navEl2.textContent).toLowerCase();
   const loadingEl = document.getElementById('picksLoading');
   const errorEl   = document.getElementById('picksError');
   const groupsEl  = document.getElementById('picksGroups');
@@ -2292,7 +2299,15 @@ async function loadWeeklyPicks() {
 
       const emailTd = document.createElement('td');
       emailTd.className = 'wp-email';
-      emailTd.textContent = doc.email || '—';
+      if (doc.teamName) {
+        emailTd.textContent = doc.teamName;
+        const subEmail = document.createElement('span');
+        subEmail.className = 'wp-submitted';
+        subEmail.textContent = doc.email || '';
+        emailTd.appendChild(subEmail);
+      } else {
+        emailTd.textContent = doc.email || '—';
+      }
       tr.appendChild(emailTd);
 
       const picks    = [doc.pick1,   doc.pick2,   doc.pick3,   doc.pick4,   doc.pick5];
@@ -2451,6 +2466,6 @@ async function loadWeeklyPicks() {
   </div>
 </div>
 
-<div class="version-badge">v0.6.7</div>
+<div class="version-badge">v0.6.8</div>
 </body>
 </html>
