@@ -2285,7 +2285,7 @@ async function loadWeeklyPicks() {
 
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
-    ['User', 'Pick 1', 'Pick 2', 'Pick 3', 'Pick 4', 'Pick 5', 'Submitted'].forEach(function(h) {
+    ['User', 'Pick 1', 'Pick 2', 'Pick 3', 'Pick 4', 'Pick 5'].forEach(function(h) {
       const th = document.createElement('th');
       th.textContent = h;
       headerRow.appendChild(th);
@@ -2299,15 +2299,7 @@ async function loadWeeklyPicks() {
 
       const emailTd = document.createElement('td');
       emailTd.className = 'wp-email';
-      if (doc.teamName) {
-        emailTd.textContent = doc.teamName;
-        const subEmail = document.createElement('span');
-        subEmail.className = 'wp-submitted';
-        subEmail.textContent = doc.email || '';
-        emailTd.appendChild(subEmail);
-      } else {
-        emailTd.textContent = doc.email || '—';
-      }
+      emailTd.textContent = doc.teamName || doc.email || '—';
       tr.appendChild(emailTd);
 
       const picks    = [doc.pick1,   doc.pick2,   doc.pick3,   doc.pick4,   doc.pick5];
@@ -2333,10 +2325,7 @@ async function loadWeeklyPicks() {
         tr.appendChild(td);
       });
 
-      const subTd = document.createElement('td');
-      subTd.className = 'wp-email';
-      subTd.textContent = [doc.date, doc.time].filter(Boolean).join(' ');
-      tr.appendChild(subTd);
+
 
       tbody.appendChild(tr);
     });
