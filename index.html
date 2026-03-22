@@ -1661,7 +1661,25 @@ async function fetchAndRenderSpreads(week) {
   updatePicksCounter();
 
   try {
-    const res = await fetch(SPREADS_CSV_URL + '&cachebust=' + Date.now());
+    // Fetch spreads and existing user picks in parallel
+    const navEl        = document.getElementById('navEmail');
+    const userEmail    = (navEl.dataset.email || navEl.textContent).toLowerCase();
+    const weekLabel    = 'Week ' + week;
+
+    const [spreadsRes, existingPicks] = await Promise.all([
+      fetch(SPREADS_CSV_URL + '&cachebust=' + Date.now()),
+      (async () => {
+        try {
+          if (!window.fbGetMyPicks) return [];
+          const docs = await window.fbGetMyPicks(userEmail);
+          // Get the most recent submission for this week
+          const weekDocs = docs.filter(d => d.week === weekLabel);
+          return weekDocs.length > 0 ? weekDocs[0] : null;
+        } catch(e) { return null; }
+      })()
+    ]);
+
+    const res = spreadsRes;
     if (!res.ok) throw new Error('Sheet unreachable');
     const text = await res.text();
     const rows = parseCSV(text);
@@ -1758,6 +1776,22 @@ async function fetchAndRenderSpreads(week) {
       card.appendChild(homeBtn);
       grid.appendChild(card);
     });
+
+    // Restore user's existing picks for this week
+    if (existingPicks) {
+      const prevPicks = [
+        { abbr: existingPicks.pick1, spread: existingPicks.spread1 },
+        { abbr: existingPicks.pick2, spread: existingPicks.spread2 },
+        { abbr: existingPicks.pick3, spread: existingPicks.spread3 },
+        { abbr: existingPicks.pick4, spread: existingPicks.spread4 },
+        { abbr: existingPicks.pick5, spread: existingPicks.spread5 },
+      ].filter(p => p.abbr && p.abbr.trim());
+      selectedPicks = prevPicks;
+    }
+
+    renderPickSelections();
+    updatePicksCounter();
+    loadingEl.style.display = 'none';
 
   } catch(e) {
     console.error('Spreads fetch error:', e);
@@ -2474,6 +2508,6 @@ async function loadWeeklyPicks() {
   </div>
 </div>
 
-<div class="version-badge">v0.6.9</div>
+<div class="version-badge">v0.7.0</div>
 </body>
 </html>
