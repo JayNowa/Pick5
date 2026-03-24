@@ -1312,8 +1312,9 @@
     letter-spacing: 0.06em;
     line-height: 1;
   }
-  .lb-stat-val.wins-val { color: var(--accent); }
-  .lb-stat-val.tb-val   { color: var(--text); }
+  .lb-stat-val.wins-val   { color: var(--accent); }
+  .lb-stat-val.losses-val { color: var(--text); }
+  .lb-stat-val.tb-val     { color: var(--text); }
   .lb-stat-label {
     font-size: 10px;
     letter-spacing: 0.14em;
@@ -2108,8 +2109,13 @@ async function fetchAndRenderSpreads(week) {
         lastDay = d.toLocaleDateString('en-US', { weekday: 'long' });
       } catch(e) {}
       const tbGame = document.getElementById('tiebreakerGame');
-      tbGame.innerHTML = '<span>Tiebreaker Game</span>' + lastAway + ' @ ' + lastHome +
-        (lastDay ? '<br><small style="font-family:Arial,sans-serif;font-size:13px;color:var(--muted);letter-spacing:0.06em;">' + lastDay + ' ' + lastTime + '</small>' : '');
+      const awayLogoTb = getTeamLogo(lastAway);
+      const homeLogoTb = getTeamLogo(lastHome);
+      const awayImgTb = awayLogoTb ? '<img src="' + awayLogoTb + '" style="width:22px;height:22px;object-fit:contain;vertical-align:middle;margin-right:4px;">' : '';
+      const homeImgTb = homeLogoTb ? '<img src="' + homeLogoTb + '" style="width:22px;height:22px;object-fit:contain;vertical-align:middle;margin-right:4px;">' : '';
+      tbGame.innerHTML = '<span>Tiebreaker Game</span>' +
+        awayImgTb + lastAway + ' @ ' + homeImgTb + lastHome +
+        (lastDay ? '<br><small style="font-family:Arial,sans-serif;font-size:12px;color:var(--muted);letter-spacing:0.06em;">' + lastDay + ' ' + lastTime + '</small>' : '');
       const tbRow = document.getElementById('tiebreakerRow');
       tbRow.dataset.away = lastAway;
       tbRow.dataset.home = lastHome;
@@ -2825,6 +2831,10 @@ async function loadLeaderboard() {
             '<div class="lb-stat-val wins-val">' + user.totalWins + '</div>' +
             '<div class="lb-stat-label">Wins</div>' +
           '</div>' +
+          '<div class="lb-stat">' +
+            '<div class="lb-stat-val losses-val">' + user.totalLosses + '</div>' +
+            '<div class="lb-stat-label">Losses</div>' +
+          '</div>' +
           (user.tbCount > 0 ?
             '<div class="lb-stat">' +
               '<div class="lb-stat-val tb-val">' + user.totalTbDiff + '</div>' +
@@ -3382,6 +3392,6 @@ async function loadWeeklyPicks() {
   </div>
 </div>
 
-<div class="version-badge">v0.7.9</div>
+<div class="version-badge">v0.8.0</div>
 </body>
 </html>
