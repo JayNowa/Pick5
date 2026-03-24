@@ -1178,20 +1178,10 @@
   }
   .tiebreaker-game {
     font-family: 'Bebas Neue', sans-serif;
-<<<<<<< HEAD
-    font-size: 18px;
-    letter-spacing: 0.08em;
-    color: var(--text);
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-=======
     font-size: 15px;
     letter-spacing: 0.08em;
     color: var(--text);
     flex-shrink: 0;
->>>>>>> 34a177897d379ce5630f72e7f768ecdc212e9fdd
   }
   .tiebreaker-game span {
     display: block;
@@ -1216,11 +1206,7 @@
     white-space: nowrap;
   }
   .tiebreaker-input-wrap input {
-<<<<<<< HEAD
-    width: 110px;
-=======
     width: 90px;
->>>>>>> 34a177897d379ce5630f72e7f768ecdc212e9fdd
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 5px;
@@ -1235,15 +1221,12 @@
     transition: border-color 0.2s, box-shadow 0.2s;
     -moz-appearance: textfield;
   }
-<<<<<<< HEAD
   .tiebreaker-input-wrap input::placeholder {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 400;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.04em;
     color: var(--muted);
   }
-=======
->>>>>>> 34a177897d379ce5630f72e7f768ecdc212e9fdd
   .tiebreaker-input-wrap input::-webkit-outer-spin-button,
   .tiebreaker-input-wrap input::-webkit-inner-spin-button { -webkit-appearance: none; }
   .tiebreaker-input-wrap input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(200,169,74,0.2); }
@@ -1440,6 +1423,7 @@
       spread1: payload.spread1 || '', spread2: payload.spread2 || '', spread3: payload.spread3 || '',
       spread4: payload.spread4 || '', spread5: payload.spread5 || '',
       tiebreaker: payload.tiebreaker !== undefined ? payload.tiebreaker : '',
+      tiebreakerGame: payload.tiebreakerGame || '',
       timestamp: Date.now()
     });
   };
@@ -1822,7 +1806,13 @@ async function submitSpreadsPicks() {
     spread3: selectedPicks[2] ? selectedPicks[2].spread : '',
     spread4: selectedPicks[3] ? selectedPicks[3].spread : '',
     spread5: selectedPicks[4] ? selectedPicks[4].spread : '',
-    tiebreaker: tiebreaker
+    tiebreaker: tiebreaker,
+    tiebreakerGame: (function() {
+      const row = document.getElementById('tiebreakerRow');
+      const a = row ? row.dataset.away : '';
+      const h = row ? row.dataset.home : '';
+      return (a && h) ? a + ' @ ' + h : '';
+    })()
   };
 
   try {
@@ -2029,7 +2019,10 @@ async function fetchAndRenderSpreads(week) {
       const tbGame = document.getElementById('tiebreakerGame');
       tbGame.innerHTML = '<span>Tiebreaker Game</span>' + lastAway + ' @ ' + lastHome +
         (lastDay ? '<br><small style="font-family:Arial,sans-serif;font-size:13px;color:var(--muted);letter-spacing:0.06em;">' + lastDay + ' ' + lastTime + '</small>' : '');
-      document.getElementById('tiebreakerRow').style.display = 'flex';
+      const tbRow = document.getElementById('tiebreakerRow');
+      tbRow.dataset.away = lastAway;
+      tbRow.dataset.home = lastHome;
+      tbRow.style.display = 'flex';
       document.getElementById('tiebreakerInput').value = '';
     }
 
@@ -2046,6 +2039,11 @@ async function fetchAndRenderSpreads(week) {
       // Pre-fill tiebreaker if they already submitted one
       if (existingPicks.tiebreaker !== undefined && existingPicks.tiebreaker !== '') {
         document.getElementById('tiebreakerInput').value = existingPicks.tiebreaker;
+      }
+      if (existingPicks.tiebreakerGame) {
+        const tbRow = document.getElementById('tiebreakerRow');
+        tbRow.dataset.away = existingPicks.tiebreakerGame.split('@')[0] ? existingPicks.tiebreakerGame.split(' @ ')[0].trim() : '';
+        tbRow.dataset.home = existingPicks.tiebreakerGame.split(' @ ')[1] ? existingPicks.tiebreakerGame.split(' @ ')[1].trim() : '';
       }
     }
 
@@ -2145,7 +2143,8 @@ async function loadMyPicks() {
         if (doc.tiebreaker !== undefined && doc.tiebreaker !== '') {
           const tbDiv = document.createElement('div');
           tbDiv.className = 'tb-display';
-          tbDiv.innerHTML = 'Tiebreaker: <strong>' + doc.tiebreaker + ' pts</strong>';
+          const gameStr = doc.tiebreakerGame ? '<span style="color:var(--muted);margin-right:6px;">' + doc.tiebreakerGame + '</span>' : '';
+          tbDiv.innerHTML = gameStr + 'Tiebreaker: <strong>' + doc.tiebreaker + ' pts</strong>';
           sub.appendChild(tbDiv);
         }
 
@@ -2940,11 +2939,7 @@ async function loadWeeklyPicks() {
         } else {
           tbTd.innerHTML = '<strong>' + doc.tiebreaker + '</strong>';
         }
-<<<<<<< HEAD
         tbTd.style.fontSize = '16px';
-=======
-        tbTd.style.fontSize = '13px';
->>>>>>> 34a177897d379ce5630f72e7f768ecdc212e9fdd
         tbTd.style.color = 'var(--text)';
       } else {
         tbTd.textContent = '—';
@@ -3100,6 +3095,6 @@ async function loadWeeklyPicks() {
   </div>
 </div>
 
-<div class="version-badge">v0.7.6</div>
+<div class="version-badge">v0.7.7</div>
 </body>
 </html>
