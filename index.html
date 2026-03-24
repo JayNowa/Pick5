@@ -152,7 +152,7 @@
   .container { width: 100%; max-width: 680px; }
 
   #loginPage  { display: flex; }
-  #selectorPage, #myPicksPage, #scoresPage, #adminPage, #weeklyPicksPage, #resultsPage { display: none; }
+  #selectorPage, #myPicksPage, #scoresPage, #adminPage, #weeklyPicksPage, #resultsPage, #leaderboardPage { display: none; }
 
   /* ── LOGIN ── */
   header { text-align: center; margin-bottom: 48px; }
@@ -1250,6 +1250,84 @@
   .tb-diff-exact  { color: #4caf7d; font-weight: 700; }
   .tb-diff-normal { color: var(--text); }
 
+
+  /* ── LEADERBOARD ── */
+  .lb-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 20px;
+    margin-bottom: 10px;
+    opacity: 0;
+    animation: pageFade 0.4s ease forwards;
+    transition: border-color 0.2s;
+  }
+  .lb-row:hover { border-color: #3a4555; }
+  .lb-row.first  { border-color: #c8a94a; background: rgba(200,169,74,0.06); }
+  .lb-row.second { border-color: #9e9e9e; background: rgba(158,158,158,0.05); }
+  .lb-row.third  { border-color: #cd7f32; background: rgba(205,127,50,0.05); }
+
+  .lb-rank {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 0.06em;
+    min-width: 40px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .lb-rank.first  { color: #c8a94a; }
+  .lb-rank.second { color: #9e9e9e; }
+  .lb-rank.third  { color: #cd7f32; }
+  .lb-rank.other  { color: var(--muted); font-size: 20px; }
+
+  .lb-info { flex: 1; }
+  .lb-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 0.08em;
+    color: var(--text);
+    line-height: 1;
+  }
+  .lb-email {
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    margin-top: 2px;
+  }
+
+  .lb-stats {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    flex-shrink: 0;
+    text-align: right;
+  }
+  .lb-stat { text-align: center; }
+  .lb-stat-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 24px;
+    letter-spacing: 0.06em;
+    line-height: 1;
+  }
+  .lb-stat-val.wins-val { color: var(--accent); }
+  .lb-stat-val.tb-val   { color: var(--text); }
+  .lb-stat-label {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .lb-record {
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    margin-top: 3px;
+  }
+
 </style>
 </head>
 <body>
@@ -1263,6 +1341,7 @@
     <button class="nav-link" id="navScores" onclick="showPage('scores')">Scores</button>
     <button class="nav-link" id="navWeeklyPicks" onclick="showPage('weeklyPicks')">Weekly Picks</button>
     <button class="nav-link" id="navResults" onclick="showPage('results')">Results</button>
+    <button class="nav-link" id="navLeaderboard" onclick="showPage('leaderboard')">Leaderboard</button>
   </div>
   <div class="nav-right">
     <span class="nav-user">Signed in as <strong id="navEmail" data-email="" data-teamname=""></strong></span>
@@ -1614,12 +1693,14 @@ async function showPage(page) {
   document.getElementById('adminPage').style.display        = 'none';
   document.getElementById('weeklyPicksPage').style.display  = 'none';
   document.getElementById('resultsPage').style.display      = 'none';
+  document.getElementById('leaderboardPage').style.display  = 'none';
 
   document.getElementById('navSelector').classList.remove('active');
   document.getElementById('navMyPicks').classList.remove('active');
   document.getElementById('navScores').classList.remove('active');
   document.getElementById('navWeeklyPicks').classList.remove('active');
   document.getElementById('navResults').classList.remove('active');
+  document.getElementById('navLeaderboard').classList.remove('active');
   clearInterval(scoresRefreshTimer);
 
   if (page === 'selector') {
@@ -1634,6 +1715,12 @@ async function showPage(page) {
     p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
     document.getElementById('navWeeklyPicks').classList.add('active');
     loadWeeklyPicks();
+  } else if (page === 'leaderboard') {
+    const p = document.getElementById('leaderboardPage');
+    p.style.display = 'flex';
+    p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
+    document.getElementById('navLeaderboard').classList.add('active');
+    loadLeaderboard();
   } else if (page === 'results') {
     const p = document.getElementById('resultsPage');
     p.style.display = 'flex';
@@ -1671,6 +1758,7 @@ function logout() {
   document.getElementById('adminPage').style.display        = 'none';
   document.getElementById('weeklyPicksPage').style.display  = 'none';
   document.getElementById('resultsPage').style.display      = 'none';
+  document.getElementById('leaderboardPage').style.display  = 'none';
   stopWeekPolling();
   currentActiveWeek = null;
   document.getElementById('emailInput').value = '';
@@ -2615,6 +2703,147 @@ function getPickResult(pick, spreadStr, scoresMap) {
 }
 
 // ── Results Page ──
+// ── Leaderboard ──
+async function loadLeaderboard() {
+  const loadingEl = document.getElementById('leaderboardLoading');
+  const errorEl   = document.getElementById('leaderboardError');
+  const contentEl = document.getElementById('leaderboardContent');
+
+  loadingEl.style.display = 'block';
+  errorEl.style.display   = 'none';
+  contentEl.innerHTML     = '';
+
+  try {
+    const [allPicks, scoresText] = await Promise.all([
+      fetchAllPicks(),
+      fetch(SCORES_CSV_URL + '&cachebust=' + Date.now()).then(r => r.ok ? r.text() : '')
+    ]);
+
+    loadingEl.style.display = 'none';
+
+    if (!allPicks || allPicks.length === 0) {
+      contentEl.innerHTML = '<div class="wp-empty">No picks submitted yet.</div>';
+      return;
+    }
+
+    // Build scores map by week
+    const scoresByWeek = {};
+    if (scoresText) {
+      const rows = parseCSV(scoresText);
+      const dataRows = rows[0][0].toLowerCase().includes('week') ? rows.slice(1) : rows;
+      dataRows.forEach(function(row) {
+        const wk       = (row[0] || '').trim();
+        const awayTeam = (row[3] || '').trim().toUpperCase();
+        const homeTeam = (row[4] || '').trim().toUpperCase();
+        const awayScore = parseFloat(row[5]);
+        const homeScore = parseFloat(row[6]);
+        const isFinal   = (row[7] || '').trim().toUpperCase() === 'F';
+        if (!wk) return;
+        if (!scoresByWeek[wk]) scoresByWeek[wk] = {};
+        const g = { awayScore, homeScore, awayTeam, homeTeam, isFinal };
+        if (awayTeam) scoresByWeek[wk][awayTeam] = g;
+        if (homeTeam) scoresByWeek[wk][homeTeam] = g;
+      });
+    }
+
+    // Latest submission per user per week
+    const userWeekMap = {};
+    const userNames   = {};
+    allPicks.forEach(function(doc) {
+      const email = doc.email || 'unknown';
+      const week  = doc.week  || '';
+      if (!week) return;
+      userNames[email] = doc.teamName || email;
+      if (!userWeekMap[email]) userWeekMap[email] = {};
+      if (!userWeekMap[email][week] || (doc.timestamp || 0) > (userWeekMap[email][week].timestamp || 0)) {
+        userWeekMap[email][week] = doc;
+      }
+    });
+
+    // Calculate totals per user
+    const standings = Object.keys(userWeekMap).map(function(email) {
+      let totalWins = 0, totalLosses = 0, totalTbDiff = 0, tbCount = 0;
+
+      Object.keys(userWeekMap[email]).forEach(function(week) {
+        const doc = userWeekMap[email][week];
+        const weekScores = scoresByWeek[week] || {};
+        const picks   = [doc.pick1,   doc.pick2,   doc.pick3,   doc.pick4,   doc.pick5];
+        const spreads = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5];
+
+        picks.forEach(function(pick, pi) {
+          if (!pick || !pick.trim()) return;
+          const result = getPickResult(pick, spreads[pi] || '', weekScores);
+          if (result === 'win')       totalWins++;
+          else if (result === 'loss') totalLosses++;
+        });
+
+        if (doc.tiebreaker !== undefined && doc.tiebreaker !== '') {
+          const actual = getActualTiebreakerFromWeek(weekScores);
+          if (actual !== null) {
+            totalTbDiff += Math.abs(parseInt(doc.tiebreaker) - actual);
+            tbCount++;
+          }
+        }
+      });
+
+      return {
+        email,
+        name: userNames[email] || email,
+        totalWins,
+        totalLosses,
+        totalTbDiff,
+        tbCount
+      };
+    });
+
+    // Sort: most wins first, then lowest TB diff as tiebreaker
+    standings.sort(function(a, b) {
+      if (b.totalWins !== a.totalWins) return b.totalWins - a.totalWins;
+      if (a.tbCount > 0 && b.tbCount > 0) return a.totalTbDiff - b.totalTbDiff;
+      return 0;
+    });
+
+    const medals = ['🥇', '🥈', '🥉'];
+    const rankClasses = ['first', 'second', 'third'];
+
+    standings.forEach(function(user, idx) {
+      const row = document.createElement('div');
+      row.className = 'lb-row' + (idx < 3 ? ' ' + rankClasses[idx] : '');
+      row.style.animationDelay = (idx * 0.06) + 's';
+
+      const rankClass = idx < 3 ? rankClasses[idx] : 'other';
+      const rankDisplay = idx < 3 ? medals[idx] : (idx + 1);
+
+      row.innerHTML =
+        '<div class="lb-rank ' + rankClass + '">' + rankDisplay + '</div>' +
+        '<div class="lb-info">' +
+          '<div class="lb-name">' + user.name + '</div>' +
+          '<div class="lb-record">' + user.totalWins + 'W &ndash; ' + user.totalLosses + 'L</div>' +
+        '</div>' +
+        '<div class="lb-stats">' +
+          '<div class="lb-stat">' +
+            '<div class="lb-stat-val wins-val">' + user.totalWins + '</div>' +
+            '<div class="lb-stat-label">Wins</div>' +
+          '</div>' +
+          (user.tbCount > 0 ?
+            '<div class="lb-stat">' +
+              '<div class="lb-stat-val tb-val">' + user.totalTbDiff + '</div>' +
+              '<div class="lb-stat-label">TB Diff</div>' +
+            '</div>' : ''
+          ) +
+        '</div>';
+
+      contentEl.appendChild(row);
+    });
+
+  } catch(err) {
+    loadingEl.style.display = 'none';
+    errorEl.style.display   = 'block';
+    errorEl.textContent     = 'Unable to load leaderboard. Please try again.';
+    console.error(err);
+  }
+}
+
 async function loadResultsPage() {
   const loadingEl = document.getElementById('resultsLoading');
   const errorEl   = document.getElementById('resultsError');
@@ -3043,6 +3272,24 @@ async function loadWeeklyPicks() {
   </div>
 </div>
 
+
+<!-- ═══ LEADERBOARD PAGE ═══ -->
+<div class="page with-nav" id="leaderboardPage">
+  <div class="container" style="max-width:680px;">
+    <div class="page-header">
+      <div class="page-title">Leaderboard</div>
+      <div class="page-subtitle">Season standings</div>
+      <div class="page-divider"></div>
+    </div>
+    <div id="leaderboardLoading" class="picks-loading">
+      <div class="loading-spinner"></div>
+      <p>Loading leaderboard…</p>
+    </div>
+    <div id="leaderboardError" class="picks-error" style="display:none;"></div>
+    <div id="leaderboardContent"></div>
+  </div>
+</div>
+
 <!-- ═══ SCORES PAGE ═══ -->
 <div class="page with-nav" id="scoresPage">
   <div class="container" style="max-width:860px;">
@@ -3135,6 +3382,6 @@ async function loadWeeklyPicks() {
   </div>
 </div>
 
-<div class="version-badge">v0.7.8</div>
+<div class="version-badge">v0.7.9</div>
 </body>
 </html>
