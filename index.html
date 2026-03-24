@@ -1178,6 +1178,7 @@
   }
   .tiebreaker-game {
     font-family: 'Bebas Neue', sans-serif;
+<<<<<<< HEAD
     font-size: 18px;
     letter-spacing: 0.08em;
     color: var(--text);
@@ -1185,6 +1186,12 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
+=======
+    font-size: 15px;
+    letter-spacing: 0.08em;
+    color: var(--text);
+    flex-shrink: 0;
+>>>>>>> 34a177897d379ce5630f72e7f768ecdc212e9fdd
   }
   .tiebreaker-game span {
     display: block;
@@ -1209,7 +1216,11 @@
     white-space: nowrap;
   }
   .tiebreaker-input-wrap input {
+<<<<<<< HEAD
     width: 110px;
+=======
+    width: 90px;
+>>>>>>> 34a177897d379ce5630f72e7f768ecdc212e9fdd
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 5px;
@@ -1224,12 +1235,15 @@
     transition: border-color 0.2s, box-shadow 0.2s;
     -moz-appearance: textfield;
   }
+<<<<<<< HEAD
   .tiebreaker-input-wrap input::placeholder {
     font-size: 12px;
     font-weight: 400;
     letter-spacing: 0.06em;
     color: var(--muted);
   }
+=======
+>>>>>>> 34a177897d379ce5630f72e7f768ecdc212e9fdd
   .tiebreaker-input-wrap input::-webkit-outer-spin-button,
   .tiebreaker-input-wrap input::-webkit-inner-spin-button { -webkit-appearance: none; }
   .tiebreaker-input-wrap input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(200,169,74,0.2); }
@@ -2926,7 +2940,11 @@ async function loadWeeklyPicks() {
         } else {
           tbTd.innerHTML = '<strong>' + doc.tiebreaker + '</strong>';
         }
+<<<<<<< HEAD
         tbTd.style.fontSize = '16px';
+=======
+        tbTd.style.fontSize = '13px';
+>>>>>>> 34a177897d379ce5630f72e7f768ecdc212e9fdd
         tbTd.style.color = 'var(--text)';
       } else {
         tbTd.textContent = '—';
