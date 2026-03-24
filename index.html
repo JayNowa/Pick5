@@ -1167,68 +1167,79 @@
   /* ── TIEBREAKER ── */
   .tiebreaker-row {
     background: var(--surface);
-    border: 1px solid var(--accent);
-    border-radius: 8px;
-    padding: 16px 20px;
-    margin-top: 16px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-top: 12px;
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 14px;
     flex-wrap: wrap;
   }
   .tiebreaker-game {
     font-family: 'Bebas Neue', sans-serif;
-    font-size: 18px;
-    letter-spacing: 0.1em;
-    color: var(--accent);
+    font-size: 15px;
+    letter-spacing: 0.08em;
+    color: var(--text);
     flex-shrink: 0;
   }
   .tiebreaker-game span {
     display: block;
     font-family: 'Barlow Condensed', sans-serif;
-    font-size: 12px;
-    letter-spacing: 0.12em;
-    color: var(--muted);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    color: var(--accent);
     text-transform: uppercase;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
   }
   .tiebreaker-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     flex: 1;
-    min-width: 200px;
   }
   .tiebreaker-input-wrap label {
-    display: block;
     font-size: 11px;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--muted);
-    margin-bottom: 6px;
+    white-space: nowrap;
   }
   .tiebreaker-input-wrap input {
-    width: 100%;
+    width: 90px;
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 5px;
-    padding: 10px 14px;
+    padding: 7px 10px;
     color: var(--text);
     font-family: 'Barlow Condensed', sans-serif;
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 700;
     letter-spacing: 0.04em;
     outline: none;
+    text-align: center;
     transition: border-color 0.2s, box-shadow 0.2s;
     -moz-appearance: textfield;
   }
   .tiebreaker-input-wrap input::-webkit-outer-spin-button,
   .tiebreaker-input-wrap input::-webkit-inner-spin-button { -webkit-appearance: none; }
   .tiebreaker-input-wrap input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(200,169,74,0.2); }
-  .tiebreaker-input-wrap input.error { border-color: var(--error); box-shadow: 0 0 0 1px rgba(224,85,85,0.2); }
-  .tiebreaker-hint {
-    font-size: 11px;
+  .tiebreaker-input-wrap input.error { border-color: var(--error); }
+  .tiebreaker-hint { display: none; }
+
+  .tb-display {
+    font-size: 13px;
     color: var(--muted);
     letter-spacing: 0.06em;
-    margin-top: 5px;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
   }
+  .tb-display strong { color: var(--accent); }
+  .tb-diff-exact  { color: #4caf7d; font-weight: 700; }
+  .tb-diff-normal { color: var(--text); }
 
 </style>
 </head>
@@ -2106,6 +2117,15 @@ async function loadMyPicks() {
           chipsEl.appendChild(chip);
         });
         sub.appendChild(chipsEl);
+
+        // Show tiebreaker if submitted
+        if (doc.tiebreaker !== undefined && doc.tiebreaker !== '') {
+          const tbDiv = document.createElement('div');
+          tbDiv.className = 'tb-display';
+          tbDiv.innerHTML = 'Tiebreaker: <strong>' + doc.tiebreaker + ' pts</strong>';
+          sub.appendChild(tbDiv);
+        }
+
         group.appendChild(sub);
       });
       groupsEl.appendChild(group);
@@ -2754,6 +2774,18 @@ async function fetchAllPicks() {
   }
 }
 
+function getActualTiebreaker(scoresMap) {
+  // Find a final game with both scores — use the last one added (last game of week)
+  let lastGame = null;
+  Object.values(scoresMap).forEach(function(g) {
+    if (g.isFinal && !isNaN(g.awayScore) && !isNaN(g.homeScore)) {
+      lastGame = g;
+    }
+  });
+  if (!lastGame) return null;
+  return lastGame.awayScore + lastGame.homeScore;
+}
+
 async function loadWeeklyPicks() {
   const loadingEl  = document.getElementById('weeklyPicksLoading');
   const errorEl    = document.getElementById('weeklyPicksError');
@@ -2812,7 +2844,7 @@ async function loadWeeklyPicks() {
 
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
-    ['User', 'Pick 1', 'Pick 2', 'Pick 3', 'Pick 4', 'Pick 5', 'Record'].forEach(function(h) {
+    ['User', 'Pick 1', 'Pick 2', 'Pick 3', 'Pick 4', 'Pick 5', 'Record', 'Tiebreaker'].forEach(function(h) {
       const th = document.createElement('th');
       th.textContent = h;
       headerRow.appendChild(th);
@@ -2873,6 +2905,25 @@ async function loadWeeklyPicks() {
         recordTd.innerHTML = '<span class="pending">Pending</span>';
       }
       tr.appendChild(recordTd);
+
+      // Tiebreaker cell
+      const tbTd = document.createElement('td');
+      if (doc.tiebreaker !== undefined && doc.tiebreaker !== '') {
+        const actualTotal = scoresMap ? getActualTiebreaker(scoresMap) : null;
+        if (actualTotal !== null) {
+          const diff = Math.abs(parseInt(doc.tiebreaker) - actualTotal);
+          const diffClass = diff === 0 ? 'tb-diff-exact' : 'tb-diff-normal';
+          tbTd.innerHTML = '<strong>' + doc.tiebreaker + '</strong> <span class="' + diffClass + '">(' + (diff === 0 ? 'exact!' : '+' + diff) + ')</span>';
+        } else {
+          tbTd.innerHTML = '<strong>' + doc.tiebreaker + '</strong>';
+        }
+        tbTd.style.fontSize = '13px';
+        tbTd.style.color = 'var(--text)';
+      } else {
+        tbTd.textContent = '—';
+        tbTd.style.color = 'var(--muted)';
+      }
+      tr.appendChild(tbTd);
 
 
 
@@ -3022,6 +3073,6 @@ async function loadWeeklyPicks() {
   </div>
 </div>
 
-<div class="version-badge">v0.7.5</div>
+<div class="version-badge">v0.7.6</div>
 </body>
 </html>
