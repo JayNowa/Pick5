@@ -1564,6 +1564,7 @@ const SPREADS_CSV_URL  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTCZp0
 // ── Scores state ──
 let scoresWeek = null;
 let scoresYear = null;
+let scoresSeasonType = 2; // 1=pre, 2=regular, 3=post
 let scoresRefreshTimer = null;
 
 // ── Week polling ──
@@ -2269,18 +2270,50 @@ async function loadMyPicks() {
 async function initScores() {
   const now = new Date();
   scoresYear = now.getMonth() < 8 ? now.getFullYear() - 1 : now.getFullYear();
-  // Default to admin-set week, fall back to 1
   try {
     const adminWeek = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
-    scoresWeek = adminWeek ? parseInt(adminWeek) : (scoresWeek || 1);
+    if (adminWeek) {
+      const aw = adminWeek.toString().toLowerCase();
+      if (aw.includes('pre')) {
+        // Pre Week — switch to preseason, extract number
+        scoresSeasonType = 1;
+        scoresWeek = parseInt(aw.replace(/[^0-9]/g, '')) || 1;
+      } else {
+        scoresSeasonType = 2;
+        scoresWeek = parseInt(adminWeek) || 1;
+      }
+    } else {
+      scoresSeasonType = 2;
+      scoresWeek = scoresWeek || 1;
+    }
   } catch(e) {
+    scoresSeasonType = 2;
     scoresWeek = scoresWeek || 1;
   }
+  updateScoresSeasonLabel();
   updateScoresWeekLabel();
   updateScoresYearLabel();
   fetchScores();
   clearInterval(scoresRefreshTimer);
   scoresRefreshTimer = setInterval(fetchScores, 15 * 60 * 1000);
+}
+
+function updateScoresSeasonLabel() {
+  const labels = { 1: 'Preseason', 2: 'Regular', 3: 'Playoffs' };
+  const maxWeeks = { 1: 4, 2: 18, 3: 4 };
+  document.getElementById('scoresSeasonLabel').textContent = labels[scoresSeasonType] || 'Regular';
+  document.getElementById('seasonPrev').disabled = scoresSeasonType <= 1;
+  document.getElementById('seasonNext').disabled = scoresSeasonType >= 3;
+  // Clamp week to valid range for season type
+  scoresWeek = Math.min(maxWeeks[scoresSeasonType] || 18, Math.max(1, scoresWeek || 1));
+  updateScoresWeekLabel();
+}
+
+function changeSeasonType(dir) {
+  scoresSeasonType = Math.min(3, Math.max(1, scoresSeasonType + dir));
+  scoresWeek = 1;
+  updateScoresSeasonLabel();
+  fetchScores();
 }
 
 function updateScoresWeekLabel() {
@@ -2298,7 +2331,8 @@ function updateScoresYearLabel() {
 }
 
 function changeScoresWeek(dir) {
-  scoresWeek = Math.min(18, Math.max(1, scoresWeek + dir));
+  const maxWeek = scoresSeasonType === 1 ? 4 : scoresSeasonType === 3 ? 4 : 18;
+  scoresWeek = Math.min(maxWeek, Math.max(1, scoresWeek + dir));
   updateScoresWeekLabel();
   fetchScores();
 }
@@ -2324,7 +2358,7 @@ async function fetchScores() {
   document.getElementById('scoresRefreshInfo').textContent = 'Last updated ' + timeStr + ' · Auto-refreshes every 15 min';
 
   try {
-    const url = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=' + scoresYear + '&seasontype=2&week=' + scoresWeek;
+    const url = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=' + scoresYear + '&seasontype=' + scoresSeasonType + '&week=' + scoresWeek;
     const res  = await fetch(url);
     if (!res.ok) throw new Error('ESPN API error');
     const data   = await res.json();
@@ -3103,7 +3137,7 @@ async function loadWeeklyPicks() {
 
   try {
     const week = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
-    const weekLabel = week ? 'Week ' + week : null;
+    const weekLabel = week ? ((week.toString().toLowerCase().includes('week')) ? week : 'Week ' + week) : null;
 
     if (!weekLabel) {
       loadingEl.style.display = 'none';
@@ -3322,6 +3356,11 @@ async function loadWeeklyPicks() {
               <button class="week-nav-btn" id="yearNext" onclick="changeScoresYear(1)">&#8594;</button>
             </div>
             <div class="scores-week-nav">
+              <button class="week-nav-btn" id="seasonPrev" onclick="changeSeasonType(-1)">&#8592;</button>
+              <span class="week-nav-label" id="scoresSeasonLabel" style="min-width:70px;font-size:13px;">Regular</span>
+              <button class="week-nav-btn" id="seasonNext" onclick="changeSeasonType(1)">&#8594;</button>
+            </div>
+            <div class="scores-week-nav">
               <button class="week-nav-btn" id="weekPrev" onclick="changeScoresWeek(-1)">&#8592;</button>
               <span class="week-nav-label" id="scoresWeekLabel">Week —</span>
               <button class="week-nav-btn" id="weekNext" onclick="changeScoresWeek(1)">&#8594;</button>
@@ -3399,6 +3438,6 @@ async function loadWeeklyPicks() {
   </div>
 </div>
 
-<div class="version-badge">v0.8.2</div>
+<div class="version-badge">v0.8.3</div>
 </body>
 </html>
