@@ -2861,7 +2861,7 @@ async function loadLeaderboard() {
       row.style.animationDelay = (idx * 0.06) + 's';
 
       const rankClass = idx < 5 ? rankClasses[idx] : (isLast ? 'loser' : 'other');
-      const rankDisplay = idx < 5 ? medals[idx] : (isLast ? '🪣' : (idx + 1));
+      const rankDisplay = idx < 5 ? medals[idx] : (isLast ? '💩' : (idx + 1));
 
       row.innerHTML =
         '<div class="lb-rank ' + rankClass + '">' + rankDisplay + '</div>' +
