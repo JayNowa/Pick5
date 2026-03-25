@@ -1602,7 +1602,7 @@ async function updateWeekBadge() {
   if (!badge) return;
   try {
     const week = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
-    badge.textContent = week ? ((week.toString().toLowerCase().includes('week')) ? week : 'Week ' + week) : 'Week —';
+    badge.textContent = week ? ((isNaN(parseInt(week)) || week.toString().toLowerCase().includes('week')) ? week : 'Week ' + week) : 'Week —';
     badge.classList.toggle('week-offseason', !week);
   } catch(e) {
     badge.textContent = 'Week —';
@@ -1959,7 +1959,7 @@ async function loadSpreadsOnHomePage() {
       loadingEl.style.display = 'none';
       return;
     }
-    const wld = (week && week.toString().toLowerCase().includes('week')) ? week : 'Week ' + week;
+    const wld = (isNaN(parseInt(week)) || week.toString().toLowerCase().includes('week')) ? week : 'Week ' + week;
     loadingMsg.textContent = 'Loading ' + wld + '…';
     await fetchAndRenderSpreads(week);
     loadingEl.style.display = 'none';
@@ -1982,7 +1982,7 @@ async function fetchAndRenderSpreads(week) {
   grid.innerHTML = '';
   errorEl.style.display   = 'none';
   loadingEl.style.display = 'block';
-  const weekLabelDisplay = (week && week.toString().toLowerCase().includes('week')) ? week : 'Week ' + week;
+  const weekLabelDisplay = (isNaN(parseInt(week)) || week.toString().toLowerCase().includes('week')) ? week : 'Week ' + week;
   loadingMsg.textContent  = 'Loading ' + weekLabelDisplay + '…';
   section.style.display   = 'block';
   selectedPicks = [];
@@ -1992,7 +1992,7 @@ async function fetchAndRenderSpreads(week) {
     // Fetch spreads and existing user picks in parallel
     const navEl        = document.getElementById('navEmail');
     const userEmail    = (navEl.dataset.email || navEl.textContent).toLowerCase();
-    const weekLabel    = (week && week.toString().toLowerCase().includes('week')) ? week : 'Week ' + week;
+    const weekLabel    = (isNaN(parseInt(week)) || week.toString().toLowerCase().includes('week')) ? week : 'Week ' + week;
 
     const [spreadsRes, existingPicks] = await Promise.all([
       fetch(SPREADS_CSV_URL + '&cachebust=' + Date.now()),
@@ -2705,7 +2705,7 @@ async function fetchScoresMap(week) {
     const rows = parseCSV(text);
     // Headers: Week, Date, Time, Away Team, Home Team, Away Score, Home Score, Quarter, Clock
     const dataRows = rows[0][0].toLowerCase().includes('week') ? rows.slice(1) : rows;
-    const weekLabel = (week && week.toString().toLowerCase().includes('week')) ? week : 'Week ' + week;
+    const weekLabel = (isNaN(parseInt(week)) || week.toString().toLowerCase().includes('week')) ? week : 'Week ' + week;
     const map = {};
 
     dataRows.forEach(function(row) {
