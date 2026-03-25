@@ -1113,8 +1113,8 @@
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
   }
-  .results-table th:last-child,
-  .results-table td:last-child { min-width: 80px; }
+  .results-table th:nth-last-child(-n+2),
+  .results-table td:nth-last-child(-n+2) { min-width: 90px; white-space: nowrap; }
   .results-table th:first-child {
     text-align: left;
     position: sticky;
@@ -1601,7 +1601,7 @@ async function updateWeekBadge() {
   if (!badge) return;
   try {
     const week = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
-    badge.textContent = week ? 'Week ' + week : 'Week —';
+    badge.textContent = week ? ((week.toString().toLowerCase().includes('week')) ? week : 'Week ' + week) : 'Week —';
     badge.classList.toggle('week-offseason', !week);
   } catch(e) {
     badge.textContent = 'Week —';
@@ -1886,7 +1886,7 @@ async function submitSpreadsPicks() {
   let weekLabel = 'Off Season';
   try {
     const w = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
-    weekLabel = w ? 'Week ' + w : 'Off Season';
+    weekLabel = w ? ((w.toString().toLowerCase().includes('week')) ? w : 'Week ' + w) : 'Off Season';
   } catch(e) {}
 
   const navEl = document.getElementById('navEmail');
@@ -1958,7 +1958,8 @@ async function loadSpreadsOnHomePage() {
       loadingEl.style.display = 'none';
       return;
     }
-    loadingMsg.textContent = 'Loading games for Week ' + week + '…';
+    const wld = (week && week.toString().toLowerCase().includes('week')) ? week : 'Week ' + week;
+    loadingMsg.textContent = 'Loading ' + wld + '…';
     await fetchAndRenderSpreads(week);
     loadingEl.style.display = 'none';
   } catch(e) {
@@ -1980,7 +1981,8 @@ async function fetchAndRenderSpreads(week) {
   grid.innerHTML = '';
   errorEl.style.display   = 'none';
   loadingEl.style.display = 'block';
-  loadingMsg.textContent  = 'Loading games for Week ' + week + '…';
+  const weekLabelDisplay = (week && week.toString().toLowerCase().includes('week')) ? week : 'Week ' + week;
+  loadingMsg.textContent  = 'Loading ' + weekLabelDisplay + '…';
   section.style.display   = 'block';
   selectedPicks = [];
   updatePicksCounter();
@@ -1989,7 +1991,7 @@ async function fetchAndRenderSpreads(week) {
     // Fetch spreads and existing user picks in parallel
     const navEl        = document.getElementById('navEmail');
     const userEmail    = (navEl.dataset.email || navEl.textContent).toLowerCase();
-    const weekLabel    = 'Week ' + week;
+    const weekLabel    = (week && week.toString().toLowerCase().includes('week')) ? week : 'Week ' + week;
 
     const [spreadsRes, existingPicks] = await Promise.all([
       fetch(SPREADS_CSV_URL + '&cachebust=' + Date.now()),
@@ -2906,7 +2908,10 @@ async function loadResultsPage() {
 
     // Get unique weeks sorted
     const allWeeks = [...new Set(allPicksSnap.map(d => d.week).filter(Boolean))].sort((a, b) => {
-      return (parseInt(a.replace(/\D/g,'')) || 0) - (parseInt(b.replace(/\D/g,'')) || 0);
+      const isPre = s => s && s.toLowerCase().includes('pre');
+      if (isPre(a) && !isPre(b)) return -1;
+      if (!isPre(a) && isPre(b)) return 1;
+      return (parseInt((a || '').replace(/[^0-9]/g,'')) || 0) - (parseInt((b || '').replace(/[^0-9]/g,'')) || 0);
     });
 
     // Get latest submission per user per week
@@ -3402,6 +3407,6 @@ async function loadWeeklyPicks() {
   </div>
 </div>
 
-<div class="version-badge">v0.8.1</div>
+<div class="version-badge">v0.8.2</div>
 </body>
 </html>
