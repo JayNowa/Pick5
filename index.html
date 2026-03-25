@@ -367,13 +367,13 @@
   }
   .game-status.live   { color: #4caf7d; }
   .game-status.live::before { content: '● '; }
-  .game-status.final  { color: var(--muted); }
-  .game-status.scheduled { color: var(--muted); }
+  .game-status.final  { color: var(--text); }
+  .game-status.scheduled { color: var(--text); }
 
   .game-network {
     font-size: 11px;
     letter-spacing: 0.08em;
-    color: var(--muted);
+    color: var(--text);
     text-transform: uppercase;
   }
 
@@ -407,7 +407,7 @@
 
   .score-team-record {
     font-size: 12px;
-    color: var(--muted);
+    color: var(--text);
     letter-spacing: 0.04em;
   }
 
@@ -432,7 +432,7 @@
     margin-top: 10px;
     font-size: 12px;
     letter-spacing: 0.08em;
-    color: var(--muted);
+    color: var(--text);
     text-align: center;
     text-transform: uppercase;
   }
@@ -1113,6 +1113,8 @@
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
   }
+  .results-table th:last-child,
+  .results-table td:last-child { min-width: 80px; }
   .results-table th:first-child {
     text-align: left;
     position: sticky;
@@ -1269,6 +1271,7 @@
   .lb-row.first  { border-color: #c8a94a; background: rgba(200,169,74,0.06); }
   .lb-row.second { border-color: #9e9e9e; background: rgba(158,158,158,0.05); }
   .lb-row.third  { border-color: #cd7f32; background: rgba(205,127,50,0.05); }
+  .lb-row.loser  { border-color: rgba(224,85,85,0.4); background: rgba(224,85,85,0.04); }
 
   .lb-rank {
     font-family: 'Bebas Neue', sans-serif;
@@ -1281,6 +1284,9 @@
   .lb-rank.first  { color: #c8a94a; }
   .lb-rank.second { color: #9e9e9e; }
   .lb-rank.third  { color: #cd7f32; }
+  .lb-rank.fourth { color: var(--muted); }
+  .lb-rank.fifth  { color: var(--muted); }
+  .lb-rank.loser  { color: var(--error); }
   .lb-rank.other  { color: var(--muted); font-size: 20px; }
 
   .lb-info { flex: 1; }
@@ -2809,16 +2815,17 @@ async function loadLeaderboard() {
       return 0;
     });
 
-    const medals = ['🥇', '🥈', '🥉'];
-    const rankClasses = ['first', 'second', 'third'];
+    const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+    const rankClasses = ['first', 'second', 'third', 'fourth', 'fifth'];
 
     standings.forEach(function(user, idx) {
       const row = document.createElement('div');
-      row.className = 'lb-row' + (idx < 3 ? ' ' + rankClasses[idx] : '');
+      row.className = 'lb-row' + (idx < 5 ? ' ' + rankClasses[idx] : (isLast ? ' loser' : ''));
       row.style.animationDelay = (idx * 0.06) + 's';
 
-      const rankClass = idx < 3 ? rankClasses[idx] : 'other';
-      const rankDisplay = idx < 3 ? medals[idx] : (idx + 1);
+      const isLast = idx === standings.length - 1 && standings.length > 1;
+      const rankClass = idx < 5 ? rankClasses[idx] : (isLast ? 'loser' : 'other');
+      const rankDisplay = idx < 5 ? medals[idx] : (isLast ? '🪣' : (idx + 1));
 
       row.innerHTML =
         '<div class="lb-rank ' + rankClass + '">' + rankDisplay + '</div>' +
@@ -3361,6 +3368,9 @@ async function loadWeeklyPicks() {
           <label>Select Week to Display</label>
           <select id="adminSpreadsWeekSelect">
             <option value="">— None (hide graphic) —</option>
+            <option value="Pre Week 1">Pre Week 1</option>
+            <option value="Pre Week 2">Pre Week 2</option>
+            <option value="Pre Week 3">Pre Week 3</option>
             <option value="1">Week 1</option>
             <option value="2">Week 2</option>
             <option value="3">Week 3</option>
@@ -3392,6 +3402,6 @@ async function loadWeeklyPicks() {
   </div>
 </div>
 
-<div class="version-badge">v0.8.0</div>
+<div class="version-badge">v0.8.1</div>
 </body>
 </html>
