@@ -2821,11 +2821,11 @@ async function loadLeaderboard() {
     const rankClasses = ['first', 'second', 'third', 'fourth', 'fifth'];
 
     standings.forEach(function(user, idx) {
+      const isLast = idx === standings.length - 1 && standings.length > 1;
       const row = document.createElement('div');
       row.className = 'lb-row' + (idx < 5 ? ' ' + rankClasses[idx] : (isLast ? ' loser' : ''));
       row.style.animationDelay = (idx * 0.06) + 's';
 
-      const isLast = idx === standings.length - 1 && standings.length > 1;
       const rankClass = idx < 5 ? rankClasses[idx] : (isLast ? 'loser' : 'other');
       const rankDisplay = idx < 5 ? medals[idx] : (isLast ? '🪣' : (idx + 1));
 
@@ -2906,17 +2906,9 @@ async function loadResultsPage() {
       });
     }
 
-    // Get unique weeks sorted
-    const allWeeks = [...new Set(allPicksSnap.map(d => d.week).filter(Boolean))].sort((a, b) => {
-      const isPre = s => s && s.toLowerCase().includes('pre');
-      if (isPre(a) && !isPre(b)) return -1;
-      if (!isPre(a) && isPre(b)) return 1;
-      return (parseInt((a || '').replace(/[^0-9]/g,'')) || 0) - (parseInt((b || '').replace(/[^0-9]/g,'')) || 0);
-    });
-
     // Get latest submission per user per week
-    const userWeekMap = {}; // { email: { "Week 1": doc, "Week 2": doc } }
-    const userNames   = {}; // { email: teamName }
+    const userWeekMap = {};
+    const userNames   = {};
     allPicksSnap.forEach(function(doc) {
       const email = doc.email || 'unknown';
       const week  = doc.week  || '';
