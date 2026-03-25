@@ -2203,6 +2203,25 @@ async function fetchAndRenderSpreads(week) {
       tbRow.dataset.home = lastHome;
       tbRow.style.display = 'flex';
       document.getElementById('tiebreakerInput').value = '';
+
+      // Lock tiebreaker if last game has started or is final
+      const tbInput = document.getElementById('tiebreakerInput');
+      const tbStarted = liveScoresMap && lastAway && liveScoresMap[lastAway.toUpperCase()] && liveScoresMap[lastAway.toUpperCase()].started;
+      const tbFinal   = liveScoresMap && lastAway && liveScoresMap[lastAway.toUpperCase()] && liveScoresMap[lastAway.toUpperCase()].isFinal;
+      if (tbStarted) {
+        tbInput.disabled = true;
+        tbInput.style.opacity = '0.45';
+        tbInput.style.cursor = 'not-allowed';
+        tbInput.placeholder = tbFinal ? 'Game Final — locked' : 'In Progress — locked';
+        // Update tiebreaker label
+        const tbSpan = tbRow.querySelector('.tiebreaker-input-wrap label');
+        if (tbSpan) tbSpan.textContent = tbFinal ? 'Total Points (Final)' : 'Total Points (In Progress)';
+      } else {
+        tbInput.disabled = false;
+        tbInput.style.opacity = '';
+        tbInput.style.cursor = '';
+        tbInput.placeholder = 'Enter total score';
+      }
     }
 
     // Restore user's existing picks for this week
