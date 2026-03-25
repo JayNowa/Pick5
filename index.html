@@ -1353,6 +1353,17 @@
     padding: 4px 0 2px;
     width: 100%;
   }
+  .game-final::after {
+    content: '✓ Final';
+    display: block;
+    text-align: center;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #4caf7d;
+    padding: 4px 0 2px;
+    width: 100%;
+  }
 
 </style>
 </head>
@@ -2037,10 +2048,10 @@ async function fetchAndRenderSpreads(week) {
             const away = (row[3] || '').trim().toUpperCase();
             const home = (row[4] || '').trim().toUpperCase();
             const qtr  = (row[7] || '').trim().toUpperCase();
-            // Game has started if quarter is not empty and not just a future placeholder
             const started = qtr !== '' && qtr !== '-' && qtr !== '0';
-            if (away) map[away] = { started, qtr };
-            if (home) map[home] = { started, qtr };
+            const isFinal = qtr === 'F' || qtr === 'F-OT' || qtr.startsWith('F/');
+            if (away) map[away] = { started, isFinal, qtr };
+            if (home) map[home] = { started, isFinal, qtr };
           });
           return map;
         } catch(e) { return {}; }
@@ -2093,8 +2104,10 @@ async function fetchAndRenderSpreads(week) {
       const awayStartedCheck = liveScoresMap && liveScoresMap[away] && liveScoresMap[away].started;
       const homeStartedCheck = liveScoresMap && liveScoresMap[home] && liveScoresMap[home].started;
       const gameStartedCheck = awayStartedCheck || homeStartedCheck;
+      const gameFinalCheck   = (liveScoresMap && liveScoresMap[away] && liveScoresMap[away].isFinal) ||
+                               (liveScoresMap && liveScoresMap[home] && liveScoresMap[home].isFinal);
 
-      card.className = 'spread-card' + (gameStartedCheck ? ' game-in-progress' : '');
+      card.className = 'spread-card' + (gameFinalCheck ? ' game-final' : gameStartedCheck ? ' game-in-progress' : '');
       card.dataset.game = i;
       card.dataset.away = away;
       card.dataset.home = home;
@@ -2107,6 +2120,8 @@ async function fetchAndRenderSpreads(week) {
       const awayStarted = liveScoresMap && liveScoresMap[away] && liveScoresMap[away].started;
       const homeStarted = liveScoresMap && liveScoresMap[home] && liveScoresMap[home].started;
       const gameStarted = awayStarted || homeStarted;
+      const gameFinal   = (liveScoresMap && liveScoresMap[away] && liveScoresMap[away].isFinal) ||
+                          (liveScoresMap && liveScoresMap[home] && liveScoresMap[home].isFinal);
 
       awayBtn.setAttribute('data-state', 'idle');
       awayBtn.dataset.spread = awaySpread || '';
