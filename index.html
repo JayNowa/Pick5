@@ -1570,6 +1570,19 @@
     return docs;
   };
 
+  window.fbSaveSpreadData = async function(weekKey, games) {
+    await setDoc(doc(db, "settings", "spreadData_" + weekKey.replace(/[^a-zA-Z0-9]/g, '_')), {
+      weekKey: weekKey,
+      games: games,
+      savedAt: Date.now()
+    });
+  };
+
+  window.fbGetSpreadData = async function(weekKey) {
+    const snap = await getDoc(doc(db, "settings", "spreadData_" + weekKey.replace(/[^a-zA-Z0-9]/g, '_')));
+    return snap.exists() ? snap.data() : null;
+  };
+
   window.fbSaveSpreadsWeek = async function(value) {
     await setDoc(doc(db, "settings", "spreadsWeek"), { value: value, updatedAt: Date.now() });
   };
@@ -1624,6 +1637,64 @@ function getTeamLogo(abbr) {
   const slug = slugs[abbr.toUpperCase()];
   if (!slug) return '';
   return 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/' + slug + '.png&w=40&h=40&transparent=true';
+}
+
+
+// ── ESPN API Helpers ──
+function buildESPNScoreboardURL(weekValue, year) {
+  year = year || new Date().getFullYear();
+  if (new Date().getMonth() < 8) year = year - 1;
+  const wv = weekValue ? weekValue.toString().toLowerCase() : '';
+  let seasontype = 2;
+  let week = 1;
+  if (wv.includes('pre')) {
+    seasontype = 1;
+    week = parseInt(wv.replace(/[^0-9]/g, '')) || 1;
+  } else {
+    week = parseInt(weekValue) || 1;
+  }
+  return 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=' + year + '&seasontype=' + seasontype + '&week=' + week;
+}
+
+// Build a live scores map from ESPN scoreboard JSON
+function buildESPNScoresMap(events) {
+  const map = {};
+  (events || []).forEach(function(event) {
+    const comp      = event.competitions[0];
+    const status    = event.status;
+    const stateType = status.type.state; // pre, in, post
+    const clock     = status.displayClock || '';
+    const period    = status.period || 0;
+    const isFinal   = stateType === 'post';
+    const isLive    = stateType === 'in';
+    const started   = isFinal || isLive;
+
+    const home = comp.competitors.find(function(c) { return c.homeAway === 'home'; });
+    const away = comp.competitors.find(function(c) { return c.homeAway === 'away'; });
+    const homeScore = parseFloat((home && home.score) || 0);
+    const awayScore = parseFloat((away && away.score) || 0);
+    const homeAbbr  = home && home.team ? home.team.abbreviation.toUpperCase() : '';
+    const awayAbbr  = away && away.team ? away.team.abbreviation.toUpperCase() : '';
+
+    const gameData = { started, isFinal, isLive, homeScore, awayScore, homeAbbr, awayAbbr, period, clock };
+    if (homeAbbr) map[homeAbbr] = gameData;
+    if (awayAbbr) map[awayAbbr] = gameData;
+  });
+  return map;
+}
+
+// Fetch ESPN scores map for a given admin week value
+async function fetchESPNScoresMap(weekValue) {
+  try {
+    const url = buildESPNScoreboardURL(weekValue);
+    const res = await fetch(url);
+    if (!res.ok) return {};
+    const data = await res.json();
+    return buildESPNScoresMap(data.events || []);
+  } catch(e) {
+    console.error('ESPN scores fetch error:', e);
+    return {};
+  }
 }
 
 // ── Week Badge — reads spreadsWeek from Firebase ──
@@ -2058,12 +2129,21 @@ async function fetchAndRenderSpreads(week) {
       })()
     ]);
 
-    const res = spreadsRes;
-    if (!res.ok) throw new Error('Sheet unreachable');
-    const text = await res.text();
-    const rows = parseCSV(text);
-    const dataRows = rows[0][0].toLowerCase().includes('week') ? rows.slice(1) : rows;
-    const weekRows = dataRows.filter(r => r[0] && r[0].trim().toLowerCase() === weekLabel.toLowerCase());
+    // Load spreads from Firebase only
+    let weekRows = null;
+    const weekKey = week.toString().replace(/[^a-zA-Z0-9]/g, '_');
+    if (window.fbGetSpreadData) {
+      const savedData = await window.fbGetSpreadData(weekKey);
+      if (savedData && savedData.games && savedData.games.length > 0) {
+        weekRows = savedData.games.map(g => [week, g.date || '', g.time || '', g.away || '', g.home || '', g.odds || '']);
+      }
+    }
+    if (!weekRows) {
+      loadingEl.style.display = 'none';
+      errorEl.style.display   = 'block';
+      document.getElementById('spreadsErrorMsg').textContent = 'No spreads saved yet for ' + weekLabel + '. Use the Admin page to Fetch & Save Spreads first.';
+      return;
+    }
 
     loadingEl.style.display = 'none';
 
@@ -2574,6 +2654,82 @@ async function loadAdminWeekOverride() {
   loadAdminSpreadsWeek();
 }
 
+async function adminFetchAndSaveSpreads() {
+  const sel    = document.getElementById('adminSpreadsWeekSelect');
+  const val    = sel.value;
+  const status = document.getElementById('adminFetchStatus');
+
+  if (!val) { status.textContent = 'Please select a week first.'; status.className = 'admin-status error'; return; }
+
+  status.textContent = 'Fetching spreads from ESPN…';
+  status.className = 'admin-status';
+
+  try {
+    const url = buildESPNScoreboardURL(val);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('ESPN unreachable');
+    const data   = await res.json();
+    const events = data.events || [];
+
+    if (events.length === 0) {
+      status.textContent = 'No games found for this week on ESPN.';
+      status.className = 'admin-status error';
+      return;
+    }
+
+    // Extract games with spreads
+    const games = events.map(function(event) {
+      const comp  = event.competitions[0];
+      const home  = comp.competitors.find(c => c.homeAway === 'home');
+      const away  = comp.competitors.find(c => c.homeAway === 'away');
+      const homeAbbr = home && home.team ? home.team.abbreviation.toUpperCase() : '';
+      const awayAbbr = away && away.team ? away.team.abbreviation.toUpperCase() : '';
+      const gameDate = new Date(event.date);
+      const date = (gameDate.getMonth()+1) + '/' + gameDate.getDate() + '/' + String(gameDate.getFullYear()).slice(2);
+      const time = gameDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      const dow  = gameDate.toLocaleDateString('en-US', { weekday: 'long' });
+
+      // Get spread from odds — default to EVEN if unavailable
+      let odds = 'EVEN';
+      const oddsArr = comp.odds || [];
+      if (oddsArr.length > 0) {
+        const line = oddsArr[0];
+        if (line.spread !== undefined && line.spread !== null) {
+          const spread = parseFloat(line.spread);
+          if (!isNaN(spread) && spread !== 0) {
+            // ESPN spread is from home team perspective (negative = home favored)
+            if (spread < 0) {
+              odds = homeAbbr + ' ' + spread;
+            } else {
+              odds = awayAbbr + ' -' + spread;
+            }
+          } else {
+            odds = 'EVEN';
+          }
+        } else if (line.details && line.details.trim() !== '') {
+          odds = line.details;
+        } else {
+          odds = 'EVEN';
+        }
+      }
+
+      return { away: awayAbbr, home: homeAbbr, odds, date, time, dow };
+    });
+
+    const weekKey = val.toString().replace(/[^a-zA-Z0-9]/g, '_');
+    await window.fbSaveSpreadData(weekKey, games);
+
+    status.textContent = 'Fetched & saved ' + games.length + ' games for ' + val + '!';
+    status.className = 'admin-status success';
+    setTimeout(() => { status.textContent = ''; status.className = 'admin-status'; }, 4000);
+
+  } catch(err) {
+    status.textContent = 'Failed to fetch spreads: ' + err.message;
+    status.className = 'admin-status error';
+    console.error(err);
+  }
+}
+
 async function adminSetSpreadsWeek() {
   const sel = document.getElementById('adminSpreadsWeekSelect');
   const val = sel.value;
@@ -2821,24 +2977,31 @@ function getPickResult(pick, spreadStr, scoresMap) {
   const game = scoresMap[abbr];
   if (!game || !game.isFinal) return 'pending';
 
-  const spreadNum = parseFloat((spreadStr || '').replace(/[^0-9.\-+]/g, ''));
+  const isHome     = game.homeAbbr === abbr;
+  const teamScore  = isHome ? game.homeScore : game.awayScore;
+  const otherScore = isHome ? game.awayScore : game.homeScore;
+  const margin     = teamScore - otherScore;
+
+  // EVEN = pick'em, just need to win outright
+  const spreadUpper = (spreadStr || '').trim().toUpperCase();
+  if (spreadUpper === 'EVEN' || spreadUpper === 'PK' || spreadStr === '') {
+    if (margin === 0) return 'loss';
+    return margin > 0 ? 'win' : 'loss';
+  }
+
+  // Parse spread — format is "TEAM -X.X" (e.g. "PHI -7.5") or just "-7.5"
+  const parts = spreadStr.trim().split(' ');
+  const spreadNum = parseFloat(parts[parts.length - 1]);
   if (isNaN(spreadNum)) return 'pending';
 
-  const { awayScore, homeScore, awayTeam, homeTeam } = game;
-  const isAway = awayTeam === abbr;
-  const teamScore  = isAway ? awayScore : homeScore;
-  const otherScore = isAway ? homeScore : awayScore;
-  const margin = teamScore - otherScore; // positive = team won
+  const spreadTeam = parts.length > 1 ? parts[0].toUpperCase() : abbr;
+  // adjustedSpread is from the perspective of the picked team
+  const adjustedSpread = spreadTeam === abbr ? spreadNum : -spreadNum;
 
-  // spreadNum is from the picked team's perspective
-  // e.g. PHI -7.5 means PHI needs to win by more than 7.5
-  // e.g. DAL +7.5 means DAL needs to lose by less than 7.5 (or win)
-  if (spreadNum < 0) {
-    // Picked the favorite — need to win by more than the spread
-    return margin > Math.abs(spreadNum) ? 'win' : 'loss';
+  if (adjustedSpread < 0) {
+    return margin > Math.abs(adjustedSpread) ? 'win' : 'loss';
   } else {
-    // Picked the underdog — need to not lose by more than the spread
-    return margin > -spreadNum ? 'win' : 'loss';
+    return margin > -adjustedSpread ? 'win' : 'loss';
   }
 }
 
@@ -2999,11 +3162,7 @@ async function loadResultsPage() {
   tableEl.innerHTML       = '';
 
   try {
-    // Get all picks from Firebase and scores data in parallel
-    const [allPicksSnap, scoresText] = await Promise.all([
-      fetchAllPicks(),
-      fetch(SCORES_CSV_URL + '&cachebust=' + Date.now()).then(r => r.ok ? r.text() : '')
-    ]);
+    const allPicksSnap = await fetchAllPicks();
 
     loadingEl.style.display = 'none';
 
@@ -3012,25 +3171,14 @@ async function loadResultsPage() {
       return;
     }
 
-    // Build scores map per week: { "Week 1": { "PHI": { awayScore, homeScore, ... } } }
+    // Get unique weeks to fetch scores for
+    const uniqueWeeks = [...new Set(allPicksSnap.map(d => d.week).filter(Boolean))];
+
+    // Fetch ESPN scores for all weeks in parallel
     const scoresByWeek = {};
-    if (scoresText) {
-      const rows = parseCSV(scoresText);
-      const dataRows = rows[0][0].toLowerCase().includes('week') ? rows.slice(1) : rows;
-      dataRows.forEach(function(row) {
-        const wk       = (row[0] || '').trim();
-        const awayTeam = (row[3] || '').trim().toUpperCase();
-        const homeTeam = (row[4] || '').trim().toUpperCase();
-        const awayScore = parseFloat(row[5]);
-        const homeScore = parseFloat(row[6]);
-        const isFinal   = (row[7] || '').trim().toUpperCase() === 'F';
-        if (!wk) return;
-        if (!scoresByWeek[wk]) scoresByWeek[wk] = {};
-        const gameData = { awayScore, homeScore, awayTeam, homeTeam, isFinal };
-        if (awayTeam) scoresByWeek[wk][awayTeam] = gameData;
-        if (homeTeam) scoresByWeek[wk][homeTeam] = gameData;
-      });
-    }
+    await Promise.all(uniqueWeeks.map(async function(wk) {
+      scoresByWeek[wk] = await fetchESPNScoresMap(wk);
+    }));
 
     // Get unique weeks sorted
     const allWeeksSet = [...new Set(allPicksSnap.map(d => d.week).filter(Boolean))];
@@ -3209,25 +3357,22 @@ async function fetchAllPicks() {
 }
 
 function getActualTiebreaker(scoresMap) {
+  // Find last final game — dedupe by game signature
+  const seen = new Set();
   let lastGame = null;
   Object.values(scoresMap).forEach(function(g) {
-    if (g.isFinal && !isNaN(g.awayScore) && !isNaN(g.homeScore)) {
+    const key = (g.homeAbbr || '') + '_' + (g.awayAbbr || '');
+    if (g.isFinal && !isNaN(g.homeScore) && !isNaN(g.awayScore) && !seen.has(key)) {
+      seen.add(key);
       lastGame = g;
     }
   });
   if (!lastGame) return null;
-  return lastGame.awayScore + lastGame.homeScore;
+  return lastGame.homeScore + lastGame.awayScore;
 }
 
 function getActualTiebreakerFromWeek(weekScores) {
-  let lastGame = null;
-  Object.values(weekScores).forEach(function(g) {
-    if (g.isFinal && !isNaN(g.awayScore) && !isNaN(g.homeScore)) {
-      lastGame = g;
-    }
-  });
-  if (!lastGame) return null;
-  return lastGame.awayScore + lastGame.homeScore;
+  return getActualTiebreaker(weekScores);
 }
 
 async function loadWeeklyPicks() {
@@ -3498,7 +3643,7 @@ async function loadWeeklyPicks() {
     <!-- Spreads Week Picker -->
     <div class="admin-card">
       <div class="admin-card-title">📊 Home Page Spreads</div>
-      <p class="admin-card-desc">Choose which week's spreads to display on the Team Selector home page. The data is pulled from your spreads Google Sheet.</p>
+      <p class="admin-card-desc">Choose a week, then click <strong>Fetch & Save Spreads</strong> to pull lines from ESPN and lock them into Firebase. Once saved, spreads won't change. Then click <strong>Show This Week</strong> to display them.</p>
 
       <div class="admin-current-week">
         Currently showing: <strong id="adminCurrentSpreadsWeek">Loading…</strong>
@@ -3532,10 +3677,12 @@ async function loadWeeklyPicks() {
             <option value="18">Week 18</option>
           </select>
         </div>
-        <div style="display:flex;gap:10px;margin-top:20px;">
-          <button class="btn-submit" style="flex:1;" onclick="adminSetSpreadsWeek()">Show This Week</button>
-          <button class="btn-clear" style="flex:1;" onclick="adminHideSpreads()">Hide Graphic</button>
+        <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">
+          <button class="btn-submit" style="flex:1;min-width:140px;" onclick="adminFetchAndSaveSpreads()">Fetch &amp; Save Spreads</button>
+          <button class="btn-submit" style="flex:1;min-width:120px;background:linear-gradient(135deg,#4caf7d,#2e7d52);" onclick="adminSetSpreadsWeek()">Show This Week</button>
+          <button class="btn-clear" style="flex:1;min-width:100px;" onclick="adminHideSpreads()">Hide Graphic</button>
         </div>
+        <div class="admin-status" id="adminFetchStatus"></div>
       </div>
 
       <div class="admin-status" id="adminSpreadsStatus"></div>
@@ -3543,6 +3690,6 @@ async function loadWeeklyPicks() {
   </div>
 </div>
 
-<div class="version-badge">v0.8.5</div>
+<div class="version-badge">v0.8.7</div>
 </body>
 </html>
