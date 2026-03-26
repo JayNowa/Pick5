@@ -1585,7 +1585,7 @@
 </div>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, query, where, getDocs, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, collection, addDoc, query, where, getDocs, doc, setDoc, getDoc, deleteDoc, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyC6wED6bBvMNGiQFFEGHdQGSP7iKGSIdvk",
@@ -1708,12 +1708,10 @@
       phone:    data.phone || '',
       isAdmin:  false
     });
-    const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     await deleteDoc(pendingRef);
   };
 
   window.fbDenyUser = async function(docId) {
-    const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     await deleteDoc(doc(db, "pendingUsers", docId));
   };
 </script>
@@ -1848,6 +1846,7 @@ async function handleLogin() {
 
   errEl.classList.remove('show');
   if (!email || !pin) { showError('Please enter both your email and PIN.'); return; }
+  if (typeof fbGetApprovedUser === 'undefined') { showError('App still loading, please try again.'); return; }
 
   btn.disabled = true;
   staEl.textContent = 'Checking credentials…';
