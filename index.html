@@ -1657,6 +1657,65 @@
     const snap = await getDoc(doc(db, "settings", "spreadsWeek"));
     return snap.exists() ? snap.data().value : null;
   };
+
+  // ── Auth helpers ──
+  window.fbGetApprovedUser = async function(email) {
+    try {
+      const q = query(collection(db, "approvedUsers"), where("email", "==", email.toLowerCase()));
+      const snap = await getDocs(q);
+      if (snap.empty) return null;
+      return { id: snap.docs[0].id, ...snap.docs[0].data() };
+    } catch(e) { console.error('fbGetApprovedUser:', e); return null; }
+  };
+
+  window.fbGetPendingUser = async function(email) {
+    try {
+      const q = query(collection(db, "pendingUsers"), where("email", "==", email.toLowerCase()));
+      const snap = await getDocs(q);
+      if (snap.empty) return null;
+      return { id: snap.docs[0].id, ...snap.docs[0].data() };
+    } catch(e) { console.error('fbGetPendingUser:', e); return null; }
+  };
+
+  window.fbSavePendingUser = async function(data) {
+    await addDoc(collection(db, "pendingUsers"), {
+      email:       data.email.toLowerCase(),
+      pin:         String(data.pin),
+      teamName:    data.teamName,
+      phone:       data.phone,
+      requestedAt: new Date().toISOString()
+    });
+  };
+
+  window.fbGetAllPendingUsers = async function() {
+    try {
+      const snap = await getDocs(collection(db, "pendingUsers"));
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      docs.sort((a, b) => (a.requestedAt || '').localeCompare(b.requestedAt || ''));
+      return docs;
+    } catch(e) { console.error('fbGetAllPendingUsers:', e); return []; }
+  };
+
+  window.fbApproveUser = async function(docId) {
+    const pendingRef = doc(db, "pendingUsers", docId);
+    const snap = await getDoc(pendingRef);
+    if (!snap.exists()) throw new Error('Pending user not found');
+    const data = snap.data();
+    await addDoc(collection(db, "approvedUsers"), {
+      email:    data.email,
+      pin:      data.pin,
+      teamName: data.teamName,
+      phone:    data.phone || '',
+      isAdmin:  false
+    });
+    const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    await deleteDoc(pendingRef);
+  };
+
+  window.fbDenyUser = async function(docId) {
+    const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    await deleteDoc(doc(db, "pendingUsers", docId));
+  };
 </script>
 
 <script>
@@ -2959,73 +3018,6 @@ async function submitAccessRequest() {
   }
 }
 
-<<<<<<< Updated upstream
-=======
-// ── Firebase Auth Helpers ──
-async function fbGetApprovedUser(email) {
-  try {
-    const snap = await firebase.firestore()
-      .collection('approvedUsers')
-      .where('email', '==', email.toLowerCase())
-      .limit(1)
-      .get();
-    if (snap.empty) return null;
-    return { id: snap.docs[0].id, ...snap.docs[0].data() };
-  } catch(e) { console.error('fbGetApprovedUser:', e); return null; }
-}
-
-async function fbGetPendingUser(email) {
-  try {
-    const snap = await firebase.firestore()
-      .collection('pendingUsers')
-      .where('email', '==', email.toLowerCase())
-      .limit(1)
-      .get();
-    if (snap.empty) return null;
-    return { id: snap.docs[0].id, ...snap.docs[0].data() };
-  } catch(e) { console.error('fbGetPendingUser:', e); return null; }
-}
-
-async function fbSavePendingUser(data) {
-  await firebase.firestore().collection('pendingUsers').add({
-    email:       data.email.toLowerCase(),
-    pin:         String(data.pin),
-    teamName:    data.teamName,
-    phone:       data.phone,
-    requestedAt: new Date().toISOString()
-  });
-}
-
-async function fbGetAllPendingUsers() {
-  try {
-    const snap = await firebase.firestore()
-      .collection('pendingUsers')
-      .orderBy('requestedAt', 'asc')
-      .get();
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  } catch(e) { console.error('fbGetAllPendingUsers:', e); return []; }
-}
-
-async function fbApproveUser(docId) {
-  const db = firebase.firestore();
-  const pendingRef = db.collection('pendingUsers').doc(docId);
-  const snap = await pendingRef.get();
-  if (!snap.exists) throw new Error('Pending user not found');
-  const data = snap.data();
-  await db.collection('approvedUsers').add({
-    email:    data.email,
-    pin:      data.pin,
-    teamName: data.teamName,
-    phone:    data.phone || '',
-    isAdmin:  false
-  });
-  await pendingRef.delete();
-}
-
-async function fbDenyUser(docId) {
-  await firebase.firestore().collection('pendingUsers').doc(docId).delete();
-}
-
 // ── Admin: Pending Requests ──
 async function loadPendingRequests() {
   const listEl    = document.getElementById('pendingRequestsList');
@@ -3100,7 +3092,6 @@ async function handleDeny(docId) {
   }
 }
 
->>>>>>> Stashed changes
 // ── Scores Map for Weekly Picks W/L (ESPN) ──
 async function fetchScoresMap(week) {
   return await fetchESPNScoresMap(week);
