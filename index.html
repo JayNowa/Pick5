@@ -19,6 +19,179 @@
     --error: #e05555;
     --nav-h: 60px;
   }
+
+  /* ── LIGHT THEME ── */
+  [data-theme="light"] {
+    --bg: #f0f2f5;
+    --surface: #ffffff;
+    --border: #d0d5e0;
+    --accent: #b8922a;
+    --accent2: #c8a94a;
+    --text: #1a1e2a;
+    --muted: #7a8399;
+    --dropdown-bg: #ffffff;
+    --hover: #e4e8f0;
+    --error: #cc3333;
+  }
+  [data-theme="light"] body {
+    background: var(--bg);
+  }
+  [data-theme="light"] .spread-card,
+  [data-theme="light"] .admin-card,
+  [data-theme="light"] .team-data-card,
+  [data-theme="light"] .lb-card,
+  [data-theme="light"] .result-row,
+  [data-theme="light"] .wp-table th,
+  [data-theme="light"] .wp-table td,
+  [data-theme="light"] .score-card,
+  [data-theme="light"] .my-picks-week,
+  [data-theme="light"] .pending-req-row {
+    border-color: var(--border);
+    background: var(--surface);
+  }
+  [data-theme="light"] nav {
+    background: rgba(240,242,245,0.95);
+    border-bottom-color: var(--border);
+  }
+  [data-theme="light"] .nav-link { color: var(--text); }
+  [data-theme="light"] .nav-link.active { color: var(--accent); }
+  [data-theme="light"] .field input,
+  [data-theme="light"] .field select,
+  [data-theme="light"] .team-data-search {
+    background: #fff;
+    border-color: var(--border);
+    color: var(--text);
+  }
+  [data-theme="light"] .btn-login,
+  [data-theme="light"] .btn-submit {
+    color: #fff;
+  }
+  [data-theme="light"] .wp-pick {
+    background: #e8ecf4;
+    border-color: var(--border);
+    color: var(--text);
+  }
+  [data-theme="light"] .wp-pick.hidden {
+    background: #f0f2f7;
+    color: var(--muted);
+  }
+  [data-theme="light"] .login-card {
+    background: var(--surface);
+    border-color: var(--border);
+  }
+  [data-theme="light"] .version-badge { color: var(--muted); }
+  [data-theme="light"] .settings-panel { background: var(--surface); border-color: var(--border); }
+
+  /* ── FONT SCALE ── */
+  html[data-fontsize="small"]  { font-size: 14px; }
+  html[data-fontsize="normal"] { font-size: 16px; }
+  html[data-fontsize="large"]  { font-size: 18px; }
+
+  /* ── SETTINGS PANEL ── */
+  #settingsBtn {
+    position: fixed;
+    bottom: 12px;
+    right: 16px;
+    z-index: 1000;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 18px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.18s;
+    opacity: 0.6;
+    padding: 0;
+  }
+  #settingsBtn:hover { color: var(--accent); border-color: var(--accent); opacity: 1; }
+
+  .settings-panel {
+    position: fixed;
+    bottom: 56px;
+    right: 16px;
+    z-index: 1000;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    width: 220px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    display: none;
+  }
+  .settings-panel.open { display: block; }
+  .settings-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .settings-row:last-child { margin-bottom: 0; }
+  .settings-label {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+  }
+  /* Theme toggle */
+  .theme-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--hover);
+    border-radius: 20px;
+    padding: 2px;
+  }
+  .theme-toggle-btn {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 16px;
+    width: 30px;
+    height: 26px;
+    border-radius: 18px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .theme-toggle-btn.active {
+    background: var(--surface);
+    color: var(--accent);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  }
+  /* Font size buttons */
+  .font-btns {
+    display: flex;
+    gap: 4px;
+  }
+  .font-btn {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    border-radius: 6px;
+    cursor: pointer;
+    padding: 3px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.15s;
+  }
+  .font-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
@@ -666,7 +839,7 @@
   .version-badge {
     position: fixed;
     bottom: 12px;
-    right: 16px;
+    right: 60px;
     font-family: 'Bebas Neue', sans-serif;
     font-size: 13px;
     letter-spacing: 0.12em;
@@ -2056,6 +2229,7 @@ function afterLogin(email, teamName) {
   document.getElementById('topNav').classList.add('visible');
   if (email && ADMIN_EMAILS.includes(email.toLowerCase())) {
     document.getElementById('adminCorner').style.display = 'block';
+  document.getElementById('settingsBtn').style.display = 'flex';
   }
   // Wait for Firebase to be ready, then load everything
   (async function waitForFirebase() {
@@ -2156,6 +2330,8 @@ async function showPage(page) {
 function logout() {
   document.getElementById('topNav').classList.remove('visible');
   document.getElementById('adminCorner').style.display  = 'none';
+  document.getElementById('settingsBtn').style.display  = 'none';
+  document.getElementById('settingsPanel').classList.remove('open');
   document.getElementById('loginPage').style.display    = 'flex';
   document.getElementById('selectorPage').style.display = 'none';
   document.getElementById('myPicksPage').style.display  = 'none';
@@ -3501,6 +3677,46 @@ function filterTeamCards() {
   });
 }
 
+
+// ── Settings: Theme & Font Size ──
+function toggleSettingsPanel() {
+  document.getElementById('settingsPanel').classList.toggle('open');
+}
+
+// Close panel if clicking outside
+document.addEventListener('click', function(e) {
+  const panel = document.getElementById('settingsPanel');
+  const btn   = document.getElementById('settingsBtn');
+  if (panel && panel.classList.contains('open') && !panel.contains(e.target) && e.target !== btn) {
+    panel.classList.remove('open');
+  }
+});
+
+function setTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('pick5-theme', theme);
+  document.getElementById('themeDark').classList.toggle('active',  theme === 'dark');
+  document.getElementById('themeLight').classList.toggle('active', theme === 'light');
+}
+
+function setFontSize(size) {
+  document.documentElement.setAttribute('data-fontsize', size);
+  localStorage.setItem('pick5-fontsize', size);
+  ['Small','Normal','Large'].forEach(function(s) {
+    document.getElementById('font' + s).classList.toggle('active', s.toLowerCase() === size);
+  });
+}
+
+function initSettings() {
+  const theme = localStorage.getItem('pick5-theme') || 'dark';
+  const size  = localStorage.getItem('pick5-fontsize') || 'normal';
+  setTheme(theme);
+  setFontSize(size);
+}
+
+// Init on load
+initSettings();
+
 // ── Scores Map for Weekly Picks W/L (ESPN) ──
 async function fetchScoresMap(week) {
   return await fetchESPNScoresMap(week);
@@ -4256,6 +4472,26 @@ async function loadWeeklyPicks() {
     <input class="team-data-search" id="teamDataSearch" type="text" placeholder="Search teams…" oninput="filterTeamCards()" />
     <div id="teamDataContent">
       <div class="team-data-loading">Loading team data…</div>
+    </div>
+  </div>
+</div>
+
+<button id="settingsBtn" onclick="toggleSettingsPanel()" title="Settings">⚙</button>
+<div id="settingsPanel" class="settings-panel">
+  <div class="settings-title">⚙ Settings</div>
+  <div class="settings-row">
+    <span class="settings-label">Theme</span>
+    <div class="theme-toggle">
+      <button class="theme-toggle-btn" id="themeDark" onclick="setTheme('dark')" title="Dark">🌙</button>
+      <button class="theme-toggle-btn" id="themeLight" onclick="setTheme('light')" title="Light">☀️</button>
+    </div>
+  </div>
+  <div class="settings-row">
+    <span class="settings-label">Font Size</span>
+    <div class="font-btns">
+      <button class="font-btn" id="fontSmall"  onclick="setFontSize('small')">S</button>
+      <button class="font-btn" id="fontNormal" onclick="setFontSize('normal')">M</button>
+      <button class="font-btn" id="fontLarge"  onclick="setFontSize('large')">L</button>
     </div>
   </div>
 </div>
