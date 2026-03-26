@@ -2138,28 +2138,8 @@ async function fetchAndRenderSpreads(week) {
           return weekDocs.length > 0 ? weekDocs[0] : null;
         } catch(e) { return null; }
       })(),
-      // Fetch live scores to check which games have started
-      (async () => {
-        try {
-          const r = await fetch(SCORES_CSV_URL + '&cachebust=' + Date.now());
-          if (!r.ok) return {};
-          const t = await r.text();
-          const srows = parseCSV(t);
-          const sdataRows = srows[0][0].toLowerCase().includes('week') ? srows.slice(1) : srows;
-          const map = {};
-          sdataRows.forEach(function(row) {
-            if (!row[0] || row[0].trim().toLowerCase() !== weekLabel.toLowerCase()) return;
-            const away = (row[3] || '').trim().toUpperCase();
-            const home = (row[4] || '').trim().toUpperCase();
-            const qtr  = (row[7] || '').trim().toUpperCase();
-            const started = qtr !== '' && qtr !== '-' && qtr !== '0';
-            const isFinal = qtr === 'F' || qtr === 'F-OT' || qtr.startsWith('F/');
-            if (away) map[away] = { started, isFinal, qtr };
-            if (home) map[home] = { started, isFinal, qtr };
-          });
-          return map;
-        } catch(e) { return {}; }
-      })()
+      // Fetch live game status from ESPN
+      fetchESPNScoresMap(week)
     ]);
 
     // Load spreads from Firebase only
@@ -2958,36 +2938,9 @@ async function submitAccessRequest() {
   }
 }
 
-// ── Scores Map for Weekly Picks W/L ──
+// ── Scores Map for Weekly Picks W/L (ESPN) ──
 async function fetchScoresMap(week) {
-  try {
-    const res = await fetch(SCORES_CSV_URL + '&cachebust=' + Date.now());
-    if (!res.ok) return {};
-    const text = await res.text();
-    const rows = parseCSV(text);
-    // Headers: Week, Date, Time, Away Team, Home Team, Away Score, Home Score, Quarter, Clock
-    const dataRows = rows[0][0].toLowerCase().includes('week') ? rows.slice(1) : rows;
-    const weekLabel = (isNaN(parseInt(week)) || week.toString().toLowerCase().includes('week')) ? week : 'Week ' + week;
-    const map = {};
-
-    dataRows.forEach(function(row) {
-      if (!row[0] || row[0].trim().toLowerCase() !== weekLabel.toLowerCase()) return;
-      const awayTeam  = (row[3] || '').trim().toUpperCase();
-      const homeTeam  = (row[4] || '').trim().toUpperCase();
-      const awayScore = parseFloat(row[5]);
-      const homeScore = parseFloat(row[6]);
-      const quarter   = (row[7] || '').trim().toUpperCase();
-      const isFinal   = quarter === 'F';
-
-      if (awayTeam) map[awayTeam] = { awayScore, homeScore, awayTeam, homeTeam, isFinal };
-      if (homeTeam) map[homeTeam] = { awayScore, homeScore, awayTeam, homeTeam, isFinal };
-    });
-
-    return map;
-  } catch(e) {
-    console.error('Scores fetch error:', e);
-    return {};
-  }
+  return await fetchESPNScoresMap(week);
 }
 
 function getPickResult(pick, spreadStr, scoresMap) {
@@ -3035,10 +2988,7 @@ async function loadLeaderboard() {
   contentEl.innerHTML     = '';
 
   try {
-    const [allPicks, scoresText] = await Promise.all([
-      fetchAllPicks(),
-      fetch(SCORES_CSV_URL + '&cachebust=' + Date.now()).then(r => r.ok ? r.text() : '')
-    ]);
+    const allPicks = await fetchAllPicks();
 
     loadingEl.style.display = 'none';
 
@@ -3047,25 +2997,12 @@ async function loadLeaderboard() {
       return;
     }
 
-    // Build scores map by week
+    // Fetch ESPN scores for all unique weeks in parallel
+    const uniqueWeeksLB2 = [...new Set(allPicks.map(d => d.week).filter(Boolean))];
     const scoresByWeek = {};
-    if (scoresText) {
-      const rows = parseCSV(scoresText);
-      const dataRows = rows[0][0].toLowerCase().includes('week') ? rows.slice(1) : rows;
-      dataRows.forEach(function(row) {
-        const wk       = (row[0] || '').trim();
-        const awayTeam = (row[3] || '').trim().toUpperCase();
-        const homeTeam = (row[4] || '').trim().toUpperCase();
-        const awayScore = parseFloat(row[5]);
-        const homeScore = parseFloat(row[6]);
-        const isFinal   = (row[7] || '').trim().toUpperCase() === 'F';
-        if (!wk) return;
-        if (!scoresByWeek[wk]) scoresByWeek[wk] = {};
-        const g = { awayScore, homeScore, awayTeam, homeTeam, isFinal };
-        if (awayTeam) scoresByWeek[wk][awayTeam] = g;
-        if (homeTeam) scoresByWeek[wk][homeTeam] = g;
-      });
-    }
+    await Promise.all(uniqueWeeksLB2.map(async function(wk) {
+      scoresByWeek[wk] = await fetchESPNScoresMap(wk);
+    }));
 
     // Latest submission per user per week
     const userWeekMap = {};
@@ -3708,6 +3645,6 @@ async function loadWeeklyPicks() {
   </div>
 </div>
 
-<div class="version-badge">v0.8.8</div>
+<div class="version-badge">v0.9.0</div>
 </body>
 </html>
