@@ -152,7 +152,7 @@
   .container { width: 100%; max-width: 680px; }
 
   #loginPage  { display: flex; }
-  #selectorPage, #myPicksPage, #scoresPage, #adminPage, #weeklyPicksPage, #resultsPage, #leaderboardPage, #usersPage { display: none; }
+  #selectorPage, #myPicksPage, #scoresPage, #adminPage, #weeklyPicksPage, #resultsPage, #leaderboardPage, #usersPage, #teamDataPage { display: none; }
 
   .pending-req-row {
     display: flex;
@@ -1470,6 +1470,101 @@
 
 
 
+
+  /* ── TEAM DATA PAGE ── */
+  .team-data-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-top: 8px;
+  }
+  .team-data-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 18px;
+    transition: border-color 0.2s;
+  }
+  .team-data-card:hover {
+    border-color: rgba(200,169,74,0.35);
+  }
+  .team-data-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+  .team-data-logo {
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+    flex-shrink: 0;
+  }
+  .team-data-name {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1.2;
+  }
+  .team-data-inception {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .team-data-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    gap: 8px;
+  }
+  .team-data-row:last-child { border-bottom: none; }
+  .team-data-label {
+    font-size: 12px;
+    color: var(--muted);
+    flex: 1;
+  }
+  .team-data-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    text-align: right;
+  }
+  .team-data-value.highlight { color: var(--accent); }
+  .team-data-section-head {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 10px 0 4px;
+  }
+  .team-data-loading {
+    text-align: center;
+    color: var(--muted);
+    padding: 40px 0;
+    font-size: 14px;
+  }
+  .team-data-search {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+    color: var(--text);
+    font-size: 14px;
+    margin-bottom: 16px;
+    box-sizing: border-box;
+  }
+  .team-data-search:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .team-data-search::placeholder { color: var(--muted); }
+
 </style>
 </head>
 <body>
@@ -1484,6 +1579,7 @@
     <button class="nav-link" id="navWeeklyPicks" onclick="showPage('weeklyPicks')">Weekly Picks</button>
     <button class="nav-link" id="navResults" onclick="showPage('results')">Results</button>
     <button class="nav-link" id="navLeaderboard" onclick="showPage('leaderboard')">Leaderboard</button>
+    <button class="nav-link" id="navTeamData" onclick="showPage('teamData')">Team Data</button>
   </div>
   <div class="nav-right">
     <span class="nav-user">Signed in as <strong id="navEmail" data-email="" data-teamname=""></strong></span>
@@ -1981,6 +2077,7 @@ async function showPage(page) {
   document.getElementById('resultsPage').style.display      = 'none';
   document.getElementById('leaderboardPage').style.display  = 'none';
   document.getElementById('usersPage').style.display         = 'none';
+  document.getElementById('teamDataPage').style.display       = 'none';
 
   document.getElementById('navSelector').classList.remove('active');
   document.getElementById('navMyPicks').classList.remove('active');
@@ -1988,6 +2085,7 @@ async function showPage(page) {
   document.getElementById('navWeeklyPicks').classList.remove('active');
   document.getElementById('navResults').classList.remove('active');
   document.getElementById('navLeaderboard').classList.remove('active');
+  document.getElementById('navTeamData').classList.remove('active');
   clearInterval(scoresRefreshTimer);
 
   if (page === 'selector') {
@@ -2037,6 +2135,12 @@ async function showPage(page) {
     p.style.display = 'flex';
     p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
     loadUsersPage();
+  } else if (page === 'teamData') {
+    const p = document.getElementById('teamDataPage');
+    p.style.display = 'flex';
+    p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
+    document.getElementById('navTeamData').classList.add('active');
+    loadTeamData();
   }
 }
 
@@ -2053,6 +2157,7 @@ function logout() {
   document.getElementById('resultsPage').style.display      = 'none';
   document.getElementById('leaderboardPage').style.display  = 'none';
   document.getElementById('usersPage').style.display         = 'none';
+  document.getElementById('teamDataPage').style.display       = 'none';
   stopWeekPolling();
   currentActiveWeek = null;
   document.getElementById('emailInput').value = '';
@@ -3225,6 +3330,148 @@ async function handleDeny(docId) {
   }
 }
 
+
+// ── Team Data Page ──
+const TEAM_DATA_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSyTUPrXCeJvMQcOWdpQm0EE8JisaQXHgLnB10M9IfcgwowwJugkybt8KfBbvGCgAN1f0OjhilfHeiB/pub?gid=714570544&single=true&output=csv';
+let teamDataCache = null;
+
+async function loadTeamData() {
+  const contentEl = document.getElementById('teamDataContent');
+  if (!contentEl) return;
+
+  if (teamDataCache) {
+    renderTeamCards(teamDataCache);
+    return;
+  }
+
+  contentEl.innerHTML = '<div class="team-data-loading">Loading team data…</div>';
+
+  try {
+    const res = await fetch(TEAM_DATA_CSV_URL + '&cachebust=' + Date.now());
+    if (!res.ok) throw new Error('Failed to fetch');
+    const text = await res.text();
+    const rows = parseCSV(text);
+    if (!rows || rows.length < 2) throw new Error('No data');
+
+    // Row 0: headers — col 0 is stat label, col 1+ are team names
+    const headers = rows[0];
+    const statLabels = [];
+    // rows 1+ have stat label in col 0, values in col 1+
+    const teams = [];
+
+    const numTeams = headers.length - 1;
+    for (let t = 0; t < numTeams; t++) {
+      teams.push({ name: headers[t + 1], stats: [] });
+    }
+
+    for (let r = 1; r < rows.length; r++) {
+      const label = (rows[r][0] || '').trim();
+      if (!label) continue;
+      statLabels.push(label);
+      for (let t = 0; t < numTeams; t++) {
+        teams[t].stats.push({ label: label, value: (rows[r][t + 1] || '').trim() });
+      }
+    }
+
+    teamDataCache = teams;
+    renderTeamCards(teams);
+  } catch(e) {
+    contentEl.innerHTML = '<div class="team-data-loading">Failed to load team data. Please try again.</div>';
+    console.error('Team data error:', e);
+  }
+}
+
+function renderTeamCards(teams) {
+  const contentEl = document.getElementById('teamDataContent');
+  if (!contentEl) return;
+
+  // Year-based stat labels for grouping
+  const yearLabels = ['2021','2021 Rankings','2022','2022 Rankings','2023','2023 Rankings','2024','2024 Rankings','2025','2025 Rankings'];
+  const highlightLabels = ['Total Wins','Win%','Best finish','Career Earnings'];
+
+  const grid = document.createElement('div');
+  grid.className = 'team-data-grid';
+  grid.id = 'teamDataGrid';
+
+  teams.forEach(function(team) {
+    if (!team.name || !team.name.trim()) return;
+
+    const card = document.createElement('div');
+    card.className = 'team-data-card';
+    card.dataset.teamname = team.name.toLowerCase();
+
+    // Get inception + name changes for header subtitle
+    const inceptionStat = team.stats.find(s => s.label === 'Team Inception');
+    const nameChangeStat = team.stats.find(s => s.label === 'Name changes');
+    const subtitle = [
+      inceptionStat && inceptionStat.value ? 'Est. ' + inceptionStat.value : '',
+      nameChangeStat && nameChangeStat.value && nameChangeStat.value !== '0' ? nameChangeStat.value + ' name change' + (nameChangeStat.value !== '1' ? 's' : '') : ''
+    ].filter(Boolean).join(' · ');
+
+    // NFL logo slug from team name — try to match common abbreviations
+    const slugMap = {
+      // map will be best-effort; teams are user-defined so we show initials if no match
+    };
+
+    let headerHTML =
+      '<div class="team-data-card-header">' +
+        '<div style="width:44px;height:44px;border-radius:50%;background:rgba(200,169,74,0.15);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:var(--accent);flex-shrink:0;">' +
+          team.name.trim()[0].toUpperCase() +
+        '</div>' +
+        '<div>' +
+          '<div class="team-data-name">' + team.name + '</div>' +
+          (subtitle ? '<div class="team-data-inception">' + subtitle + '</div>' : '') +
+        '</div>' +
+      '</div>';
+
+    // Season records section
+    let seasonsHTML = '<div class="team-data-section-head">Season Records</div>';
+    let hasSeasons = false;
+    for (let y = 2021; y <= 2025; y++) {
+      const rec = team.stats.find(s => s.label === String(y));
+      const rank = team.stats.find(s => s.label === y + ' Rankings');
+      if (rec && rec.value) {
+        hasSeasons = true;
+        seasonsHTML +=
+          '<div class="team-data-row">' +
+            '<span class="team-data-label">' + y + '</span>' +
+            '<span class="team-data-value">' + rec.value + (rank && rank.value ? ' <span style="color:var(--muted);font-weight:400;font-size:11px;">(#' + rank.value + ')</span>' : '') + '</span>' +
+          '</div>';
+      }
+    }
+
+    // Overall stats section
+    let overallHTML = '<div class="team-data-section-head" style="margin-top:12px;">Overall</div>';
+    const overallLabels = ['Total Wins','Total Losses','Best finish','Worst finish','Win%','5-0','0-5','Career Earnings'];
+    overallLabels.forEach(function(lbl) {
+      const stat = team.stats.find(s => s.label === lbl);
+      if (stat && stat.value) {
+        const isHighlight = highlightLabels.includes(lbl);
+        overallHTML +=
+          '<div class="team-data-row">' +
+            '<span class="team-data-label">' + lbl + '</span>' +
+            '<span class="team-data-value' + (isHighlight ? ' highlight' : '') + '">' + stat.value + '</span>' +
+          '</div>';
+      }
+    });
+
+    card.innerHTML = headerHTML + (hasSeasons ? seasonsHTML : '') + overallHTML;
+    grid.appendChild(card);
+  });
+
+  contentEl.innerHTML = '';
+  contentEl.appendChild(grid);
+}
+
+function filterTeamCards() {
+  const query = (document.getElementById('teamDataSearch').value || '').toLowerCase().trim();
+  const cards = document.querySelectorAll('#teamDataGrid .team-data-card');
+  cards.forEach(function(card) {
+    const name = card.dataset.teamname || '';
+    card.style.display = (!query || name.includes(query)) ? '' : 'none';
+  });
+}
+
 // ── Scores Map for Weekly Picks W/L (ESPN) ──
 async function fetchScoresMap(week) {
   return await fetchESPNScoresMap(week);
@@ -3955,6 +4202,21 @@ async function loadWeeklyPicks() {
   </div>
 </div>
 
-<div class="version-badge">v0.9.2</div>
+
+<div class="page with-nav" id="teamDataPage">
+  <div class="container">
+    <div class="page-header">
+      <div class="page-title">Team Data</div>
+      <div class="page-subtitle">Historical stats &amp; records</div>
+      <div class="page-divider"></div>
+    </div>
+    <input class="team-data-search" id="teamDataSearch" type="text" placeholder="Search teams…" oninput="filterTeamCards()" />
+    <div id="teamDataContent">
+      <div class="team-data-loading">Loading team data…</div>
+    </div>
+  </div>
+</div>
+
+<div class="version-badge">v0.9.3</div>
 </body>
 </html>
