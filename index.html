@@ -3038,16 +3038,15 @@ async function loadPendingRequests() {
     row.className = 'pending-req-row';
     row.id = 'pending-row-' + user.id;
     const ts = user.requestedAt ? new Date(user.requestedAt).toLocaleDateString() : '';
-    row.innerHTML = \`
-      <div class="pending-req-info">
-        <div class="pending-req-email">\${user.email}</div>
-        <div class="pending-req-meta">\${user.teamName || '—'} &nbsp;·&nbsp; \${user.phone || '—'} \${ts ? '&nbsp;·&nbsp; ' + ts : ''}</div>
-      </div>
-      <div class="pending-req-actions">
-        <button class="btn-approve" id="approve-\${user.id}" onclick="handleApprove('\${user.id}')">Approve</button>
-        <button class="btn-deny"    id="deny-\${user.id}"    onclick="handleDeny('\${user.id}')">Deny</button>
-      </div>
-    \`;
+    row.innerHTML =
+      '<div class="pending-req-info">' +
+        '<div class="pending-req-email">' + user.email + '</div>' +
+        '<div class="pending-req-meta">' + (user.teamName || '—') + ' &nbsp;·&nbsp; ' + (user.phone || '—') + (ts ? ' &nbsp;·&nbsp; ' + ts : '') + '</div>' +
+      '</div>' +
+      '<div class="pending-req-actions">' +
+        '<button class="btn-approve" id="approve-' + user.id + '" onclick="handleApprove(\'' + user.id + '\')">Approve</button>' +
+        '<button class="btn-deny" id="deny-' + user.id + '" onclick="handleDeny(\'' + user.id + '\')">Deny</button>' +
+      '</div>';
     listEl.appendChild(row);
   });
 }
