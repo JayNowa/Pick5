@@ -1524,13 +1524,13 @@
   .team-data-row:last-child { border-bottom: none; }
   .team-data-label {
     font-size: 12px;
-    color: var(--muted);
+    color: #fff;
     flex: 1;
   }
   .team-data-value {
     font-size: 13px;
     font-weight: 600;
-    color: var(--text);
+    color: #fff;
     text-align: right;
   }
   .team-data-value.highlight { color: var(--accent); }
@@ -1539,7 +1539,7 @@
     font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: var(--muted);
+    color: #fff;
     margin: 10px 0 4px;
   }
   .team-data-loading {
@@ -3381,6 +3381,25 @@ async function loadTeamData() {
   }
 }
 
+function rankEmoji(rank) {
+  const n = parseInt(rank);
+  if (n === 1) return ' 🥇';
+  if (n === 2) return ' 🥈';
+  if (n === 3) return ' 🥉';
+  // Last place — we'll pass total teams count separately
+  return '';
+}
+
+function rankEmojiFull(rank, totalTeams) {
+  const n = parseInt(rank);
+  if (isNaN(n)) return '';
+  if (n === 1) return ' 🥇';
+  if (n === 2) return ' 🥈';
+  if (n === 3) return ' 🥉';
+  if (totalTeams && n === totalTeams) return ' 💩';
+  return '';
+}
+
 function renderTeamCards(teams) {
   const contentEl = document.getElementById('teamDataContent');
   if (!contentEl) return;
@@ -3392,6 +3411,8 @@ function renderTeamCards(teams) {
   const grid = document.createElement('div');
   grid.className = 'team-data-grid';
   grid.id = 'teamDataGrid';
+
+  const totalTeams = teams.filter(t => t.name && t.name.trim()).length;
 
   teams.forEach(function(team) {
     if (!team.name || !team.name.trim()) return;
@@ -3435,7 +3456,7 @@ function renderTeamCards(teams) {
         seasonsHTML +=
           '<div class="team-data-row">' +
             '<span class="team-data-label">' + y + '</span>' +
-            '<span class="team-data-value">' + rec.value + (rank && rank.value ? ' <span style="color:var(--muted);font-weight:400;font-size:11px;">(#' + rank.value + ')</span>' : '') + '</span>' +
+            '<span class="team-data-value">' + rec.value + (rank && rank.value ? ' <span style="color:var(--muted);font-weight:400;font-size:11px;">(#' + rank.value + rankEmojiFull(rank.value, totalTeams) + ')</span>' : '') + '</span>' +
           '</div>';
       }
     }
@@ -3450,7 +3471,7 @@ function renderTeamCards(teams) {
         overallHTML +=
           '<div class="team-data-row">' +
             '<span class="team-data-label">' + lbl + '</span>' +
-            '<span class="team-data-value' + (isHighlight ? ' highlight' : '') + '">' + stat.value + '</span>' +
+            '<span class="team-data-value' + (isHighlight ? ' highlight' : '') + '">' + stat.value + (lbl === 'Best finish' || lbl === 'Worst finish' ? rankEmojiFull(stat.value, totalTeams) : '') + '</span>' +
           '</div>';
       }
     });
