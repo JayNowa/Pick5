@@ -397,7 +397,7 @@
   .container { width: 100%; max-width: 680px; }
 
   #loginPage  { display: flex; }
-  #selectorPage, #myPicksPage, #scoresPage, #adminPage, #weeklyPicksPage, #resultsPage, #leaderboardPage, #usersPage, #teamDataPage { display: none; }
+  #selectorPage, #myPicksPage, #scoresPage, #adminPage, #weeklyPicksPage, #resultsPage, #leaderboardPage, #usersPage, #teamDataPage, #rulesPage { display: none; }
 
   .pending-req-row {
     display: flex;
@@ -1818,6 +1818,49 @@
   }
   .team-data-search::placeholder { color: var(--muted); }
 
+
+  /* ── RULES PAGE ── */
+  .rules-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .rules-list li {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    padding: 16px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-size: 15px;
+    color: var(--text);
+    line-height: 1.6;
+  }
+  [data-theme="light"] .rules-list li {
+    border-bottom-color: var(--border);
+  }
+  .rules-list li:last-child { border-bottom: none; }
+  .rule-number {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    color: var(--accent);
+    line-height: 1;
+    min-width: 32px;
+    padding-top: 2px;
+  }
+  .rule-text { flex: 1; }
+  .rules-loading {
+    text-align: center;
+    color: var(--muted);
+    padding: 40px 0;
+    font-size: 14px;
+  }
+  .rules-error {
+    text-align: center;
+    color: var(--error);
+    padding: 40px 0;
+    font-size: 14px;
+  }
+
 </style>
 </head>
 <body>
@@ -1833,6 +1876,7 @@
     <button class="nav-link" id="navResults" onclick="showPage('results')">Results</button>
     <button class="nav-link" id="navLeaderboard" onclick="showPage('leaderboard')">Leaderboard</button>
     <button class="nav-link" id="navTeamData" onclick="showPage('teamData')">Team Data</button>
+    <button class="nav-link" id="navRules" onclick="showPage('rules')">Rules</button>
   </div>
   <div class="nav-right">
     <span class="nav-user">Signed in as <strong id="navEmail" data-email="" data-teamname=""></strong></span>
@@ -2333,6 +2377,7 @@ async function showPage(page) {
   document.getElementById('leaderboardPage').style.display  = 'none';
   document.getElementById('usersPage').style.display         = 'none';
   document.getElementById('teamDataPage').style.display       = 'none';
+  document.getElementById('rulesPage').style.display          = 'none';
 
   document.getElementById('navSelector').classList.remove('active');
   document.getElementById('navMyPicks').classList.remove('active');
@@ -2341,6 +2386,7 @@ async function showPage(page) {
   document.getElementById('navResults').classList.remove('active');
   document.getElementById('navLeaderboard').classList.remove('active');
   document.getElementById('navTeamData').classList.remove('active');
+  document.getElementById('navRules').classList.remove('active');
   clearInterval(scoresRefreshTimer);
 
   if (page === 'selector') {
@@ -2397,6 +2443,12 @@ async function showPage(page) {
     p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
     document.getElementById('navTeamData').classList.add('active');
     loadTeamData();
+  } else if (page === 'rules') {
+    const p = document.getElementById('rulesPage');
+    p.style.display = 'flex';
+    p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
+    document.getElementById('navRules').classList.add('active');
+    loadRules();
   }
 }
 
@@ -2416,6 +2468,7 @@ function logout() {
   document.getElementById('leaderboardPage').style.display  = 'none';
   document.getElementById('usersPage').style.display         = 'none';
   document.getElementById('teamDataPage').style.display       = 'none';
+  document.getElementById('rulesPage').style.display          = 'none';
   stopWeekPolling();
   currentActiveWeek = null;
   document.getElementById('emailInput').value = '';
@@ -3824,6 +3877,49 @@ function initSettings() {
 // Init on load
 initSettings();
 
+// ── Rules Page ──
+const RULES_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSrOK6gU_IKZDjDFPVzPS4feK73hhXXbD1EOWkvcJ_LpUwhD_8K5iyb22Q4kuORdEfQeSCtvKM4GI2Z/pub?gid=0&single=true&output=csv';
+
+async function loadRules() {
+  const contentEl = document.getElementById('rulesContent');
+  if (!contentEl) return;
+  contentEl.innerHTML = '<div class="rules-loading">Loading rules…</div>';
+
+  try {
+    const res = await fetch(RULES_CSV_URL + '&cachebust=' + Date.now());
+    if (!res.ok) throw new Error('Failed to fetch rules');
+    const text = await res.text();
+    const rows = parseCSV(text);
+
+    const rules = rows
+      .map(function(row) { return (row[0] || '').trim(); })
+      .filter(function(r) { return r.length > 0; });
+
+    if (rules.length === 0) {
+      contentEl.innerHTML = '<div class="rules-loading">No rules found.</div>';
+      return;
+    }
+
+    const ul = document.createElement('ul');
+    ul.className = 'rules-list';
+
+    rules.forEach(function(rule, i) {
+      const li = document.createElement('li');
+      li.innerHTML =
+        '<span class="rule-number">' + (i + 1) + '</span>' +
+        '<span class="rule-text">' + rule + '</span>';
+      ul.appendChild(li);
+    });
+
+    contentEl.innerHTML = '';
+    contentEl.appendChild(ul);
+
+  } catch(e) {
+    contentEl.innerHTML = '<div class="rules-error">Failed to load rules. Please try again.</div>';
+    console.error('Rules fetch error:', e);
+  }
+}
+
 // ── Scores Map for Weekly Picks W/L (ESPN) ──
 async function fetchScoresMap(week) {
   return await fetchESPNScoresMap(week);
@@ -4593,6 +4689,19 @@ async function loadWeeklyPicks() {
     <input class="team-data-search" id="teamDataSearch" type="text" placeholder="Search teams…" oninput="filterTeamCards()" />
     <div id="teamDataContent">
       <div class="team-data-loading">Loading team data…</div>
+    </div>
+  </div>
+</div>
+
+<div class="page with-nav" id="rulesPage">
+  <div class="container" style="max-width:720px;">
+    <div class="page-header">
+      <div class="page-title">Rules</div>
+      <div class="page-subtitle">League rules &amp; guidelines</div>
+      <div class="page-divider"></div>
+    </div>
+    <div class="admin-card">
+      <div id="rulesContent"><div class="rules-loading">Loading rules…</div></div>
     </div>
   </div>
 </div>
