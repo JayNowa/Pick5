@@ -3992,7 +3992,6 @@ async function loadRecords() {
     const table = document.createElement('table');
     table.className = 'records-table';
 
-    // Header
     const thead = document.createElement('thead');
     thead.innerHTML = '<tr><th>Record</th><th>Leaders</th></tr>';
     table.appendChild(thead);
@@ -4000,21 +3999,17 @@ async function loadRecords() {
     const tbody = document.createElement('tbody');
 
     records.forEach(function(record) {
-      // Parse "Team(5), Team2(4), Team3(4)" into sorted entries
+      // Parse "Team(5), Team2(4)" into sorted entries
       const entries = [];
       const regex = /([^,(]+)\((\d+)\)/g;
       let m;
       while ((m = regex.exec(record.value)) !== null) {
         entries.push({ name: m[1].trim(), count: parseInt(m[2]) });
       }
-      // Sort descending by count
       entries.sort(function(a, b) { return b.count - a.count; });
 
-      const maxCount = entries.length > 0 ? entries[0].count : 0;
-      const minCount = entries.length > 0 ? entries[entries.length - 1].count : 0;
-
-      // Determine tier counts for medal assignment
       const uniqueCounts = [...new Set(entries.map(function(e) { return e.count; }))].sort(function(a,b){return b-a;});
+      const minCount = entries.length > 0 ? entries[entries.length - 1].count : 0;
 
       const tr = document.createElement('tr');
 
@@ -4024,31 +4019,51 @@ async function loadRecords() {
       labelTd.textContent = record.label;
       tr.appendChild(labelTd);
 
-      // Chips cell
       const chipsTd = document.createElement('td');
-      const chipsDiv = document.createElement('div');
-      chipsDiv.className = 'record-chips';
 
-      entries.forEach(function(entry) {
-        const rank = uniqueCounts.indexOf(entry.count);
-        const isLast = entry.count === minCount && entries.length > 1;
-        let chipClass = '';
-        let emoji = '';
-        if (rank === 0)                       { chipClass = 'gold';   emoji = '🥇'; }
-        else if (rank === 1)                  { chipClass = 'silver'; emoji = '🥈'; }
-        else if (rank === 2)                  { chipClass = 'bronze'; emoji = '🥉'; }
-        else if (isLast && uniqueCounts.length > 3) { chipClass = 'poop'; emoji = '💩'; }
+      // Always show grouped list by count
+      if (entries.length > 0) {
+        const groupMap = {};
+        entries.forEach(function(e) {
+          if (!groupMap[e.count]) groupMap[e.count] = [];
+          groupMap[e.count].push(e.name);
+        });
+        const counts = Object.keys(groupMap).map(Number).sort(function(a,b){return b-a;});
+        const groupDiv = document.createElement('div');
+        groupDiv.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
 
-        const chip = document.createElement('span');
-        chip.className = 'record-chip' + (chipClass ? ' ' + chipClass : '');
-        chip.innerHTML =
-          (emoji ? '<span>' + emoji + '</span>' : '') +
-          '<span>' + entry.name + '</span>' +
-          '<span class="record-chip-count">(' + entry.count + ')</span>';
-        chipsDiv.appendChild(chip);
-      });
+        counts.forEach(function(count, idx) {
+          const rank = uniqueCounts.indexOf(count);
+          const isLast = count === minCount && counts.length > 1;
+          let emoji = '';
+          let color = 'var(--text)';
+          if (rank === 0)                            { emoji = '🥇'; color = 'var(--accent)'; }
+          else if (rank === 1)                       { emoji = '🥈'; color = '#b0b8cc'; }
+          else if (rank === 2)                       { emoji = '🥉'; color = '#cd7f32'; }
+          else if (isLast && uniqueCounts.length > 3){ emoji = '💩'; color = 'var(--muted)'; }
 
-      chipsTd.appendChild(chipsDiv);
+          const row = document.createElement('div');
+          row.style.cssText = 'display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;';
+
+          const countLabel = document.createElement('span');
+          countLabel.style.cssText = 'font-size:13px;font-weight:800;min-width:28px;color:' + color + ';white-space:nowrap;flex-shrink:0;';
+          countLabel.textContent = (emoji ? emoji + ' ' : '') + count + 'x';
+
+          const names = document.createElement('span');
+          names.style.cssText = 'font-size:13px;color:var(--text);line-height:1.6;';
+          names.textContent = groupMap[count].join(', ');
+
+          row.appendChild(countLabel);
+          row.appendChild(names);
+          groupDiv.appendChild(row);
+        });
+
+        chipsTd.appendChild(groupDiv);
+
+      } else {
+        chipsTd.textContent = record.value;
+      }
+
       tr.appendChild(chipsTd);
       tbody.appendChild(tr);
     });
