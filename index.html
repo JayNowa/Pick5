@@ -2173,6 +2173,7 @@ const PICKS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwSRseA76KhYoG
 const PICKS_DB_URL     = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS9-umRqGXfrl2flUZQ2pQaGaNT0FB8VsmjbFOs9Yjjh8PH2DaTGyAWEkEvWf5HUjHxgzyq7Z5XrvY2/pub?gid=0&single=true&output=csv';
 const SCORES_CSV_URL   = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTCZp0JY_6F3IQ_Uv7pRTTLRymDJ6NG8t9nT6KrFZ5pru7yZykoa5h2prW91r0x9kbej0aCZKHrSxH8/pub?gid=1564710724&single=true&output=csv';
 const SPREADS_CSV_URL  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTCZp0JY_6F3IQ_Uv7pRTTLRymDJ6NG8t9nT6KrFZ5pru7yZykoa5h2prW91r0x9kbej0aCZKHrSxH8/pub?gid=1821550063&single=true&output=csv';
+const RULES_CSV_URL    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSrOK6gU_IKZDjDFPVzPS4feK73hhXXbD1EOWkvcJ_LpUwhD_8K5iyb22Q4kuORdEfQeSCtvKM4GI2Z/pub?gid=0&single=true&output=csv';
 
 // ── Scores state ──
 let scoresWeek = null;
@@ -3878,8 +3879,6 @@ function initSettings() {
 initSettings();
 
 // ── Rules Page ──
-const RULES_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSrOK6gU_IKZDjDFPVzPS4feK73hhXXbD1EOWkvcJ_LpUwhD_8K5iyb22Q4kuORdEfQeSCtvKM4GI2Z/pub?gid=0&single=true&output=csv';
-
 async function loadRules() {
   const contentEl = document.getElementById('rulesContent');
   if (!contentEl) return;
