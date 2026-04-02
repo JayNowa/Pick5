@@ -3965,7 +3965,7 @@ initSettings();
 async function loadRecords() {
   const contentEl = document.getElementById('recordsContent');
   if (!contentEl) return;
-  contentEl.innerHTML = '<div class="rules-loading">Loading records…</div>';
+  contentEl.innerHTML = '<div class="rules-loading">Loading records...</div>';
 
   try {
     const res = await fetch(RECORDS_CSV_URL + '&cachebust=' + Date.now());
@@ -3975,10 +3975,7 @@ async function loadRecords() {
 
     const records = rows
       .map(function(row) {
-        return {
-          label: (row[0] || '').trim(),
-          value: (row[1] || '').trim()
-        };
+        return { label: (row[0] || '').trim(), value: (row[1] || '').trim() };
       })
       .filter(function(r) { return r.label && r.value; });
 
@@ -3991,80 +3988,77 @@ async function loadRecords() {
     wrap.className = 'records-table-wrap';
     const table = document.createElement('table');
     table.className = 'records-table';
-
     const thead = document.createElement('thead');
-    thead.innerHTML = '<tr><th>Record</th><th>Leaders</th></tr>';
+    thead.innerHTML = '<tr><th>Record</th><th></th></tr>';
     table.appendChild(thead);
-
     const tbody = document.createElement('tbody');
 
-    records.forEach(function(record) {
-      // Parse "Team(5), Team2(4)" into sorted entries
-      const entries = [];
-      const regex = /([^,(]+)\((\d+)\)/g;
-      let m;
-      while ((m = regex.exec(record.value)) !== null) {
-        entries.push({ name: m[1].trim(), count: parseInt(m[2]) });
-      }
-      entries.sort(function(a, b) { return b.count - a.count; });
-
-      const uniqueCounts = [...new Set(entries.map(function(e) { return e.count; }))].sort(function(a,b){return b-a;});
-      const minCount = entries.length > 0 ? entries[entries.length - 1].count : 0;
-
+    records.forEach(function(record, index) {
       const tr = document.createElement('tr');
 
-      // Label cell
       const labelTd = document.createElement('td');
       labelTd.className = 'record-label';
       labelTd.textContent = record.label;
       tr.appendChild(labelTd);
 
-      const chipsTd = document.createElement('td');
+      const valueTd = document.createElement('td');
+      const isGrouped = index >= records.length - 2;
 
-      // Always show grouped list by count
-      if (entries.length > 0) {
-        const groupMap = {};
+      if (isGrouped) {
+        const entries = [];
+        const pat = /([^,(]+)[(]([0-9]+)[)]/g;
+        let m;
+        while ((m = pat.exec(record.value)) !== null) {
+          entries.push({ name: m[1].trim(), count: parseInt(m[2]) });
+        }
+        entries.sort(function(a, b) { return b.count - a.count; });
+
+        const uniq = [...new Set(entries.map(function(e) { return e.count; }))].sort(function(a,b){return b-a;});
+        const minC = entries.length > 0 ? entries[entries.length - 1].count : 0;
+
+        const gmap = {};
         entries.forEach(function(e) {
-          if (!groupMap[e.count]) groupMap[e.count] = [];
-          groupMap[e.count].push(e.name);
+          if (!gmap[e.count]) gmap[e.count] = [];
+          gmap[e.count].push(e.name);
         });
-        const counts = Object.keys(groupMap).map(Number).sort(function(a,b){return b-a;});
-        const groupDiv = document.createElement('div');
-        groupDiv.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
+        const cts = Object.keys(gmap).map(Number).sort(function(a,b){return b-a;});
 
-        counts.forEach(function(count, idx) {
-          const rank = uniqueCounts.indexOf(count);
-          const isLast = count === minCount && counts.length > 1;
-          let emoji = '';
-          let color = 'var(--text)';
-          if (rank === 0)                            { emoji = '🥇'; color = 'var(--accent)'; }
-          else if (rank === 1)                       { emoji = '🥈'; color = '#b0b8cc'; }
-          else if (rank === 2)                       { emoji = '🥉'; color = '#cd7f32'; }
-          else if (isLast && uniqueCounts.length > 3){ emoji = '💩'; color = 'var(--muted)'; }
+        const gDiv = document.createElement('div');
+        gDiv.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
+
+        cts.forEach(function(count) {
+          const rank = uniq.indexOf(count);
+          const isLast = count === minC && cts.length > 1;
+          let emoji = '', color = 'var(--text)';
+          if      (rank === 0)                { emoji = '\u{1F947}'; color = 'var(--accent)'; }
+          else if (rank === 1)                { emoji = '\u{1F948}'; color = '#b0b8cc'; }
+          else if (rank === 2)                { emoji = '\u{1F949}'; color = '#cd7f32'; }
+          else if (isLast && uniq.length > 3) { emoji = '\u{1F4A9}'; color = 'var(--muted)'; }
 
           const row = document.createElement('div');
           row.style.cssText = 'display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;';
 
-          const countLabel = document.createElement('span');
-          countLabel.style.cssText = 'font-size:13px;font-weight:800;min-width:28px;color:' + color + ';white-space:nowrap;flex-shrink:0;';
-          countLabel.textContent = (emoji ? emoji + ' ' : '') + count + 'x';
+          const cLbl = document.createElement('span');
+          cLbl.style.cssText = 'font-size:13px;font-weight:800;min-width:32px;color:' + color + ';white-space:nowrap;flex-shrink:0;';
+          cLbl.textContent = (emoji ? emoji + ' ' : '') + count + 'x';
 
-          const names = document.createElement('span');
-          names.style.cssText = 'font-size:13px;color:var(--text);line-height:1.6;';
-          names.textContent = groupMap[count].join(', ');
+          const nms = document.createElement('span');
+          nms.style.cssText = 'font-size:13px;color:var(--text);line-height:1.6;';
+          nms.textContent = gmap[count].join(', ');
 
-          row.appendChild(countLabel);
-          row.appendChild(names);
-          groupDiv.appendChild(row);
+          row.appendChild(cLbl);
+          row.appendChild(nms);
+          gDiv.appendChild(row);
         });
 
-        chipsTd.appendChild(groupDiv);
+        valueTd.appendChild(gDiv);
 
       } else {
-        chipsTd.textContent = record.value;
+        valueTd.style.cssText = 'font-size:15px;color:var(--text);';
+        valueTd.textContent = record.value;
       }
 
-      tr.appendChild(chipsTd);
+      tr.appendChild(valueTd);
       tbody.appendChild(tr);
     });
 
@@ -4078,7 +4072,6 @@ async function loadRecords() {
     console.error('Records fetch error:', e);
   }
 }
-
 // ── Rules Page ──
 async function loadRules() {
   const contentEl = document.getElementById('rulesContent');
