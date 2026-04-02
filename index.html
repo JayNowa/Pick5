@@ -3993,7 +3993,7 @@ async function loadRecords() {
     table.appendChild(thead);
     const tbody = document.createElement('tbody');
 
-    records.forEach(function(record, index) {
+    records.forEach(function(record) {
       const tr = document.createElement('tr');
 
       const labelTd = document.createElement('td');
@@ -4002,63 +4002,10 @@ async function loadRecords() {
       tr.appendChild(labelTd);
 
       const valueTd = document.createElement('td');
-      const isGrouped = index >= records.length - 2;
-
-      if (isGrouped) {
-        const entries = [];
-        const pat = /([^,(]+)[(]([0-9]+)[)]/g;
-        let m;
-        while ((m = pat.exec(record.value)) !== null) {
-          entries.push({ name: m[1].trim(), count: parseInt(m[2]) });
-        }
-        entries.sort(function(a, b) { return b.count - a.count; });
-
-        const uniq = [...new Set(entries.map(function(e) { return e.count; }))].sort(function(a,b){return b-a;});
-        const minC = entries.length > 0 ? entries[entries.length - 1].count : 0;
-
-        const gmap = {};
-        entries.forEach(function(e) {
-          if (!gmap[e.count]) gmap[e.count] = [];
-          gmap[e.count].push(e.name);
-        });
-        const cts = Object.keys(gmap).map(Number).sort(function(a,b){return b-a;});
-
-        const gDiv = document.createElement('div');
-        gDiv.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
-
-        cts.forEach(function(count) {
-          const rank = uniq.indexOf(count);
-          const isLast = count === minC && cts.length > 1;
-          let emoji = '', color = 'var(--text)';
-          if      (rank === 0)                { emoji = '\u{1F947}'; color = 'var(--accent)'; }
-          else if (rank === 1)                { emoji = '\u{1F948}'; color = '#b0b8cc'; }
-          else if (rank === 2)                { emoji = '\u{1F949}'; color = '#cd7f32'; }
-          else if (isLast && uniq.length > 3) { emoji = '\u{1F4A9}'; color = 'var(--muted)'; }
-
-          const row = document.createElement('div');
-          row.style.cssText = 'display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;';
-
-          const cLbl = document.createElement('span');
-          cLbl.style.cssText = 'font-size:13px;font-weight:800;min-width:32px;color:' + color + ';white-space:nowrap;flex-shrink:0;';
-          cLbl.textContent = (emoji ? emoji + ' ' : '') + count + 'x';
-
-          const nms = document.createElement('span');
-          nms.style.cssText = 'font-size:13px;color:var(--text);line-height:1.6;';
-          nms.textContent = gmap[count].join(', ');
-
-          row.appendChild(cLbl);
-          row.appendChild(nms);
-          gDiv.appendChild(row);
-        });
-
-        valueTd.appendChild(gDiv);
-
-      } else {
-        valueTd.style.cssText = 'font-size:15px;color:var(--text);';
-        valueTd.textContent = record.value;
-      }
-
+      valueTd.style.cssText = 'font-size:15px;color:var(--text);';
+      valueTd.textContent = record.value;
       tr.appendChild(valueTd);
+
       tbody.appendChild(tr);
     });
 
