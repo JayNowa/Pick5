@@ -1874,13 +1874,13 @@
   [data-theme="light"] .streak-row { border-bottom-color: var(--border); }
   .streak-header {
     font-family: 'Bebas Neue', sans-serif;
-    font-size: 16px;
+    font-size: 18px;
     letter-spacing: 0.08em;
     color: var(--accent);
     margin-bottom: 4px;
   }
   .streak-teams {
-    font-size: 14px;
+    font-size: 16px;
     color: var(--text);
     line-height: 1.6;
   }
@@ -1917,7 +1917,7 @@
   .records-table tr:hover td { background: rgba(255,255,255,0.02); }
   [data-theme="light"] .records-table tr:hover td { background: rgba(0,0,0,0.02); }
   .record-label {
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 700;
     color: var(--accent);
     white-space: nowrap;
@@ -4028,7 +4028,7 @@ async function loadRecords() {
       tr.appendChild(labelTd);
 
       const valueTd = document.createElement('td');
-      valueTd.style.cssText = 'font-size:15px;color:var(--text);';
+      valueTd.style.cssText = 'font-size:17px;color:var(--text);';
       valueTd.textContent = record.value;
       tr.appendChild(valueTd);
 
@@ -4963,6 +4963,6 @@ async function loadWeeklyPicks() {
   </div>
 </div>
 
-<div class="version-badge">v0.9.5</div>
+<div class="version-badge">v0.9.6</div>
 </body>
 </html>
