@@ -4215,6 +4215,7 @@ async function loadLeaderboard() {
     // Calculate totals per user
     const standings = Object.keys(userWeekMap).map(function(email) {
       let totalWins = 0, totalLosses = 0, totalTbDiff = 0, tbCount = 0;
+      let hasPending = false;
 
       Object.keys(userWeekMap[email]).forEach(function(week) {
         const doc = userWeekMap[email][week];
@@ -4222,12 +4223,21 @@ async function loadLeaderboard() {
         const picks   = [doc.pick1,   doc.pick2,   doc.pick3,   doc.pick4,   doc.pick5];
         const spreads = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5];
 
+        let weekPending = 0;
         picks.forEach(function(pick, pi) {
           if (!pick || !pick.trim()) return;
           const result = getPickResult(pick, spreads[pi] || '', weekScores);
           if (result === 'win')       totalWins++;
           else if (result === 'loss') totalLosses++;
+          else                        weekPending++;
         });
+
+        // Flag if this is the active week and not all games are final
+        if (currentActiveWeek) {
+          const activeLabel = (isNaN(parseInt(currentActiveWeek)) || currentActiveWeek.toString().toLowerCase().includes('week'))
+            ? currentActiveWeek : 'Week ' + currentActiveWeek;
+          if (week === activeLabel && weekPending > 0) hasPending = true;
+        }
 
         if (doc.tiebreaker !== undefined && doc.tiebreaker !== '') {
           const actual = getActualTiebreakerFromWeek(weekScores);
@@ -4244,7 +4254,8 @@ async function loadLeaderboard() {
         totalWins,
         totalLosses,
         totalTbDiff,
-        tbCount
+        tbCount,
+        hasPending
       };
     });
 
@@ -4271,11 +4282,11 @@ async function loadLeaderboard() {
         '<div class="lb-rank ' + rankClass + '">' + rankDisplay + '</div>' +
         '<div class="lb-info">' +
           '<div class="lb-name">' + user.name + '</div>' +
-          '<div class="lb-record">' + user.totalWins + 'W &ndash; ' + user.totalLosses + 'L</div>' +
+          '<div class="lb-record">' + user.totalWins + 'W &ndash; ' + user.totalLosses + 'L' + (user.hasPending ? ' <span style="color:var(--muted);font-size:11px;letter-spacing:0.06em;">*pending</span>' : '') + '</div>' +
         '</div>' +
         '<div class="lb-stats">' +
           '<div class="lb-stat">' +
-            '<div class="lb-stat-val wins-val">' + user.totalWins + '</div>' +
+            '<div class="lb-stat-val wins-val">' + user.totalWins + (user.hasPending ? '<span style="color:var(--muted);font-size:14px;">*</span>' : '') + '</div>' +
             '<div class="lb-stat-label">Wins</div>' +
           '</div>' +
           '<div class="lb-stat">' +
@@ -4568,7 +4579,10 @@ async function loadWeeklyPicks() {
           const home = (lastGame.home || '').toUpperCase();
           const gameData = scoresMap && (scoresMap[away] || scoresMap[home]);
 
-          document.getElementById('wpTbMatchup').textContent = away + ' @ ' + home;
+          document.getElementById('wpTbMatchup').innerHTML =
+            (getTeamLogo(away) ? '<img src="' + getTeamLogo(away) + '" style="width:22px;height:22px;object-fit:contain;">' : '') +
+            '<span style="font-family:\'Bebas Neue\',sans-serif;font-size:16px;letter-spacing:0.08em;color:var(--text);">' + away + ' @ ' + home + '</span>' +
+            (getTeamLogo(home) ? '<img src="' + getTeamLogo(home) + '" style="width:22px;height:22px;object-fit:contain;">' : '');
 
           if (gameData && gameData.started) {
             const awayScore = scoresMap[away] ? scoresMap[away].awayScore : (scoresMap[home] ? scoresMap[home].awayScore : 0);
@@ -4748,9 +4762,9 @@ async function loadWeeklyPicks() {
           <div class="page-subtitle" id="weeklyPicksSubtitle">Loading…</div>
           <div class="page-divider"></div>
         </div>
-        <div id="wpTiebreakerWidget" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;min-width:180px;text-align:right;">
-          <div style="font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Tiebreaker Game</div>
-          <div id="wpTbMatchup" style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:0.08em;color:var(--text);"></div>
+        <div id="wpTiebreakerWidget" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;min-width:200px;text-align:right;">
+          <div style="font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Tiebreaker Game</div>
+          <div id="wpTbMatchup" style="display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-bottom:4px;"></div>
           <div id="wpTbScore" style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:0.06em;color:var(--accent);line-height:1;margin:2px 0;"></div>
           <div id="wpTbStatus" style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);"></div>
           <div id="wpTbTotal" style="font-size:12px;color:var(--muted);margin-top:3px;"></div>
