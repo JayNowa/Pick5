@@ -2037,7 +2037,7 @@
     </div>
     <div class="field">
       <label>Phone Number</label>
-      <input type="tel" id="requestPhone" placeholder="xxx-xxx-xxxx" maxlength="12" />
+      <input type="tel" id="requestPhone" placeholder="xxx-xxx-xxxx" maxlength="12" oninput="formatPhoneInput(this)" />
     </div>
     <button class="btn-login" id="requestBtn" onclick="submitAccessRequest()">Submit Request</button>
     <div class="request-access-link" style="margin-top:12px;">
@@ -3541,6 +3541,13 @@ function stopWeekPolling() {
 }
 
 // ── Request Access ──
+function formatPhoneInput(input) {
+  const digits = input.value.replace(/\D/g, '').slice(0, 10);
+  let formatted = digits;
+  if (digits.length > 6)      formatted = digits.slice(0,3) + '-' + digits.slice(3,6) + '-' + digits.slice(6);
+  else if (digits.length > 3) formatted = digits.slice(0,3) + '-' + digits.slice(3);
+  input.value = formatted;
+}
 function openRequestAccess() {
   document.getElementById('requestAccessOverlay').style.display = 'flex';
   document.getElementById('requestEmail').value = '';
@@ -5109,6 +5116,6 @@ async function loadWeeklyPicks() {
   </div>
 </div>
 
-<div class="version-badge">v0.9.8</div>
+<div class="version-badge">v0.9.9</div>
 </body>
 </html>
