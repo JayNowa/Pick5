@@ -2529,6 +2529,7 @@ async function showPage(page) {
     initScores();
   } else if (page === 'admin') {
     loadPendingRequests();
+    loadMissingPicks();
     initPollingToggle();
     const p = document.getElementById('adminPage');
     p.style.display = 'flex';
@@ -3707,6 +3708,78 @@ function updateUsersCount() {
 }
 
 // ── Admin: Pending Requests ──
+// ── Admin: Missing Picks ──
+async function loadMissingPicks() {
+  const listEl    = document.getElementById('missingPicksList');
+  const loadingEl = document.getElementById('missingPicksLoading');
+  if (!listEl) return;
+
+  loadingEl.style.display = 'block';
+  listEl.innerHTML = '';
+
+  try {
+    // Get active week
+    const activeWeek = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
+    if (!activeWeek) {
+      loadingEl.style.display = 'none';
+      listEl.innerHTML = '<div class="pending-none">No active week set.</div>';
+      return;
+    }
+    const weekLabel = (isNaN(parseInt(activeWeek)) || activeWeek.toString().toLowerCase().includes('week'))
+      ? activeWeek : 'Week ' + activeWeek;
+
+    // Get all approved users and picks for this week in parallel
+    const [allUsers, weekPicks] = await Promise.all([
+      window.fbGetAllApprovedUsers ? window.fbGetAllApprovedUsers() : [],
+      window.fbGetWeeklyPicks ? window.fbGetWeeklyPicks(weekLabel) : []
+    ]);
+
+    loadingEl.style.display = 'none';
+
+    // Build set of emails that have picked
+    const pickedEmails = new Set(weekPicks.map(function(d) { return (d.email || '').toLowerCase(); }));
+
+    // Find users who haven't picked
+    const missing = allUsers.filter(function(u) {
+      return !pickedEmails.has((u.email || '').toLowerCase());
+    });
+
+    if (missing.length === 0) {
+      listEl.innerHTML = '<div class="pending-none" style="color:#4caf7d;">✓ Everyone has submitted picks for ' + weekLabel + '!</div>';
+      return;
+    }
+
+    // Header
+    const header = document.createElement('div');
+    header.style.cssText = 'font-size:12px;color:var(--muted);margin-bottom:10px;letter-spacing:0.06em;';
+    header.textContent = missing.length + ' user' + (missing.length !== 1 ? 's' : '') + ' missing picks for ' + weekLabel;
+    listEl.appendChild(header);
+
+    missing.forEach(function(user) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06);';
+
+      row.innerHTML =
+        '<div style="flex:1;min-width:160px;">' +
+          '<div style="font-size:15px;font-weight:600;color:var(--accent);">' + (user.teamName || '—') + '</div>' +
+          '<div style="font-size:13px;color:#fff;margin-top:1px;">' + user.email + '</div>' +
+          (user.phone ? '<div style="font-size:13px;color:var(--muted);">' + user.phone + '</div>' : '') +
+        '</div>';
+
+      listEl.appendChild(row);
+    });
+
+    // Remove border from last row
+    const rows = listEl.querySelectorAll('div[style*="border-bottom"]');
+    if (rows.length > 0) rows[rows.length - 1].style.borderBottom = 'none';
+
+  } catch(e) {
+    loadingEl.style.display = 'none';
+    listEl.innerHTML = '<div class="pending-none">Failed to load. Please try again.</div>';
+    console.error('loadMissingPicks error:', e);
+  }
+}
+
 async function loadPendingRequests() {
   const listEl    = document.getElementById('pendingRequestsList');
   const loadingEl = document.getElementById('pendingRequestsLoading');
@@ -4876,6 +4949,14 @@ async function loadWeeklyPicks() {
       <div id="pendingRequestsList"></div>
     </div>
 
+    <!-- Missing Picks -->
+    <div class="admin-card" id="missingPicksCard">
+      <div class="admin-card-title">📋 Missing Picks</div>
+      <p class="admin-card-desc">Users who have not submitted picks for the current active week.</p>
+      <div id="missingPicksLoading" style="color:var(--muted);font-size:14px;margin-bottom:8px;">Loading…</div>
+      <div id="missingPicksList"></div>
+    </div>
+
     <!-- Week Polling Toggle -->
     <div class="admin-card">
       <div class="admin-card-title">🔄 Week Polling</div>
@@ -5028,6 +5109,6 @@ async function loadWeeklyPicks() {
   </div>
 </div>
 
-<div class="version-badge">v0.9.7</div>
+<div class="version-badge">v0.9.8</div>
 </body>
 </html>
