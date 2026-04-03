@@ -2260,6 +2260,20 @@
   window.fbDeleteApprovedUser = async function(docId) {
     await deleteDoc(doc(db, "approvedUsers", docId));
   };
+
+  window.fbCheckTeamNameTaken = async function(teamName) {
+    try {
+      const normalised = teamName.trim().toLowerCase();
+      // Check both approvedUsers and pendingUsers
+      const [approvedSnap, pendingSnap] = await Promise.all([
+        getDocs(collection(db, "approvedUsers")),
+        getDocs(collection(db, "pendingUsers"))
+      ]);
+      const takenInApproved = approvedSnap.docs.some(d => (d.data().teamName || '').trim().toLowerCase() === normalised);
+      const takenInPending  = pendingSnap.docs.some(d => (d.data().teamName || '').trim().toLowerCase() === normalised);
+      return takenInApproved || takenInPending;
+    } catch(e) { console.error('fbCheckTeamNameTaken:', e); return false; }
+  };
 </script>
 
 <script>
@@ -3579,6 +3593,14 @@ async function submitAccessRequest() {
     return;
   }
 
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    errEl.textContent = 'Please enter a valid email address.';
+    errEl.classList.add('show');
+    return;
+  }
+
   if (pin.length < 3) {
     errEl.textContent = 'PIN must be at least 3 characters.';
     errEl.classList.add('show');
@@ -3613,6 +3635,17 @@ async function submitAccessRequest() {
 
     if (existingPending) {
       errEl.textContent = 'This email already has a pending request. Please wait for approval!';
+      errEl.classList.add('show');
+      btn.disabled = false;
+      staEl.textContent = '';
+      return;
+    }
+
+    // Check if team name is already taken
+    staEl.textContent = 'Checking team name…';
+    const teamNameTaken = await fbCheckTeamNameTaken(teamName);
+    if (teamNameTaken) {
+      errEl.textContent = 'That team name is already taken. Please choose a different one.';
       errEl.classList.add('show');
       btn.disabled = false;
       staEl.textContent = '';
@@ -5116,6 +5149,6 @@ async function loadWeeklyPicks() {
   </div>
 </div>
 
-<div class="version-badge">v0.9.9</div>
+<div class="version-badge">v1.0.1</div>
 </body>
 </html>
