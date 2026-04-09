@@ -398,7 +398,7 @@
   .container { width: 100%; max-width: 680px; }
 
   #loginPage  { display: flex; }
-  #selectorPage, #myPicksPage, #scoresPage, #adminPage, #weeklyPicksPage, #resultsPage, #leaderboardPage, #usersPage, #teamDataPage, #rulesPage, #recordsPage { display: none; }
+  #selectorPage, #myPicksPage, #scoresPage, #nbaScoresPage, #adminPage, #weeklyPicksPage, #resultsPage, #leaderboardPage, #usersPage, #teamDataPage, #rulesPage, #recordsPage { display: none; }
 
   .pending-req-row {
     display: flex;
@@ -1974,6 +1974,7 @@
     <button class="nav-link" id="navTeamData" onclick="showPage('teamData')">Team Data</button>
     <button class="nav-link" id="navRules" onclick="showPage('rules')">Rules</button>
     <button class="nav-link" id="navRecords" onclick="showPage('records')">Records</button>
+    <button class="nav-link" id="navNbaScores" onclick="showPage('nbaScores')" style="display:none;">NBA Scores</button>
   </div>
   <div class="nav-right">
     <span class="nav-user">Signed in as <strong id="navEmail" data-email="" data-teamname=""></strong></span>
@@ -2190,6 +2191,15 @@
   window.fbGetSpreadsWeek = async function() {
     const snap = await getDoc(doc(db, "settings", "spreadsWeek"));
     return snap.exists() ? snap.data().value : null;
+  };
+
+  window.fbSaveNbaVisible = async function(visible) {
+    await setDoc(doc(db, "settings", "nbaVisible"), { value: visible, updatedAt: Date.now() });
+  };
+
+  window.fbGetNbaVisible = async function() {
+    const snap = await getDoc(doc(db, "settings", "nbaVisible"));
+    return snap.exists() ? snap.data().value : false;
   };
 
   // ── Auth helpers ──
@@ -2475,6 +2485,14 @@ function afterLogin(email, teamName) {
       const w = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
       currentActiveWeek = w ? String(w) : null;
     } catch(e) {}
+    // Show NBA nav if enabled or if admin
+    try {
+      const nbaVisible = window.fbGetNbaVisible ? await window.fbGetNbaVisible() : false;
+      const isAdmin = email && ADMIN_EMAILS.includes(email.toLowerCase());
+      if (nbaVisible || isAdmin) {
+        document.getElementById('navNbaScores').style.display = '';
+      }
+    } catch(e) {}
     await updateWeekBadge();
     await showPage('selector');
     if (pollingEnabled) startWeekPolling();
@@ -2486,6 +2504,7 @@ async function showPage(page) {
   document.getElementById('selectorPage').style.display     = 'none';
   document.getElementById('myPicksPage').style.display      = 'none';
   document.getElementById('scoresPage').style.display       = 'none';
+  document.getElementById('nbaScoresPage').style.display    = 'none';
   document.getElementById('adminPage').style.display        = 'none';
   document.getElementById('weeklyPicksPage').style.display  = 'none';
   document.getElementById('resultsPage').style.display      = 'none';
@@ -2498,6 +2517,7 @@ async function showPage(page) {
   document.getElementById('navSelector').classList.remove('active');
   document.getElementById('navMyPicks').classList.remove('active');
   document.getElementById('navScores').classList.remove('active');
+  document.getElementById('navNbaScores').classList.remove('active');
   document.getElementById('navWeeklyPicks').classList.remove('active');
   document.getElementById('navResults').classList.remove('active');
   document.getElementById('navLeaderboard').classList.remove('active');
@@ -2505,6 +2525,7 @@ async function showPage(page) {
   document.getElementById('navRules').classList.remove('active');
   document.getElementById('navRecords').classList.remove('active');
   clearInterval(scoresRefreshTimer);
+  clearInterval(nbaScoresRefreshTimer);
 
   if (page === 'selector') {
     const p = document.getElementById('selectorPage');
@@ -2542,10 +2563,17 @@ async function showPage(page) {
     p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
     document.getElementById('navScores').classList.add('active');
     initScores();
+  } else if (page === 'nbaScores') {
+    const p = document.getElementById('nbaScoresPage');
+    p.style.display = 'flex';
+    p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
+    document.getElementById('navNbaScores').classList.add('active');
+    initNbaScores();
   } else if (page === 'admin') {
     loadPendingRequests();
     loadMissingPicks();
     initPollingToggle();
+    loadAdminNbaStatus();
     const p = document.getElementById('adminPage');
     p.style.display = 'flex';
     p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
@@ -2587,6 +2615,7 @@ function logout() {
   document.getElementById('selectorPage').style.display = 'none';
   document.getElementById('myPicksPage').style.display  = 'none';
   document.getElementById('scoresPage').style.display   = 'none';
+  document.getElementById('nbaScoresPage').style.display = 'none';
   document.getElementById('adminPage').style.display        = 'none';
   document.getElementById('weeklyPicksPage').style.display  = 'none';
   document.getElementById('resultsPage').style.display      = 'none';
@@ -2595,7 +2624,9 @@ function logout() {
   document.getElementById('teamDataPage').style.display       = 'none';
   document.getElementById('rulesPage').style.display          = 'none';
   document.getElementById('recordsPage').style.display        = 'none';
+  document.getElementById('navNbaScores').style.display  = 'none';
   stopWeekPolling();
+  clearInterval(nbaScoresRefreshTimer);
   currentActiveWeek = null;
   document.getElementById('emailInput').value = '';
   document.getElementById('pinInput').value   = '';
@@ -3356,9 +3387,210 @@ async function fetchScores() {
   }
 }
 
+// ── NBA Scores ──
+let nbaScoresDate = null;
+let nbaScoresRefreshTimer = null;
+
+function nbaDateToYMD(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return '' + y + m + day;
+}
+
+function nbaDateLabel(d) {
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const cmp = new Date(d); cmp.setHours(0,0,0,0);
+  const diff = Math.round((cmp - today) / 86400000);
+  if (diff === 0) return 'Today';
+  if (diff === -1) return 'Yesterday';
+  if (diff === 1) return 'Tomorrow';
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function updateNbaDateLabel() {
+  document.getElementById('nbaDateLabel').textContent = nbaDateLabel(nbaScoresDate);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const cmp = new Date(nbaScoresDate); cmp.setHours(0,0,0,0);
+  document.getElementById('nbaPrev').disabled = false;
+  document.getElementById('nbaNext').disabled = cmp >= today;
+}
+
+function changeNbaDate(dir) {
+  const d = new Date(nbaScoresDate);
+  d.setDate(d.getDate() + dir);
+  nbaScoresDate = d;
+  updateNbaDateLabel();
+  fetchNbaScores();
+}
+
+function initNbaScores() {
+  if (!nbaScoresDate) nbaScoresDate = new Date();
+  updateNbaDateLabel();
+  fetchNbaScores();
+  clearInterval(nbaScoresRefreshTimer);
+  nbaScoresRefreshTimer = setInterval(fetchNbaScores, 15 * 60 * 1000);
+}
+
+async function fetchNbaScores() {
+  const loadingEl = document.getElementById('nbaScoresLoading');
+  const errorEl   = document.getElementById('nbaScoresError');
+  const gridEl    = document.getElementById('nbaScoresGrid');
+  loadingEl.style.display = 'block';
+  errorEl.style.display   = 'none';
+  gridEl.innerHTML        = '';
+
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  document.getElementById('nbaRefreshInfo').textContent = 'Last updated ' + timeStr + ' · Auto-refreshes every 15 min';
+
+  try {
+    const dateStr = nbaDateToYMD(nbaScoresDate);
+    const url = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=' + dateStr;
+    const res  = await fetch(url);
+    if (!res.ok) throw new Error('ESPN API error');
+    const data   = await res.json();
+    const events = data.events || [];
+    loadingEl.style.display = 'none';
+
+    if (events.length === 0) {
+      gridEl.innerHTML = '<div class="scores-empty"><div class="icon">🏀</div><p>No games scheduled for this date.</p></div>';
+      return;
+    }
+
+    const grid = document.createElement('div');
+    grid.className = 'scores-grid';
+
+    events.forEach(function(event, ei) {
+      const comp      = event.competitions[0];
+      const status    = event.status;
+      const stateType = status.type.state;
+      const statusStr = status.type.shortDetail || '';
+      const broadcasts = comp.broadcasts || [];
+      const network   = broadcasts.length > 0 && broadcasts[0].names ? broadcasts[0].names[0] : '';
+
+      const home = comp.competitors.find(function(c) { return c.homeAway === 'home'; });
+      const away = comp.competitors.find(function(c) { return c.homeAway === 'away'; });
+
+      const homeScore = parseInt(home && home.score) || 0;
+      const awayScore = parseInt(away && away.score) || 0;
+      const isFinal = stateType === 'post';
+      const isLive  = stateType === 'in';
+      const isPre   = stateType === 'pre';
+      const homeWins = isFinal && homeScore > awayScore;
+      const awayWins = isFinal && awayScore > homeScore;
+
+      const card = document.createElement('div');
+      card.className = 'score-card' + (isLive ? ' live' : '');
+      card.style.animationDelay = (ei * 0.04) + 's';
+
+      const gameDate    = new Date(event.date);
+      const gameTimeStr = gameDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+      const awayName   = away && away.team ? away.team.shortDisplayName : 'Away';
+      const homeName   = home && home.team ? home.team.shortDisplayName : 'Home';
+      const awayRecord = away && away.records && away.records[0] ? away.records[0].summary : '';
+      const homeRecord = home && home.records && home.records[0] ? home.records[0].summary : '';
+
+      const cardHeader = document.createElement('div');
+      cardHeader.className = 'score-card-header';
+      const statusEl = document.createElement('span');
+      statusEl.className = 'game-status ' + (isLive ? 'live' : isFinal ? 'final' : 'scheduled');
+      statusEl.textContent = isLive ? statusStr : isFinal ? 'Final' : 'Scheduled';
+      const networkEl = document.createElement('span');
+      networkEl.className = 'game-network';
+      networkEl.textContent = network;
+      cardHeader.appendChild(statusEl);
+      cardHeader.appendChild(networkEl);
+
+      const cardBody = document.createElement('div');
+      cardBody.className = 'score-card-body';
+      const matchup = document.createElement('div');
+      matchup.className = 'score-matchup';
+
+      const awayRow = document.createElement('div');
+      awayRow.className = 'score-team';
+      const awayInfo = document.createElement('div');
+      const awayNameEl = document.createElement('div');
+      awayNameEl.className = 'score-team-name' + (awayWins ? ' winner' : '');
+      awayNameEl.textContent = awayName;
+      const awayRecordEl = document.createElement('div');
+      awayRecordEl.className = 'score-team-record';
+      awayRecordEl.textContent = awayRecord;
+      awayInfo.appendChild(awayNameEl); awayInfo.appendChild(awayRecordEl);
+      const awayPts = document.createElement('div');
+      awayPts.className = 'score-points' + (awayWins ? ' winner' : '') + (isPre ? ' tbd' : '');
+      awayPts.textContent = isPre ? '—' : awayScore;
+      awayRow.appendChild(awayInfo); awayRow.appendChild(awayPts);
+
+      const dividerEl = document.createElement('div');
+      dividerEl.className = 'score-divider';
+
+      const homeRow = document.createElement('div');
+      homeRow.className = 'score-team';
+      const homeInfo = document.createElement('div');
+      const homeNameEl = document.createElement('div');
+      homeNameEl.className = 'score-team-name' + (homeWins ? ' winner' : '');
+      homeNameEl.textContent = homeName;
+      const homeRecordEl = document.createElement('div');
+      homeRecordEl.className = 'score-team-record';
+      homeRecordEl.textContent = homeRecord;
+      homeInfo.appendChild(homeNameEl); homeInfo.appendChild(homeRecordEl);
+      const homePts = document.createElement('div');
+      homePts.className = 'score-points' + (homeWins ? ' winner' : '') + (isPre ? ' tbd' : '');
+      homePts.textContent = isPre ? '—' : homeScore;
+      homeRow.appendChild(homeInfo); homeRow.appendChild(homePts);
+
+      matchup.appendChild(awayRow); matchup.appendChild(dividerEl); matchup.appendChild(homeRow);
+      cardBody.appendChild(matchup);
+
+      if (isPre || isLive) {
+        const timeInfo = document.createElement('div');
+        timeInfo.className = 'game-time-info';
+        timeInfo.textContent = isPre ? gameTimeStr : statusStr;
+        cardBody.appendChild(timeInfo);
+      }
+
+      card.appendChild(cardHeader); card.appendChild(cardBody);
+      grid.appendChild(card);
+    });
+
+    gridEl.appendChild(grid);
+  } catch(err) {
+    loadingEl.style.display = 'none';
+    errorEl.style.display   = 'block';
+    errorEl.textContent     = 'Unable to load scores. Please try again later.';
+    console.error(err);
+  }
+}
+
 // ── Admin ──
 async function loadAdminWeekOverride() {
   loadAdminSpreadsWeek();
+}
+
+async function loadAdminNbaStatus() {
+  try {
+    const visible = window.fbGetNbaVisible ? await window.fbGetNbaVisible() : false;
+    const cb = document.getElementById('nbaVisibleToggle');
+    const lbl = document.getElementById('nbaVisibleLabel');
+    if (cb) cb.checked = !!visible;
+    if (lbl) lbl.textContent = visible ? 'NBA Scores visible to all users' : 'NBA Scores hidden from regular users';
+  } catch(e) {}
+}
+
+async function handleNbaToggle(checked) {
+  const lbl = document.getElementById('nbaVisibleLabel');
+  if (lbl) lbl.textContent = 'Saving…';
+  try {
+    await window.fbSaveNbaVisible(checked);
+    if (lbl) lbl.textContent = checked ? 'NBA Scores visible to all users' : 'NBA Scores hidden from regular users';
+    // Update nav button visibility for the current session
+    document.getElementById('navNbaScores').style.display = checked ? '' : 'none';
+  } catch(e) {
+    if (lbl) lbl.textContent = 'Error saving — try again';
+  }
 }
 
 async function adminFetchAndSaveSpreads() {
@@ -4969,6 +5201,39 @@ async function loadWeeklyPicks() {
 </div>
 
 
+<!-- ═══ NBA SCORES PAGE ═══ -->
+<div class="page with-nav" id="nbaScoresPage">
+  <div class="container" style="max-width:860px;">
+    <div class="page-header">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <div>
+          <div class="page-title">NBA Scores</div>
+          <div class="page-subtitle">Live &amp; Final Results</div>
+          <div class="page-divider"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;margin-top:4px;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="scores-week-nav">
+              <button class="week-nav-btn" id="nbaPrev" onclick="changeNbaDate(-1)">&#8592;</button>
+              <span class="week-nav-label" id="nbaDateLabel" style="min-width:90px;">——</span>
+              <button class="week-nav-btn" id="nbaNext" onclick="changeNbaDate(1)">&#8594;</button>
+            </div>
+          </div>
+          <div class="scores-refresh-info" id="nbaRefreshInfo">Refreshes every 15 min</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="nbaScoresLoading" class="picks-loading">
+      <div class="loading-spinner"></div>
+      <p>Loading scores…</p>
+    </div>
+    <div id="nbaScoresError" class="picks-error" style="display:none;"></div>
+    <div id="nbaScoresGrid"></div>
+  </div>
+</div>
+
+
 <!-- ═══ ADMIN PAGE ═══ -->
 <div class="page with-nav" id="adminPage">
   <div class="container">
@@ -5053,6 +5318,19 @@ async function loadWeeklyPicks() {
       </div>
 
       <div class="admin-status" id="adminSpreadsStatus"></div>
+    </div>
+
+    <!-- NBA Scores Visibility -->
+    <div class="admin-card">
+      <div class="admin-card-title">🏀 NBA Scores</div>
+      <p class="admin-card-desc">Toggle whether the NBA Scores page is visible to regular users. Admins can always access it regardless of this setting.</p>
+      <div style="display:flex;align-items:center;gap:14px;margin-top:12px;">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;">
+          <input type="checkbox" id="nbaVisibleToggle" onchange="handleNbaToggle(this.checked)"
+            style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;" />
+          <span style="font-size:14px;color:var(--text);font-weight:600;" id="nbaVisibleLabel">Loading…</span>
+        </label>
+      </div>
     </div>
   </div>
 </div>
