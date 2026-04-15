@@ -398,7 +398,7 @@
   .container { width: 100%; max-width: 680px; }
 
   #loginPage  { display: flex; }
-  #selectorPage, #myPicksPage, #scoresPage, #nbaScoresPage, #adminPage, #weeklyPicksPage, #resultsPage, #leaderboardPage, #usersPage, #teamDataPage, #rulesPage, #recordsPage { display: none; }
+  #selectorPage, #myPicksPage, #scoresPage, #nbaScoresPage, #adminPage, #weeklyPicksPage, #resultsPage, #leaderboardPage, #usersPage, #teamDataPage, #rulesPage, #recordsPage, #weeklyRecapPage { display: none; }
 
   .pending-req-row {
     display: flex;
@@ -1455,6 +1455,86 @@
     line-height: 1;
   }
   [data-theme="light"] .wp-dist-item { background: #f5f6fa; }
+  .wp-dist-item.win  { border-color: #4caf7d; background: rgba(76,175,125,0.12); }
+
+  .wp-dist-collapsible { margin-top: 0; margin-bottom: 20px; }
+  .wp-dist-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 16px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    cursor: pointer;
+    text-align: left;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .wp-dist-toggle:hover { color: var(--text); border-color: var(--accent); }
+  .wp-dist-chevron { font-size: 11px; transition: transform 0.2s; }
+  .wp-dist-collapsible.open .wp-dist-chevron { transform: rotate(180deg); }
+  .wp-dist-body { display: none; padding-top: 12px; }
+  .wp-dist-collapsible.open .wp-dist-body { display: flex; }
+
+  .wp-section { margin-bottom: 28px; }
+  .wp-section-label {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 15px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  /* ── WEEKLY RECAP ── */
+  .recap-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .recap-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .recap-card-label {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .recap-card-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    letter-spacing: 0.06em;
+    color: var(--text);
+    line-height: 1.2;
+  }
+  .recap-card-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 5px;
+  }
+  .recap-card.gold  { border-color: #f5c842; }
+  .recap-card.gold  .recap-card-value { color: #f5c842; }
+  .recap-card.green { border-color: #4caf7d; }
+  .recap-card.green .recap-card-value { color: #4caf7d; }
+  .recap-card.red   { border-color: #e05555; }
+  .recap-card.red   .recap-card-value { color: #e05555; }
+  [data-theme="light"] .recap-card { background: #f5f6fa; }
+  .wp-dist-item.loss { border-color: #e05555; background: rgba(224,85,85,0.12); }
+  .wp-dist-item.win  .wp-dist-count { color: #4caf7d; }
+  .wp-dist-item.loss .wp-dist-count { color: #e05555; }
+  .wp-dist-item.loss img { filter: grayscale(0.4); }
 
   /* ── RESULTS PAGE ── */
   .results-wrap {
@@ -2016,13 +2096,14 @@
   <div class="nav-links">
     <button class="nav-link active" id="navSelector" onclick="showPage('selector')">Pick 5</button>
     <button class="nav-link" id="navMyPicks" onclick="showPage('myPicks')">My Picks</button>
-    <button class="nav-link" id="navScores" onclick="showPage('scores')">Scores</button>
+    <button class="nav-link" id="navScores" onclick="showPage('scores')">NFL Scores</button>
     <button class="nav-link" id="navWeeklyPicks" onclick="showPage('weeklyPicks')">Weekly Picks</button>
     <button class="nav-link" id="navResults" onclick="showPage('results')">Results</button>
     <button class="nav-link" id="navLeaderboard" onclick="showPage('leaderboard')">Leaderboard</button>
     <button class="nav-link" id="navTeamData" onclick="showPage('teamData')">Team Data</button>
     <button class="nav-link" id="navRules" onclick="showPage('rules')">Rules</button>
     <button class="nav-link" id="navRecords" onclick="showPage('records')">Records</button>
+    <button class="nav-link" id="navWeeklyRecap" onclick="showPage('weeklyRecap')">Recap</button>
     <button class="nav-link" id="navNbaScores" onclick="showPage('nbaScores')" style="display:none;">NBA Scores</button>
   </div>
   <div class="nav-right">
@@ -2562,6 +2643,7 @@ async function showPage(page) {
   document.getElementById('teamDataPage').style.display       = 'none';
   document.getElementById('rulesPage').style.display          = 'none';
   document.getElementById('recordsPage').style.display        = 'none';
+  document.getElementById('weeklyRecapPage').style.display    = 'none';
 
   document.getElementById('navSelector').classList.remove('active');
   document.getElementById('navMyPicks').classList.remove('active');
@@ -2573,6 +2655,7 @@ async function showPage(page) {
   document.getElementById('navTeamData').classList.remove('active');
   document.getElementById('navRules').classList.remove('active');
   document.getElementById('navRecords').classList.remove('active');
+  document.getElementById('navWeeklyRecap').classList.remove('active');
   clearInterval(scoresRefreshTimer);
   clearInterval(nbaScoresRefreshTimer);
 
@@ -2651,6 +2734,12 @@ async function showPage(page) {
     document.getElementById('navRecords').classList.add('active');
     loadRecords();
     loadStreakCards();
+  } else if (page === 'weeklyRecap') {
+    const p = document.getElementById('weeklyRecapPage');
+    p.style.display = 'flex';
+    p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
+    document.getElementById('navWeeklyRecap').classList.add('active');
+    initWeeklyRecap();
   }
 }
 
@@ -2673,6 +2762,7 @@ function logout() {
   document.getElementById('teamDataPage').style.display       = 'none';
   document.getElementById('rulesPage').style.display          = 'none';
   document.getElementById('recordsPage').style.display        = 'none';
+  document.getElementById('weeklyRecapPage').style.display    = 'none';
   document.getElementById('navNbaScores').style.display  = 'none';
   stopWeekPolling();
   clearInterval(nbaScoresRefreshTimer);
@@ -5015,37 +5105,26 @@ async function loadWeeklyPicks() {
       }
     });
 
+    // Sort alphabetically by team name
     const users = Object.values(byUser).sort(function(a, b) {
-      return (a.email || '').localeCompare(b.email || '');
+      return (a.teamName || a.email || '').localeCompare(b.teamName || b.email || '');
     });
 
-    const wrap = document.createElement('div');
-    wrap.className = 'wp-table-wrap';
+    // Logged-in user's pick doc
+    const loggedInEmail = (document.getElementById('navEmail').dataset.email || '').toLowerCase();
+    const myDoc = byUser[Object.keys(byUser).find(function(e) { return e.toLowerCase() === loggedInEmail; })];
 
-    const table = document.createElement('table');
-    table.className = 'wp-table';
-
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
-    ['User', 'Pick 1', 'Pick 2', 'Pick 3', 'Pick 4', 'Pick 5', 'Record', 'Tiebreaker'].forEach(function(h) {
-      const th = document.createElement('th');
-      th.textContent = h;
-      headerRow.appendChild(th);
-    });
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
-
-    const tbody = document.createElement('tbody');
-    users.forEach(function(doc) {
+    // ── Helper: build a single pick row ──
+    function buildPickRow(doc) {
       const tr = document.createElement('tr');
 
-      const emailTd = document.createElement('td');
-      emailTd.className = 'wp-email';
-      emailTd.textContent = doc.teamName || doc.email || '—';
-      tr.appendChild(emailTd);
+      const nameTd = document.createElement('td');
+      nameTd.className = 'wp-email';
+      nameTd.textContent = doc.teamName || doc.email || '—';
+      tr.appendChild(nameTd);
 
-      const picks    = [doc.pick1,   doc.pick2,   doc.pick3,   doc.pick4,   doc.pick5];
-      const spreads  = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5];
+      const picks   = [doc.pick1,   doc.pick2,   doc.pick3,   doc.pick4,   doc.pick5];
+      const spreads = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5];
       let wins = 0, losses = 0, pending = 0;
 
       picks.forEach(function(pick, pi) {
@@ -5053,139 +5132,131 @@ async function loadWeeklyPicks() {
         if (pick && pick.trim()) {
           const chip = document.createElement('span');
           chip.className = 'wp-pick';
-          const spread = spreads[pi] || '';
-
-          // Check if game has started from ESPN scores map
+          const spread   = spreads[pi] || '';
           const pickAbbr = pick.trim().toUpperCase();
           const gameData = scoresMap && scoresMap[pickAbbr];
-          const gameStarted = gameData && gameData.started;
-
-          if (!gameStarted) {
-            // Game not started — hide the pick
+          if (!gameData || !gameData.started) {
             chip.classList.add('hidden');
             chip.textContent = 'Not started';
             pending++;
           } else {
-            // Game started — show logo + pick + spread
             const logo = getTeamLogo(pick);
-            if (logo) {
-              const img = document.createElement('img');
-              img.src = logo; img.alt = pick;
-              chip.appendChild(img);
-            }
+            if (logo) { const img = document.createElement('img'); img.src = logo; img.alt = pick; chip.appendChild(img); }
             chip.appendChild(document.createTextNode(pick + (spread ? ' ' + spread : '')));
-
-            // Only colour win/loss after game is final
             const result = getPickResult(pick, spread, scoresMap);
             if (result === 'win')       { chip.classList.add('win');  wins++; }
             else if (result === 'loss') { chip.classList.add('loss'); losses++; }
             else                        { pending++; }
           }
-
           td.appendChild(chip);
         } else {
-          td.textContent = '—';
-          td.style.color = 'var(--muted)';
+          td.textContent = '—'; td.style.color = 'var(--muted)';
         }
         tr.appendChild(td);
       });
 
-      // W/L record cell
       const recordTd = document.createElement('td');
       recordTd.className = 'wp-record';
       if (wins > 0 || losses > 0) {
-        recordTd.innerHTML =
-          '<span class="wins">' + wins + 'W</span> ' +
-          '<span class="losses">' + losses + 'L</span>' +
+        recordTd.innerHTML = '<span class="wins">' + wins + 'W</span> <span class="losses">' + losses + 'L</span>' +
           (pending > 0 ? ' <span class="pending">(' + pending + ' pending)</span>' : '');
-      } else {
-        recordTd.innerHTML = '<span class="pending">Pending</span>';
-      }
+      } else { recordTd.innerHTML = '<span class="pending">Pending</span>'; }
       tr.appendChild(recordTd);
 
-      // Tiebreaker cell
       const tbTd = document.createElement('td');
       if (doc.tiebreaker !== undefined && doc.tiebreaker !== '') {
         const actualTotal = scoresMap ? getActualTiebreaker(scoresMap) : null;
         if (actualTotal !== null) {
           const diff = Math.abs(parseInt(doc.tiebreaker) - actualTotal);
-          const diffClass = diff === 0 ? 'tb-diff-exact' : 'tb-diff-normal';
-          tbTd.innerHTML = '<strong>' + doc.tiebreaker + '</strong> <span class="' + diffClass + '">(' + (diff === 0 ? 'exact!' : '+' + diff) + ')</span>';
-        } else {
-          tbTd.innerHTML = '<strong>' + doc.tiebreaker + '</strong>';
-        }
-        tbTd.style.fontSize = '16px';
-        tbTd.style.color = 'var(--text)';
-      } else {
-        tbTd.textContent = '—';
-        tbTd.style.color = 'var(--muted)';
-      }
+          tbTd.innerHTML = '<strong>' + doc.tiebreaker + '</strong> <span class="' + (diff === 0 ? 'tb-diff-exact' : 'tb-diff-normal') + '">(' + (diff === 0 ? 'exact!' : '+' + diff) + ')</span>';
+        } else { tbTd.innerHTML = '<strong>' + doc.tiebreaker + '</strong>'; }
+        tbTd.style.fontSize = '16px'; tbTd.style.color = 'var(--text)';
+      } else { tbTd.textContent = '—'; tbTd.style.color = 'var(--muted)'; }
       tr.appendChild(tbTd);
 
+      return tr;
+    }
 
+    // ── Helper: build a picks table from an array of docs ──
+    function buildPickTable(docsArray) {
+      const wrap = document.createElement('div'); wrap.className = 'wp-table-wrap';
+      const table = document.createElement('table'); table.className = 'wp-table';
+      const thead = document.createElement('thead'); const hrow = document.createElement('tr');
+      ['User','Pick 1','Pick 2','Pick 3','Pick 4','Pick 5','Record','Tiebreaker'].forEach(function(h) {
+        const th = document.createElement('th'); th.textContent = h; hrow.appendChild(th);
+      });
+      thead.appendChild(hrow); table.appendChild(thead);
+      const tbody = document.createElement('tbody');
+      docsArray.forEach(function(doc) { tbody.appendChild(buildPickRow(doc)); });
+      table.appendChild(tbody); wrap.appendChild(table);
+      return wrap;
+    }
 
-      tbody.appendChild(tr);
-    });
-
-    table.appendChild(tbody);
-    wrap.appendChild(table);
-    tableEl.appendChild(wrap);
-
-    // ── Pick Distribution ──
+    // ── Pick Distribution (collapsed toggle) ──
     const pickCounts = {};
+    const pickSpreads = {};
     users.forEach(function(doc) {
-      [doc.pick1, doc.pick2, doc.pick3, doc.pick4, doc.pick5].forEach(function(pick) {
+      [[doc.pick1, doc.spread1], [doc.pick2, doc.spread2], [doc.pick3, doc.spread3], [doc.pick4, doc.spread4], [doc.pick5, doc.spread5]].forEach(function(pair) {
+        const pick = pair[0], spread = pair[1];
         if (pick && pick.trim()) {
           const abbr = pick.trim().toUpperCase();
           pickCounts[abbr] = (pickCounts[abbr] || 0) + 1;
+          if (spread && !pickSpreads[abbr]) pickSpreads[abbr] = spread;
         }
       });
     });
 
-    const sortedTeams = Object.keys(pickCounts).sort(function(a, b) {
-      return pickCounts[b] - pickCounts[a];
-    });
+    const sortedTeams = Object.keys(pickCounts).sort(function(a, b) { return pickCounts[b] - pickCounts[a]; });
 
     if (sortedTeams.length > 0) {
       const distWrap = document.createElement('div');
-      distWrap.className = 'wp-dist';
+      distWrap.className = 'wp-dist wp-dist-collapsible';
 
-      const distTitle = document.createElement('div');
-      distTitle.className = 'wp-dist-title';
-      distTitle.textContent = 'Pick Distribution';
-      distWrap.appendChild(distTitle);
+      const toggle = document.createElement('button');
+      toggle.className = 'wp-dist-toggle';
+      toggle.innerHTML = 'Pick Distribution <span class="wp-dist-chevron">▼</span>';
+      toggle.onclick = function() { distWrap.classList.toggle('open'); };
+      distWrap.appendChild(toggle);
 
       const grid = document.createElement('div');
-      grid.className = 'wp-dist-grid';
+      grid.className = 'wp-dist-grid wp-dist-body';
 
       sortedTeams.forEach(function(abbr) {
         const item = document.createElement('div');
-        item.className = 'wp-dist-item';
-
+        const distResult = getPickResult(abbr, pickSpreads[abbr] || '', scoresMap);
+        item.className = 'wp-dist-item' + (distResult === 'win' ? ' win' : distResult === 'loss' ? ' loss' : '');
         const logo = getTeamLogo(abbr);
-        if (logo) {
-          const img = document.createElement('img');
-          img.src = logo;
-          img.alt = abbr;
-          item.appendChild(img);
-        }
-
-        const name = document.createElement('span');
-        name.className = 'wp-dist-abbr';
-        name.textContent = abbr;
-        item.appendChild(name);
-
-        const count = document.createElement('span');
-        count.className = 'wp-dist-count';
-        count.textContent = pickCounts[abbr];
-        item.appendChild(count);
-
+        if (logo) { const img = document.createElement('img'); img.src = logo; img.alt = abbr; item.appendChild(img); }
+        const name = document.createElement('span'); name.className = 'wp-dist-abbr'; name.textContent = abbr; item.appendChild(name);
+        const count = document.createElement('span'); count.className = 'wp-dist-count'; count.textContent = pickCounts[abbr]; item.appendChild(count);
         grid.appendChild(item);
       });
 
       distWrap.appendChild(grid);
       tableEl.appendChild(distWrap);
     }
+
+    // ── My Picks ──
+    if (myDoc) {
+      const mySection = document.createElement('div');
+      mySection.className = 'wp-section';
+      const myLabel = document.createElement('div');
+      myLabel.className = 'wp-section-label';
+      myLabel.textContent = 'My Picks';
+      mySection.appendChild(myLabel);
+      mySection.appendChild(buildPickTable([myDoc]));
+      tableEl.appendChild(mySection);
+    }
+
+    // ── Everyone's Picks ──
+    const allSection = document.createElement('div');
+    allSection.className = 'wp-section';
+    const allLabel = document.createElement('div');
+    allLabel.className = 'wp-section-label';
+    allLabel.textContent = "Everyone's Picks";
+    allSection.appendChild(allLabel);
+    allSection.appendChild(buildPickTable(users));
+    tableEl.appendChild(allSection);
 
   } catch(err) {
     loadingEl.style.display = 'none';
@@ -5195,8 +5266,345 @@ async function loadWeeklyPicks() {
   }
 }
 
+// ── Weekly Recap ──
+let recapAllPicks = null;
+let recapWeeks    = [];
+let recapWeekIdx  = 0;
+
+async function initWeeklyRecap() {
+  const loadingEl  = document.getElementById('recapLoading');
+  const errorEl    = document.getElementById('recapError');
+  const contentEl  = document.getElementById('recapContent');
+  const subtitleEl = document.getElementById('recapSubtitle');
+
+  loadingEl.style.display = 'block';
+  errorEl.style.display   = 'none';
+  contentEl.innerHTML     = '';
+  subtitleEl.textContent  = 'Loading…';
+
+  try {
+    recapAllPicks = await fetchAllPicks();
+
+    if (!recapAllPicks || recapAllPicks.length === 0) {
+      loadingEl.style.display = 'none';
+      contentEl.innerHTML = '<div class="wp-empty">No picks available yet.</div>';
+      return;
+    }
+
+    const unique = [...new Set(recapAllPicks.map(function(d) { return d.week; }).filter(Boolean))];
+    recapWeeks = unique.sort(function(a, b) {
+      const ord = function(s) {
+        if (!s) return 999;
+        if (s.toLowerCase().includes('pre')) return -1;
+        return parseInt(s.replace(/[^0-9]/g, '')) || 999;
+      };
+      return ord(a) - ord(b);
+    });
+
+    if (recapWeeks.length === 0) {
+      loadingEl.style.display = 'none';
+      contentEl.innerHTML = '<div class="wp-empty">No weeks available.</div>';
+      return;
+    }
+
+    recapWeekIdx = recapWeeks.length - 1;
+    await renderRecapWeek();
+
+  } catch(err) {
+    loadingEl.style.display = 'none';
+    errorEl.style.display   = 'block';
+    errorEl.textContent     = 'Unable to load recap. Please try again.';
+    console.error(err);
+  }
+}
+
+async function changeRecapWeek(dir) {
+  const next = recapWeekIdx + dir;
+  if (next < 0 || next >= recapWeeks.length) return;
+  recapWeekIdx = next;
+  await renderRecapWeek();
+}
+
+async function renderRecapWeek() {
+  const loadingEl  = document.getElementById('recapLoading');
+  const errorEl    = document.getElementById('recapError');
+  const contentEl  = document.getElementById('recapContent');
+  const subtitleEl = document.getElementById('recapSubtitle');
+  const weekLbl    = document.getElementById('recapWeekLabel');
+  const week       = recapWeeks[recapWeekIdx];
+
+  loadingEl.style.display = 'block';
+  errorEl.style.display   = 'none';
+  contentEl.innerHTML     = '';
+
+  document.getElementById('recapPrev').disabled = recapWeekIdx === 0;
+  document.getElementById('recapNext').disabled = recapWeekIdx === recapWeeks.length - 1;
+  weekLbl.textContent    = week;
+  subtitleEl.textContent = week + ' · Recap';
+
+  try {
+    const weekPicks = (recapAllPicks || []).filter(function(d) { return d.week === week; });
+    const scoresMap = await fetchESPNScoresMap(week);
+    loadingEl.style.display = 'none';
+
+    if (weekPicks.length === 0) {
+      contentEl.innerHTML = '<div class="wp-empty">No picks found for ' + week + '.</div>';
+      return;
+    }
+
+    // Dedupe to latest per user
+    const byUser = {};
+    weekPicks.forEach(function(doc) {
+      const email = doc.email || 'unknown';
+      if (!byUser[email] || (doc.timestamp || 0) > (byUser[email].timestamp || 0)) {
+        byUser[email] = doc;
+      }
+    });
+    const users = Object.values(byUser);
+
+    // Per-user records
+    const userRecords = users.map(function(doc) {
+      const picks   = [doc.pick1,   doc.pick2,   doc.pick3,   doc.pick4,   doc.pick5];
+      const spreads = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5];
+      let wins = 0, losses = 0, pending = 0;
+      picks.forEach(function(pick, i) {
+        if (!pick || !pick.trim()) return;
+        const r = getPickResult(pick.trim().toUpperCase(), spreads[i] || '', scoresMap);
+        if (r === 'win') wins++;
+        else if (r === 'loss') losses++;
+        else pending++;
+      });
+      const actualTotal = getActualTiebreaker(scoresMap);
+      const tbDiff = (doc.tiebreaker !== undefined && doc.tiebreaker !== '' && actualTotal !== null)
+        ? Math.abs(parseInt(doc.tiebreaker) - actualTotal) : null;
+      return { doc, wins, losses, pending, tbDiff };
+    });
+
+    // ── Highlights ──
+    const maxWins   = Math.max(...userRecords.map(function(r) { return r.wins; }));
+    const bestUsers = userRecords.filter(function(r) { return r.wins === maxWins && maxWins > 0; });
+
+    const allFinal  = userRecords.every(function(r) { return r.pending === 0; });
+    const minWins   = allFinal ? Math.min(...userRecords.map(function(r) { return r.wins; })) : null;
+    const worstUsers = (allFinal && minWins !== null)
+      ? userRecords.filter(function(r) { return r.wins === minWins; }) : [];
+
+    const tbUsers   = userRecords.filter(function(r) { return r.tbDiff !== null; });
+    const minTbDiff = tbUsers.length > 0 ? Math.min(...tbUsers.map(function(r) { return r.tbDiff; })) : null;
+    const tbKings   = tbUsers.filter(function(r) { return r.tbDiff === minTbDiff; });
+
+    const pickCounts = {};
+    users.forEach(function(doc) {
+      [doc.pick1, doc.pick2, doc.pick3, doc.pick4, doc.pick5].forEach(function(p) {
+        if (p && p.trim()) {
+          const abbr = p.trim().toUpperCase();
+          pickCounts[abbr] = (pickCounts[abbr] || 0) + 1;
+        }
+      });
+    });
+    const maxCount  = Math.max(...Object.values(pickCounts));
+    const hotPicks  = Object.keys(pickCounts).filter(function(k) { return pickCounts[k] === maxCount; });
+
+    // ── Cards ──
+    function makeCard(cls, label, value, sub) {
+      const card = document.createElement('div');
+      card.className = 'recap-card ' + cls;
+      card.innerHTML =
+        '<div class="recap-card-label">' + label + '</div>' +
+        '<div class="recap-card-value">' + value + '</div>' +
+        (sub ? '<div class="recap-card-sub">' + sub + '</div>' : '');
+      return card;
+    }
+
+    const cards = document.createElement('div');
+    cards.className = 'recap-cards';
+
+    if (bestUsers.length > 0) {
+      const names = bestUsers.map(function(r) { return r.doc.teamName || r.doc.email; }).join(', ');
+      const perfect = maxWins === 5 && bestUsers[0].losses === 0;
+      cards.appendChild(makeCard(
+        perfect ? 'gold' : 'green',
+        perfect ? '🏆 Perfect Week' : '🏆 Best of the Week',
+        names,
+        maxWins + '-' + bestUsers[0].losses + (bestUsers[0].pending > 0 ? ' (' + bestUsers[0].pending + ' pending)' : '')
+      ));
+    }
+
+    if (worstUsers.length > 0 && allFinal && !(worstUsers.length === users.length)) {
+      const names = worstUsers.map(function(r) { return r.doc.teamName || r.doc.email; }).join(', ');
+      cards.appendChild(makeCard(
+        'red',
+        minWins === 0 ? '💀 Winless' : '📉 Rough Week',
+        names,
+        minWins + '-' + worstUsers[0].losses
+      ));
+    }
+
+    if (tbKings.length > 0 && minTbDiff !== null) {
+      const names = tbKings.map(function(r) { return r.doc.teamName || r.doc.email; }).join(', ');
+      const exact = minTbDiff === 0;
+      cards.appendChild(makeCard(
+        exact ? 'gold' : '',
+        '🎯 Tiebreaker',
+        names,
+        exact ? 'Exact! (' + tbKings[0].doc.tiebreaker + ')' : '+' + minTbDiff + ' off (' + tbKings[0].doc.tiebreaker + ')'
+      ));
+    }
+
+    if (hotPicks.length > 0 && maxCount > 1) {
+      const logoHtml = hotPicks.map(function(abbr) {
+        const logo = getTeamLogo(abbr);
+        return (logo ? '<img src="' + logo + '" style="width:18px;height:18px;object-fit:contain;vertical-align:middle;margin-right:3px;">' : '') + abbr;
+      }).join(', ');
+      cards.appendChild(makeCard(
+        '',
+        '🔥 Most Popular Pick',
+        logoHtml,
+        maxCount + ' of ' + users.length + ' teams'
+      ));
+    }
+
+    if (cards.children.length > 0) contentEl.appendChild(cards);
+
+    // ── Picks Table ──
+    userRecords.sort(function(a, b) {
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      return a.losses - b.losses;
+    });
+
+    const wrap  = document.createElement('div');
+    wrap.className = 'wp-table-wrap';
+    const table = document.createElement('table');
+    table.className = 'wp-table';
+
+    const thead = document.createElement('thead');
+    const hrow  = document.createElement('tr');
+    ['User','Pick 1','Pick 2','Pick 3','Pick 4','Pick 5','Record','Tiebreaker'].forEach(function(h) {
+      const th = document.createElement('th');
+      th.textContent = h;
+      hrow.appendChild(th);
+    });
+    thead.appendChild(hrow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    userRecords.forEach(function(rec) {
+      const doc = rec.doc;
+      const tr  = document.createElement('tr');
+
+      const nameTd = document.createElement('td');
+      nameTd.className  = 'wp-email';
+      nameTd.textContent = doc.teamName || doc.email || '—';
+      tr.appendChild(nameTd);
+
+      const picks   = [doc.pick1,   doc.pick2,   doc.pick3,   doc.pick4,   doc.pick5];
+      const spreads = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5];
+
+      picks.forEach(function(pick, pi) {
+        const td = document.createElement('td');
+        if (pick && pick.trim()) {
+          const chip    = document.createElement('span');
+          chip.className = 'wp-pick';
+          const spread   = spreads[pi] || '';
+          const abbr     = pick.trim().toUpperCase();
+          const gameData = scoresMap && scoresMap[abbr];
+
+          if (!gameData || !gameData.started) {
+            chip.classList.add('hidden');
+            chip.textContent = 'Not started';
+          } else {
+            const logo = getTeamLogo(abbr);
+            if (logo) {
+              const img = document.createElement('img');
+              img.src = logo; img.alt = abbr;
+              chip.appendChild(img);
+            }
+            chip.appendChild(document.createTextNode(abbr + (spread ? ' ' + spread : '')));
+            const result = getPickResult(abbr, spread, scoresMap);
+            if (result === 'win')  chip.classList.add('win');
+            else if (result === 'loss') chip.classList.add('loss');
+          }
+          td.appendChild(chip);
+        } else {
+          td.textContent = '—';
+          td.style.color = 'var(--muted)';
+        }
+        tr.appendChild(td);
+      });
+
+      const recordTd = document.createElement('td');
+      recordTd.className = 'wp-record';
+      if (rec.wins > 0 || rec.losses > 0) {
+        recordTd.innerHTML =
+          '<span class="wins">'   + rec.wins   + 'W</span> ' +
+          '<span class="losses">' + rec.losses + 'L</span>' +
+          (rec.pending > 0 ? ' <span class="pending">(' + rec.pending + ' pending)</span>' : '');
+      } else {
+        recordTd.innerHTML = '<span class="pending">Pending</span>';
+      }
+      tr.appendChild(recordTd);
+
+      const tbTd = document.createElement('td');
+      if (doc.tiebreaker !== undefined && doc.tiebreaker !== '') {
+        const actualTotal = getActualTiebreaker(scoresMap);
+        if (actualTotal !== null) {
+          const diff = Math.abs(parseInt(doc.tiebreaker) - actualTotal);
+          tbTd.innerHTML = '<strong>' + doc.tiebreaker + '</strong> <span class="' + (diff === 0 ? 'tb-diff-exact' : 'tb-diff-normal') + '">(' + (diff === 0 ? 'exact!' : '+' + diff) + ')</span>';
+        } else {
+          tbTd.innerHTML = '<strong>' + doc.tiebreaker + '</strong>';
+        }
+        tbTd.style.fontSize = '16px';
+        tbTd.style.color    = 'var(--text)';
+      } else {
+        tbTd.textContent   = '—';
+        tbTd.style.color   = 'var(--muted)';
+      }
+      tr.appendChild(tbTd);
+
+      tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    contentEl.appendChild(wrap);
+
+  } catch(err) {
+    loadingEl.style.display = 'none';
+    errorEl.style.display   = 'block';
+    errorEl.textContent     = 'Unable to load recap. Please try again.';
+    console.error(err);
+  }
+}
+
 </script>
 
+
+
+<!-- ═══ WEEKLY RECAP PAGE ═══ -->
+<div class="page with-nav" id="weeklyRecapPage">
+  <div class="container" style="max-width:900px;">
+    <div class="page-header">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <div>
+          <div class="page-title">Weekly Recap</div>
+          <div class="page-subtitle" id="recapSubtitle">Loading…</div>
+          <div class="page-divider"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding-top:6px;">
+          <button class="week-nav-btn" id="recapPrev" onclick="changeRecapWeek(-1)">&#8592;</button>
+          <span id="recapWeekLabel" style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:0.1em;color:var(--text);min-width:80px;text-align:center;">—</span>
+          <button class="week-nav-btn" id="recapNext" onclick="changeRecapWeek(1)">&#8594;</button>
+        </div>
+      </div>
+    </div>
+    <div id="recapLoading" class="picks-loading">
+      <div class="loading-spinner"></div>
+      <p>Loading recap…</p>
+    </div>
+    <div id="recapError" class="picks-error" style="display:none;"></div>
+    <div id="recapContent"></div>
+  </div>
+</div>
 
 
 <!-- ═══ WEEKLY PICKS PAGE ═══ -->
@@ -5529,6 +5937,6 @@ async function loadWeeklyPicks() {
   </div>
 </div>
 
-<div class="version-badge">v1.0.1</div>
+<div class="version-badge">v1.0.2</div>
 </body>
 </html>
