@@ -5206,7 +5206,7 @@ async function loadWeeklyPicks() {
       });
     });
 
-    const sortedTeams = Object.keys(pickCounts).sort(function(a, b) { return pickCounts[b] - pickCounts[a]; });
+    const sortedTeams = Object.keys(pickCounts).sort(function(a, b) { return a.localeCompare(b); });
 
     if (sortedTeams.length > 0) {
       const distWrap = document.createElement('div');
@@ -5325,27 +5325,39 @@ async function changeRecapWeek(dir) {
   await renderRecapWeek();
 }
 
+function makeRecapCard(cls, label, value, sub) {
+  const card = document.createElement('div');
+  card.className = 'recap-card ' + cls;
+  card.innerHTML =
+    '<div class="recap-card-label">' + label + '</div>' +
+    '<div class="recap-card-value">' + value + '</div>' +
+    (sub ? '<div class="recap-card-sub">' + sub + '</div>' : '');
+  return card;
+}
+
 async function renderRecapWeek() {
-  const loadingEl  = document.getElementById('recapLoading');
-  const errorEl    = document.getElementById('recapError');
-  const contentEl  = document.getElementById('recapContent');
-  const subtitleEl = document.getElementById('recapSubtitle');
-  const weekLbl    = document.getElementById('recapWeekLabel');
-  const week       = recapWeeks[recapWeekIdx];
-
-  loadingEl.style.display = 'block';
-  errorEl.style.display   = 'none';
-  contentEl.innerHTML     = '';
-
-  document.getElementById('recapPrev').disabled = recapWeekIdx === 0;
-  document.getElementById('recapNext').disabled = recapWeekIdx === recapWeeks.length - 1;
-  weekLbl.textContent    = week;
-  subtitleEl.textContent = week + ' · Recap';
-
   try {
+    const loadingEl  = document.getElementById('recapLoading');
+    const errorEl    = document.getElementById('recapError');
+    const contentEl  = document.getElementById('recapContent');
+    const subtitleEl = document.getElementById('recapSubtitle');
+    const weekLbl    = document.getElementById('recapWeekLabel');
+    const week       = recapWeeks[recapWeekIdx];
+
+    if (loadingEl) loadingEl.style.display = 'block';
+    if (errorEl)   errorEl.style.display   = 'none';
+    if (contentEl) contentEl.innerHTML     = '';
+
+    const prevBtn = document.getElementById('recapPrev');
+    const nextBtn = document.getElementById('recapNext');
+    if (prevBtn) prevBtn.disabled = recapWeekIdx === 0;
+    if (nextBtn) nextBtn.disabled = recapWeekIdx === recapWeeks.length - 1;
+    if (weekLbl)    weekLbl.textContent    = week || '—';
+    if (subtitleEl) subtitleEl.textContent = (week || '—') + ' · Recap';
+
     const weekPicks = (recapAllPicks || []).filter(function(d) { return d.week === week; });
     const scoresMap = await fetchESPNScoresMap(week);
-    loadingEl.style.display = 'none';
+    if (loadingEl) loadingEl.style.display = 'none';
 
     if (weekPicks.length === 0) {
       contentEl.innerHTML = '<div class="wp-empty">No picks found for ' + week + '.</div>';
@@ -5406,23 +5418,13 @@ async function renderRecapWeek() {
     const hotPicks  = Object.keys(pickCounts).filter(function(k) { return pickCounts[k] === maxCount; });
 
     // ── Cards ──
-    function makeCard(cls, label, value, sub) {
-      const card = document.createElement('div');
-      card.className = 'recap-card ' + cls;
-      card.innerHTML =
-        '<div class="recap-card-label">' + label + '</div>' +
-        '<div class="recap-card-value">' + value + '</div>' +
-        (sub ? '<div class="recap-card-sub">' + sub + '</div>' : '');
-      return card;
-    }
-
     const cards = document.createElement('div');
     cards.className = 'recap-cards';
 
     if (bestUsers.length > 0) {
       const names = bestUsers.map(function(r) { return r.doc.teamName || r.doc.email; }).join(', ');
       const perfect = maxWins === 5 && bestUsers[0].losses === 0;
-      cards.appendChild(makeCard(
+      cards.appendChild(makeRecapCard(
         perfect ? 'gold' : 'green',
         perfect ? '🏆 Perfect Week' : '🏆 Best of the Week',
         names,
@@ -5432,7 +5434,7 @@ async function renderRecapWeek() {
 
     if (worstUsers.length > 0 && allFinal && !(worstUsers.length === users.length)) {
       const names = worstUsers.map(function(r) { return r.doc.teamName || r.doc.email; }).join(', ');
-      cards.appendChild(makeCard(
+      cards.appendChild(makeRecapCard(
         'red',
         minWins === 0 ? '💀 Winless' : '📉 Rough Week',
         names,
@@ -5443,7 +5445,7 @@ async function renderRecapWeek() {
     if (tbKings.length > 0 && minTbDiff !== null) {
       const names = tbKings.map(function(r) { return r.doc.teamName || r.doc.email; }).join(', ');
       const exact = minTbDiff === 0;
-      cards.appendChild(makeCard(
+      cards.appendChild(makeRecapCard(
         exact ? 'gold' : '',
         '🎯 Tiebreaker',
         names,
@@ -5456,7 +5458,7 @@ async function renderRecapWeek() {
         const logo = getTeamLogo(abbr);
         return (logo ? '<img src="' + logo + '" style="width:18px;height:18px;object-fit:contain;vertical-align:middle;margin-right:3px;">' : '') + abbr;
       }).join(', ');
-      cards.appendChild(makeCard(
+      cards.appendChild(makeRecapCard(
         '',
         '🔥 Most Popular Pick',
         logoHtml,
@@ -5569,9 +5571,10 @@ async function renderRecapWeek() {
     contentEl.appendChild(wrap);
 
   } catch(err) {
-    loadingEl.style.display = 'none';
-    errorEl.style.display   = 'block';
-    errorEl.textContent     = 'Unable to load recap. Please try again.';
+    const loadingEl = document.getElementById('recapLoading');
+    const errorEl   = document.getElementById('recapError');
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (errorEl) { errorEl.style.display = 'block'; errorEl.textContent = 'Unable to load recap. Please try again.'; }
     console.error(err);
   }
 }
