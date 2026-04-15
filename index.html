@@ -1407,6 +1407,55 @@
   .wp-record .pending { color: var(--muted); font-size: 12px; font-family: 'Barlow Condensed', sans-serif; }
 
 
+  /* ── PICK DISTRIBUTION ── */
+  .wp-dist {
+    margin-top: 28px;
+  }
+  .wp-dist-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .wp-dist-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .wp-dist-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 12px 7px 9px;
+    min-width: 110px;
+  }
+  .wp-dist-item img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    flex-shrink: 0;
+  }
+  .wp-dist-item .wp-dist-abbr {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 16px;
+    letter-spacing: 0.08em;
+    color: var(--text);
+    flex: 1;
+  }
+  .wp-dist-item .wp-dist-count {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+    line-height: 1;
+  }
+  [data-theme="light"] .wp-dist-item { background: #f5f6fa; }
+
   /* ── RESULTS PAGE ── */
   .results-wrap {
     overflow-x: auto;
@@ -5081,6 +5130,62 @@ async function loadWeeklyPicks() {
     table.appendChild(tbody);
     wrap.appendChild(table);
     tableEl.appendChild(wrap);
+
+    // ── Pick Distribution ──
+    const pickCounts = {};
+    users.forEach(function(doc) {
+      [doc.pick1, doc.pick2, doc.pick3, doc.pick4, doc.pick5].forEach(function(pick) {
+        if (pick && pick.trim()) {
+          const abbr = pick.trim().toUpperCase();
+          pickCounts[abbr] = (pickCounts[abbr] || 0) + 1;
+        }
+      });
+    });
+
+    const sortedTeams = Object.keys(pickCounts).sort(function(a, b) {
+      return pickCounts[b] - pickCounts[a];
+    });
+
+    if (sortedTeams.length > 0) {
+      const distWrap = document.createElement('div');
+      distWrap.className = 'wp-dist';
+
+      const distTitle = document.createElement('div');
+      distTitle.className = 'wp-dist-title';
+      distTitle.textContent = 'Pick Distribution';
+      distWrap.appendChild(distTitle);
+
+      const grid = document.createElement('div');
+      grid.className = 'wp-dist-grid';
+
+      sortedTeams.forEach(function(abbr) {
+        const item = document.createElement('div');
+        item.className = 'wp-dist-item';
+
+        const logo = getTeamLogo(abbr);
+        if (logo) {
+          const img = document.createElement('img');
+          img.src = logo;
+          img.alt = abbr;
+          item.appendChild(img);
+        }
+
+        const name = document.createElement('span');
+        name.className = 'wp-dist-abbr';
+        name.textContent = abbr;
+        item.appendChild(name);
+
+        const count = document.createElement('span');
+        count.className = 'wp-dist-count';
+        count.textContent = pickCounts[abbr];
+        item.appendChild(count);
+
+        grid.appendChild(item);
+      });
+
+      distWrap.appendChild(grid);
+      tableEl.appendChild(distWrap);
+    }
 
   } catch(err) {
     loadingEl.style.display = 'none';
