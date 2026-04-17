@@ -3691,7 +3691,7 @@ async function fetchScores() {
       const stateType = status.type.state;
       const statusStr = status.type.shortDetail || '';
       const broadcasts = comp.broadcasts || [];
-      const network   = broadcasts.length > 0 && broadcasts[0].names ? broadcasts[0].names[0] : '';
+      const network   = broadcasts.flatMap(function(b) { return b.names || []; }).join(' · ');
 
       const home = comp.competitors.find(function(c) { return c.homeAway === 'home'; });
       const away = comp.competitors.find(function(c) { return c.homeAway === 'away'; });
@@ -3908,7 +3908,7 @@ async function fetchNbaScores() {
       const stateType = status.type.state;
       const statusStr = status.type.shortDetail || '';
       const broadcasts = comp.broadcasts || [];
-      const network   = broadcasts.length > 0 && broadcasts[0].names ? broadcasts[0].names[0] : '';
+      const network   = broadcasts.flatMap(function(b) { return b.names || []; }).join(' · ');
 
       const home = comp.competitors.find(function(c) { return c.homeAway === 'home'; });
       const away = comp.competitors.find(function(c) { return c.homeAway === 'away'; });
@@ -4083,7 +4083,7 @@ async function fetchMlbScores() {
       const stateType = status.type.state;
       const statusStr = status.type.shortDetail || '';
       const broadcasts = comp.broadcasts || [];
-      const network   = broadcasts.length > 0 && broadcasts[0].names ? broadcasts[0].names[0] : '';
+      const network   = broadcasts.flatMap(function(b) { return b.names || []; }).join(' · ');
 
       const home = comp.competitors.find(function(c) { return c.homeAway === 'home'; });
       const away = comp.competitors.find(function(c) { return c.homeAway === 'away'; });
