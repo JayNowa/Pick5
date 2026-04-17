@@ -936,6 +936,40 @@
     color: var(--text);
   }
   .gd-stats-table td:first-child { text-align: left; color: var(--muted); }
+  .gd-player-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .gd-player-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    min-width: 380px;
+  }
+  .gd-player-table thead th {
+    text-align: right;
+    padding: 5px 8px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .gd-player-table thead th:first-child { text-align: left; }
+  .gd-player-table td {
+    text-align: right;
+    padding: 5px 8px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .gd-player-name {
+    text-align: left !important;
+    color: var(--text) !important;
+    font-weight: 500;
+    min-width: 120px;
+  }
+
   .gd-loading {
     padding: 48px 24px;
     text-align: center;
@@ -4896,6 +4930,62 @@ function renderGameDetail(data, sport) {
     }
   }
 
+  // MLB player stats (batting + pitching)
+  if (sport === 'baseball' && !isPre) {
+    const playerGroups = (data.boxscore && data.boxscore.players) || [];
+    ['away', 'home'].forEach(function(side) {
+      const group = playerGroups.find(function(g) { return g.homeAway === side; });
+      if (!group) return;
+      const teamAbbr = (side === 'away' ? awayTeam : homeTeam).abbreviation || side;
+      const stats = group.statistics || [];
+
+      const batting = stats.find(function(s) { return s.name === 'batting'; });
+      if (batting && batting.athletes && batting.athletes.length > 0) {
+        const batKeys = batting.keys || batting.labels || [];
+        const wantedBat = ['AB','R','H','RBI','HR','BB','SO'];
+        const colIdx = wantedBat.map(function(k) {
+          const i = batKeys.findIndex(function(bk) { return bk === k || bk.toUpperCase() === k; });
+          return i;
+        });
+        html += '<div class="gd-section"><div class="gd-section-title">' + escHtml(teamAbbr) + ' Batting</div>';
+        html += '<div class="gd-player-table-wrap"><table class="gd-player-table"><thead><tr><th>Player</th>';
+        wantedBat.forEach(function(k) { html += '<th>' + escHtml(k) + '</th>'; });
+        html += '</tr></thead><tbody>';
+        batting.athletes.forEach(function(a) {
+          if (!a.athlete) return;
+          html += '<tr><td class="gd-player-name">' + escHtml(a.athlete.shortName || a.athlete.displayName || '') + '</td>';
+          colIdx.forEach(function(ci) {
+            html += '<td>' + (ci >= 0 && a.stats && a.stats[ci] !== undefined ? escHtml(String(a.stats[ci])) : '—') + '</td>';
+          });
+          html += '</tr>';
+        });
+        html += '</tbody></table></div></div>';
+      }
+
+      const pitching = stats.find(function(s) { return s.name === 'pitching'; });
+      if (pitching && pitching.athletes && pitching.athletes.length > 0) {
+        const pitKeys = pitching.keys || pitching.labels || [];
+        const wantedPit = ['IP','H','R','ER','BB','SO','ERA'];
+        const colIdx = wantedPit.map(function(k) {
+          return pitKeys.findIndex(function(pk) { return pk === k || pk.toUpperCase() === k; });
+        });
+        html += '<div class="gd-section"><div class="gd-section-title">' + escHtml(teamAbbr) + ' Pitching</div>';
+        html += '<div class="gd-player-table-wrap"><table class="gd-player-table"><thead><tr><th>Pitcher</th>';
+        wantedPit.forEach(function(k) { html += '<th>' + escHtml(k) + '</th>'; });
+        html += '</tr></thead><tbody>';
+        pitching.athletes.forEach(function(a) {
+          if (!a.athlete) return;
+          html += '<tr><td class="gd-player-name">' + escHtml(a.athlete.shortName || a.athlete.displayName || '') + '</td>';
+          colIdx.forEach(function(ci) {
+            html += '<td>' + (ci >= 0 && a.stats && a.stats[ci] !== undefined ? escHtml(String(a.stats[ci])) : '—') + '</td>';
+          });
+          html += '</tr>';
+        });
+        html += '</tbody></table></div></div>';
+      }
+    });
+  }
+
   html += '</div>'; // end gd-body
   return html;
 }
@@ -6780,7 +6870,7 @@ document.addEventListener('keydown', function(e) {
   </div>
 </div>
 
-<div class="version-badge">v1.0.5</div>
+<div class="version-badge">v1.0.6</div>
 
 <!-- ═══ GAME DETAIL MODAL ═══ -->
 <div id="gameDetailOverlay" style="display:none;" onclick="if(event.target===this)closeGameModal()">
