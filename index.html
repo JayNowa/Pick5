@@ -4907,7 +4907,7 @@ async function loadLeaderboard() {
 
         let weekPending = 0;
         picks.forEach(function(pick, pi) {
-          if (!pick || !pick.trim()) return;
+          if (!pick || !pick.trim()) { totalLosses++; return; }
           const result = getPickResult(pick, spreads[pi] || '', weekScores);
           if (result === 'win')       totalWins++;
           else if (result === 'loss') totalLosses++;
@@ -5106,7 +5106,7 @@ async function loadResultsPage() {
 
         let w = 0, l = 0, p = 0;
         picks.forEach(function(pick, pi) {
-          if (!pick || !pick.trim()) return;
+          if (!pick || !pick.trim()) { l++; return; }
           const result = getPickResult(pick, spreads[pi] || '', weekScores);
           if (result === 'win')       w++;
           else if (result === 'loss') l++;
@@ -5352,6 +5352,7 @@ async function loadWeeklyPicks() {
           td.appendChild(chip);
         } else {
           td.textContent = '—'; td.style.color = 'var(--muted)';
+          losses++;
         }
         tr.appendChild(td);
       });
@@ -5581,7 +5582,7 @@ async function renderRecapWeek() {
       const spreads = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5];
       let wins = 0, losses = 0, pending = 0;
       picks.forEach(function(pick, i) {
-        if (!pick || !pick.trim()) return;
+        if (!pick || !pick.trim()) { losses++; return; }
         const r = getPickResult(pick.trim().toUpperCase(), spreads[i] || '', scoresMap);
         if (r === 'win') wins++;
         else if (r === 'loss') losses++;
@@ -6150,6 +6151,6 @@ async function renderRecapWeek() {
   </div>
 </div>
 
-<div class="version-badge">v1.0.2</div>
+<div class="version-badge">v1.0.3</div>
 </body>
 </html>
