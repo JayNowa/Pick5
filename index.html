@@ -2086,6 +2086,125 @@
     font-weight: 700;
   }
 
+  /* ── TRASH TALK PAGE ── */
+  .tt-post-form {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  .tt-post-form textarea {
+    width: 100%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1.5;
+    padding: 12px 14px;
+    resize: vertical;
+    min-height: 80px;
+    box-sizing: border-box;
+    transition: border-color 0.18s;
+  }
+  .tt-post-form textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .tt-post-form textarea::placeholder { color: var(--muted); }
+  .tt-post-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+  }
+  .tt-char-count {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .tt-char-count.over { color: var(--error); }
+  .btn-tt-post {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #1a1400;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 22px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.18s;
+  }
+  .btn-tt-post:hover:not(:disabled) { opacity: 0.88; }
+  .btn-tt-post:disabled { opacity: 0.4; cursor: not-allowed; }
+  .tt-feed { display: flex; flex-direction: column; gap: 12px; }
+  .tt-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 20px;
+    transition: border-color 0.18s;
+  }
+  .tt-card:hover { border-color: rgba(200,169,74,0.3); }
+  .tt-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+  }
+  .tt-author {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .tt-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .tt-time {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .tt-delete-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 3px 8px;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .tt-delete-btn:hover { color: var(--error); border-color: var(--error); }
+  .tt-message {
+    font-size: 15px;
+    color: var(--text);
+    line-height: 1.55;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+  .tt-empty {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--muted);
+    font-size: 15px;
+  }
+  .tt-empty-icon { font-size: 36px; margin-bottom: 12px; }
+  .tt-loading {
+    text-align: center;
+    padding: 40px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  [data-theme="light"] .tt-post-form { background: var(--surface); border-color: var(--border); }
+  [data-theme="light"] .tt-post-form textarea { background: #f5f7fb; border-color: var(--border); color: var(--text); }
+  [data-theme="light"] .tt-card { background: var(--surface); border-color: var(--border); }
+  [data-theme="light"] .tt-message { color: var(--text); }
+
 </style>
 </head>
 <body>
@@ -2105,6 +2224,7 @@
     <button class="nav-link" id="navRecords" onclick="showPage('records')">Records</button>
     <button class="nav-link" id="navWeeklyRecap" onclick="showPage('weeklyRecap')">Recap</button>
     <button class="nav-link" id="navNbaScores" onclick="showPage('nbaScores')" style="display:none;">NBA Scores</button>
+    <button class="nav-link" id="navTrashTalk" onclick="showPage('trashTalk')">💬 Trash Talk</button>
   </div>
   <div class="nav-right">
     <span class="nav-user">Signed in as <strong id="navEmail" data-email="" data-teamname=""></strong></span>
@@ -2250,7 +2370,7 @@
 </div>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, query, where, getDocs, doc, setDoc, getDoc, deleteDoc, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, collection, addDoc, query, where, getDocs, doc, setDoc, getDoc, deleteDoc, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyC6wED6bBvMNGiQFFEGHdQGSP7iKGSIdvk",
@@ -2414,6 +2534,27 @@
       const takenInPending  = pendingSnap.docs.some(d => (d.data().teamName || '').trim().toLowerCase() === normalised);
       return takenInApproved || takenInPending;
     } catch(e) { console.error('fbCheckTeamNameTaken:', e); return false; }
+  };
+
+  window.fbSaveTrashTalk = async function(payload) {
+    await addDoc(collection(db, "trashTalk"), {
+      fromEmail:    payload.fromEmail.toLowerCase(),
+      fromTeamName: payload.fromTeamName,
+      message:      payload.message,
+      timestamp:    Date.now()
+    });
+  };
+
+  window.fbGetTrashTalk = async function() {
+    try {
+      const q = query(collection(db, "trashTalk"), orderBy("timestamp", "desc"), limit(100));
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch(e) { console.error('fbGetTrashTalk:', e); return []; }
+  };
+
+  window.fbDeleteTrashTalk = async function(docId) {
+    await deleteDoc(doc(db, "trashTalk", docId));
   };
 </script>
 
@@ -2639,6 +2780,7 @@ async function showPage(page) {
   document.getElementById('rulesPage').style.display          = 'none';
   document.getElementById('recordsPage').style.display        = 'none';
   document.getElementById('weeklyRecapPage').style.display    = 'none';
+  document.getElementById('trashTalkPage').style.display      = 'none';
 
   document.getElementById('navSelector').classList.remove('active');
   document.getElementById('navMyPicks').classList.remove('active');
@@ -2651,6 +2793,7 @@ async function showPage(page) {
   document.getElementById('navRules').classList.remove('active');
   document.getElementById('navRecords').classList.remove('active');
   document.getElementById('navWeeklyRecap').classList.remove('active');
+  document.getElementById('navTrashTalk').classList.remove('active');
   clearInterval(scoresRefreshTimer);
   clearInterval(nbaScoresRefreshTimer);
 
@@ -2734,6 +2877,12 @@ async function showPage(page) {
     p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
     document.getElementById('navWeeklyRecap').classList.add('active');
     initWeeklyRecap();
+  } else if (page === 'trashTalk') {
+    const p = document.getElementById('trashTalkPage');
+    p.style.display = 'flex';
+    p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
+    document.getElementById('navTrashTalk').classList.add('active');
+    loadTrashTalk();
   }
 }
 
@@ -2757,6 +2906,7 @@ function logout() {
   document.getElementById('rulesPage').style.display          = 'none';
   document.getElementById('recordsPage').style.display        = 'none';
   document.getElementById('weeklyRecapPage').style.display    = 'none';
+  document.getElementById('trashTalkPage').style.display      = 'none';
   document.getElementById('navNbaScores').style.display  = 'none';
   clearInterval(nbaScoresRefreshTimer);
   currentActiveWeek = null;
@@ -2766,6 +2916,105 @@ function logout() {
   document.getElementById('spreadsSection').style.display = 'none';
   selectedPicks = [];
   clearInterval(scoresRefreshTimer);
+}
+
+// ── Trash Talk ──
+function ttRelativeTime(ts) {
+  const diff = Date.now() - ts;
+  const mins  = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days  = Math.floor(diff / 86400000);
+  if (mins < 1)   return 'just now';
+  if (mins < 60)  return mins + 'm ago';
+  if (hours < 24) return hours + 'h ago';
+  if (days < 7)   return days + 'd ago';
+  return new Date(ts).toLocaleDateString();
+}
+
+function ttUpdateCharCount() {
+  const ta  = document.getElementById('ttTextarea');
+  const btn = document.getElementById('ttPostBtn');
+  const ctr = document.getElementById('ttCharCount');
+  if (!ta) return;
+  const len = ta.value.length;
+  ctr.textContent = len + ' / 280';
+  ctr.classList.toggle('over', len > 280);
+  btn.disabled = len === 0 || len > 280;
+}
+
+async function loadTrashTalk() {
+  const container = document.getElementById('ttFeedContainer');
+  container.innerHTML = '<div class="tt-loading">Loading messages…</div>';
+  const posts = await window.fbGetTrashTalk();
+  const currentEmail = (document.getElementById('navEmail').dataset.email || '').toLowerCase();
+  const isAdmin = ADMIN_EMAILS.includes(currentEmail);
+
+  if (posts.length === 0) {
+    container.innerHTML = '<div class="tt-empty"><div class="tt-empty-icon">💬</div>No trash talk yet. Be the first.</div>';
+    return;
+  }
+
+  const feed = document.createElement('div');
+  feed.className = 'tt-feed';
+  posts.forEach(function(post) {
+    const canDelete = isAdmin || post.fromEmail === currentEmail;
+    const card = document.createElement('div');
+    card.className = 'tt-card';
+    card.innerHTML =
+      '<div class="tt-card-header">' +
+        '<span class="tt-author">' + escHtml(post.fromTeamName || post.fromEmail) + '</span>' +
+        '<div class="tt-meta">' +
+          '<span class="tt-time">' + ttRelativeTime(post.timestamp) + '</span>' +
+          (canDelete ? '<button class="tt-delete-btn" onclick="deleteTrashTalk(\'' + post.id + '\', this)">Delete</button>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div class="tt-message">' + escHtml(post.message) + '</div>';
+    feed.appendChild(card);
+  });
+  container.innerHTML = '';
+  container.appendChild(feed);
+}
+
+async function submitTrashTalk() {
+  const ta  = document.getElementById('ttTextarea');
+  const btn = document.getElementById('ttPostBtn');
+  const msg = ta.value.trim();
+  if (!msg || msg.length > 280) return;
+
+  const emailEl   = document.getElementById('navEmail');
+  const email     = (emailEl.dataset.email || '').toLowerCase();
+  const teamName  = emailEl.dataset.teamname || email;
+
+  btn.disabled    = true;
+  btn.textContent = 'Posting…';
+  try {
+    await window.fbSaveTrashTalk({ fromEmail: email, fromTeamName: teamName, message: msg });
+    ta.value = '';
+    ttUpdateCharCount();
+    await loadTrashTalk();
+  } catch(e) {
+    console.error('submitTrashTalk:', e);
+    alert('Failed to post. Please try again.');
+  } finally {
+    btn.textContent = 'Post';
+  }
+}
+
+async function deleteTrashTalk(docId, btnEl) {
+  if (!confirm('Delete this post?')) return;
+  btnEl.disabled = true;
+  try {
+    await window.fbDeleteTrashTalk(docId);
+    await loadTrashTalk();
+  } catch(e) {
+    console.error('deleteTrashTalk:', e);
+    alert('Failed to delete.');
+    btnEl.disabled = false;
+  }
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ── Picks: toggle, render, counter ──
@@ -5826,6 +6075,29 @@ async function renderRecapWeek() {
     </div>
     <div class="admin-card">
       <div id="rulesContent"><div class="rules-loading">Loading rules…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TRASH TALK PAGE ═══ -->
+<div class="page with-nav" id="trashTalkPage">
+  <div class="container" style="max-width:680px;">
+    <div class="page-header">
+      <div class="page-title">💬 Trash Talk</div>
+      <div class="page-subtitle">Say your piece. Take your lumps.</div>
+      <div class="page-divider"></div>
+    </div>
+
+    <div class="tt-post-form">
+      <textarea id="ttTextarea" maxlength="280" placeholder="Drop your trash talk here…" oninput="ttUpdateCharCount()"></textarea>
+      <div class="tt-post-actions">
+        <span class="tt-char-count" id="ttCharCount">0 / 280</span>
+        <button class="btn-tt-post" id="ttPostBtn" onclick="submitTrashTalk()" disabled>Post</button>
+      </div>
+    </div>
+
+    <div id="ttFeedContainer">
+      <div class="tt-loading">Loading messages…</div>
     </div>
   </div>
 </div>
