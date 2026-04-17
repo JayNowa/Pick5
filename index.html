@@ -702,6 +702,12 @@
     justify-content: space-between;
     gap: 10px;
   }
+  .score-team-logo {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    flex-shrink: 0;
+  }
 
   .score-team-name {
     font-family: 'Barlow Condensed', sans-serif;
@@ -3705,6 +3711,8 @@ async function fetchScores() {
       const homeName   = home && home.team ? home.team.shortDisplayName : 'Home';
       const awayRecord = away && away.records && away.records[0] ? away.records[0].summary : '';
       const homeRecord = home && home.records && home.records[0] ? home.records[0].summary : '';
+      const awayLogoUrl = (away && away.team && away.team.logo) || ('https://a.espncdn.com/i/teamlogos/nfl/500/' + (away && away.team ? away.team.abbreviation.toLowerCase() : 'nfl') + '.png');
+      const homeLogoUrl = (home && home.team && home.team.logo) || ('https://a.espncdn.com/i/teamlogos/nfl/500/' + (home && home.team ? home.team.abbreviation.toLowerCase() : 'nfl') + '.png');
 
       const cardHeader = document.createElement('div');
       cardHeader.className = 'score-card-header';
@@ -3724,6 +3732,8 @@ async function fetchScores() {
 
       const awayRow = document.createElement('div');
       awayRow.className = 'score-team';
+      const awayLogoEl = document.createElement('img');
+      awayLogoEl.className = 'score-team-logo'; awayLogoEl.src = awayLogoUrl; awayLogoEl.alt = awayName;
       const awayInfo = document.createElement('div');
       const awayNameEl = document.createElement('div');
       awayNameEl.className = 'score-team-name' + (awayWins ? ' winner' : '');
@@ -3735,13 +3745,15 @@ async function fetchScores() {
       const awayPts = document.createElement('div');
       awayPts.className = 'score-points' + (awayWins ? ' winner' : '') + (isPre ? ' tbd' : '');
       awayPts.textContent = isPre ? '—' : awayScore;
-      awayRow.appendChild(awayInfo); awayRow.appendChild(awayPts);
+      awayRow.appendChild(awayLogoEl); awayRow.appendChild(awayInfo); awayRow.appendChild(awayPts);
 
       const dividerEl = document.createElement('div');
       dividerEl.className = 'score-divider';
 
       const homeRow = document.createElement('div');
       homeRow.className = 'score-team';
+      const homeLogoEl = document.createElement('img');
+      homeLogoEl.className = 'score-team-logo'; homeLogoEl.src = homeLogoUrl; homeLogoEl.alt = homeName;
       const homeInfo = document.createElement('div');
       const homeNameEl = document.createElement('div');
       homeNameEl.className = 'score-team-name' + (homeWins ? ' winner' : '');
@@ -3753,7 +3765,7 @@ async function fetchScores() {
       const homePts = document.createElement('div');
       homePts.className = 'score-points' + (homeWins ? ' winner' : '') + (isPre ? ' tbd' : '');
       homePts.textContent = isPre ? '—' : homeScore;
-      homeRow.appendChild(homeInfo); homeRow.appendChild(homePts);
+      homeRow.appendChild(homeLogoEl); homeRow.appendChild(homeInfo); homeRow.appendChild(homePts);
 
       matchup.appendChild(awayRow); matchup.appendChild(dividerEl); matchup.appendChild(homeRow);
       cardBody.appendChild(matchup);
@@ -3883,6 +3895,8 @@ async function fetchNbaScores() {
       const homeName   = home && home.team ? home.team.shortDisplayName : 'Home';
       const awayRecord = away && away.records && away.records[0] ? away.records[0].summary : '';
       const homeRecord = home && home.records && home.records[0] ? home.records[0].summary : '';
+      const awayLogoUrl = (away && away.team && away.team.logo) || ('https://a.espncdn.com/i/teamlogos/nfl/500/' + (away && away.team ? away.team.abbreviation.toLowerCase() : 'nfl') + '.png');
+      const homeLogoUrl = (home && home.team && home.team.logo) || ('https://a.espncdn.com/i/teamlogos/nfl/500/' + (home && home.team ? home.team.abbreviation.toLowerCase() : 'nfl') + '.png');
 
       const cardHeader = document.createElement('div');
       cardHeader.className = 'score-card-header';
@@ -3902,6 +3916,8 @@ async function fetchNbaScores() {
 
       const awayRow = document.createElement('div');
       awayRow.className = 'score-team';
+      const awayLogoEl = document.createElement('img');
+      awayLogoEl.className = 'score-team-logo'; awayLogoEl.src = awayLogoUrl; awayLogoEl.alt = awayName;
       const awayInfo = document.createElement('div');
       const awayNameEl = document.createElement('div');
       awayNameEl.className = 'score-team-name' + (awayWins ? ' winner' : '');
@@ -3913,13 +3929,15 @@ async function fetchNbaScores() {
       const awayPts = document.createElement('div');
       awayPts.className = 'score-points' + (awayWins ? ' winner' : '') + (isPre ? ' tbd' : '');
       awayPts.textContent = isPre ? '—' : awayScore;
-      awayRow.appendChild(awayInfo); awayRow.appendChild(awayPts);
+      awayRow.appendChild(awayLogoEl); awayRow.appendChild(awayInfo); awayRow.appendChild(awayPts);
 
       const dividerEl = document.createElement('div');
       dividerEl.className = 'score-divider';
 
       const homeRow = document.createElement('div');
       homeRow.className = 'score-team';
+      const homeLogoEl = document.createElement('img');
+      homeLogoEl.className = 'score-team-logo'; homeLogoEl.src = homeLogoUrl; homeLogoEl.alt = homeName;
       const homeInfo = document.createElement('div');
       const homeNameEl = document.createElement('div');
       homeNameEl.className = 'score-team-name' + (homeWins ? ' winner' : '');
@@ -3931,7 +3949,7 @@ async function fetchNbaScores() {
       const homePts = document.createElement('div');
       homePts.className = 'score-points' + (homeWins ? ' winner' : '') + (isPre ? ' tbd' : '');
       homePts.textContent = isPre ? '—' : homeScore;
-      homeRow.appendChild(homeInfo); homeRow.appendChild(homePts);
+      homeRow.appendChild(homeLogoEl); homeRow.appendChild(homeInfo); homeRow.appendChild(homePts);
 
       matchup.appendChild(awayRow); matchup.appendChild(dividerEl); matchup.appendChild(homeRow);
       cardBody.appendChild(matchup);
