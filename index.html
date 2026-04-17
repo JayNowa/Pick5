@@ -2201,7 +2201,7 @@
     background: transparent;
     border: 1px solid transparent;
     border-radius: 6px;
-    color: var(--muted);
+    color: var(--text);
     cursor: pointer;
     font-size: 12px;
     padding: 3px 8px;
@@ -2281,7 +2281,7 @@
     background: transparent;
     border: 1px solid transparent;
     border-radius: 6px;
-    color: var(--muted);
+    color: var(--text);
     cursor: pointer;
     font-size: 12px;
     padding: 3px 8px;
@@ -4082,8 +4082,9 @@ function updateNbaDateLabel() {
   document.getElementById('nbaDateLabel').textContent = nbaDateLabel(nbaScoresDate);
   const today = new Date(); today.setHours(0,0,0,0);
   const cmp = new Date(nbaScoresDate); cmp.setHours(0,0,0,0);
+  const nbaMaxDate = new Date(today); nbaMaxDate.setDate(today.getDate() + 14);
   document.getElementById('nbaPrev').disabled = false;
-  document.getElementById('nbaNext').disabled = cmp >= today;
+  document.getElementById('nbaNext').disabled = cmp >= nbaMaxDate;
 }
 
 function changeNbaDate(dir) {
@@ -4265,8 +4266,9 @@ function updateMlbDateLabel() {
   document.getElementById('mlbDateLabel').textContent = mlbDateLabelStr(mlbScoresDate);
   const today = new Date(); today.setHours(0,0,0,0);
   const cmp = new Date(mlbScoresDate); cmp.setHours(0,0,0,0);
+  const mlbMaxDate = new Date(today); mlbMaxDate.setDate(today.getDate() + 14);
   document.getElementById('mlbPrev').disabled = false;
-  document.getElementById('mlbNext').disabled = cmp >= today;
+  document.getElementById('mlbNext').disabled = cmp >= mlbMaxDate;
 }
 
 function changeMlbDate(dir) {
