@@ -398,7 +398,7 @@
   .container { width: 100%; max-width: 680px; }
 
   #loginPage  { display: flex; }
-  #selectorPage, #myPicksPage, #scoresPage, #nbaScoresPage, #adminPage, #weeklyPicksPage, #resultsPage, #leaderboardPage, #usersPage, #teamDataPage, #rulesPage, #recordsPage, #weeklyRecapPage { display: none; }
+  #selectorPage, #myPicksPage, #scoresPage, #adminPage, #weeklyPicksPage, #resultsPage, #leaderboardPage, #usersPage, #teamDataPage, #rulesRecordsPage { display: none; }
 
   .pending-req-row {
     display: flex;
@@ -647,6 +647,29 @@
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: 14px;
   }
+  /* ── Scores tabs ── */
+  .scores-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .scores-tab {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 7px 18px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.18s;
+  }
+  .scores-tab:hover { border-color: var(--accent); color: var(--text); }
+  .scores-tab.active { background: var(--accent); border-color: var(--accent); color: #0a0c10; }
+
   .score-card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -2221,15 +2244,12 @@
   <div class="nav-links">
     <button class="nav-link active" id="navSelector" onclick="showPage('selector')">Pick 5</button>
     <button class="nav-link" id="navMyPicks" onclick="showPage('myPicks')">My Picks</button>
-    <button class="nav-link" id="navScores" onclick="showPage('scores')">NFL Scores</button>
+    <button class="nav-link" id="navScores" onclick="showPage('scores')">Scores</button>
     <button class="nav-link" id="navWeeklyPicks" onclick="showPage('weeklyPicks')">Weekly Picks</button>
     <button class="nav-link" id="navResults" onclick="showPage('results')">Results</button>
     <button class="nav-link" id="navLeaderboard" onclick="showPage('leaderboard')">Leaderboard</button>
     <button class="nav-link" id="navTeamData" onclick="showPage('teamData')">Team Data</button>
-    <button class="nav-link" id="navRules" onclick="showPage('rules')">Rules</button>
-    <button class="nav-link" id="navRecords" onclick="showPage('records')">Records</button>
-    <button class="nav-link" id="navWeeklyRecap" onclick="showPage('weeklyRecap')">Recap</button>
-    <button class="nav-link" id="navNbaScores" onclick="showPage('nbaScores')" style="display:none;">NBA Scores</button>
+    <button class="nav-link" id="navRulesRecords" onclick="showPage('rulesRecords')">Rules/Records</button>
     <button class="nav-link" id="navTrashTalk" onclick="showPage('trashTalk')">💬 Trash Talk</button>
   </div>
   <div class="nav-right">
@@ -2455,6 +2475,15 @@
 
   window.fbGetNbaVisible = async function() {
     const snap = await getDoc(doc(db, "settings", "nbaVisible"));
+    return snap.exists() ? snap.data().value : false;
+  };
+
+  window.fbSaveMlbVisible = async function(visible) {
+    await setDoc(doc(db, "settings", "mlbVisible"), { value: visible, updatedAt: Date.now() });
+  };
+
+  window.fbGetMlbVisible = async function() {
+    const snap = await getDoc(doc(db, "settings", "mlbVisible"));
     return snap.exists() ? snap.data().value : false;
   };
 
@@ -2758,13 +2787,13 @@ function afterLogin(email, teamName) {
       const w = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
       currentActiveWeek = w ? String(w) : null;
     } catch(e) {}
-    // Show NBA nav if enabled or if admin
+    // Show NBA/MLB score tabs if enabled or if admin
     try {
       const nbaVisible = window.fbGetNbaVisible ? await window.fbGetNbaVisible() : false;
+      const mlbVisible = window.fbGetMlbVisible ? await window.fbGetMlbVisible() : false;
       const isAdmin = email && ADMIN_EMAILS.includes(email.toLowerCase());
-      if (nbaVisible || isAdmin) {
-        document.getElementById('navNbaScores').style.display = '';
-      }
+      if (nbaVisible || isAdmin) document.getElementById('nbaTab').style.display = '';
+      if (mlbVisible || isAdmin) document.getElementById('mlbTab').style.display = '';
     } catch(e) {}
     await updateWeekBadge();
     await showPage('selector');
@@ -2776,32 +2805,27 @@ async function showPage(page) {
   document.getElementById('selectorPage').style.display     = 'none';
   document.getElementById('myPicksPage').style.display      = 'none';
   document.getElementById('scoresPage').style.display       = 'none';
-  document.getElementById('nbaScoresPage').style.display    = 'none';
   document.getElementById('adminPage').style.display        = 'none';
   document.getElementById('weeklyPicksPage').style.display  = 'none';
   document.getElementById('resultsPage').style.display      = 'none';
   document.getElementById('leaderboardPage').style.display  = 'none';
-  document.getElementById('usersPage').style.display         = 'none';
-  document.getElementById('teamDataPage').style.display       = 'none';
-  document.getElementById('rulesPage').style.display          = 'none';
-  document.getElementById('recordsPage').style.display        = 'none';
-  document.getElementById('weeklyRecapPage').style.display    = 'none';
-  document.getElementById('trashTalkPage').style.display      = 'none';
+  document.getElementById('usersPage').style.display        = 'none';
+  document.getElementById('teamDataPage').style.display     = 'none';
+  document.getElementById('rulesRecordsPage').style.display = 'none';
+  document.getElementById('trashTalkPage').style.display    = 'none';
 
   document.getElementById('navSelector').classList.remove('active');
   document.getElementById('navMyPicks').classList.remove('active');
   document.getElementById('navScores').classList.remove('active');
-  document.getElementById('navNbaScores').classList.remove('active');
   document.getElementById('navWeeklyPicks').classList.remove('active');
   document.getElementById('navResults').classList.remove('active');
   document.getElementById('navLeaderboard').classList.remove('active');
   document.getElementById('navTeamData').classList.remove('active');
-  document.getElementById('navRules').classList.remove('active');
-  document.getElementById('navRecords').classList.remove('active');
-  document.getElementById('navWeeklyRecap').classList.remove('active');
+  document.getElementById('navRulesRecords').classList.remove('active');
   document.getElementById('navTrashTalk').classList.remove('active');
   clearInterval(scoresRefreshTimer);
   clearInterval(nbaScoresRefreshTimer);
+  clearInterval(mlbScoresRefreshTimer);
 
   if (page === 'selector') {
     const p = document.getElementById('selectorPage');
@@ -2839,16 +2863,11 @@ async function showPage(page) {
     p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
     document.getElementById('navScores').classList.add('active');
     initScores();
-  } else if (page === 'nbaScores') {
-    const p = document.getElementById('nbaScoresPage');
-    p.style.display = 'flex';
-    p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
-    document.getElementById('navNbaScores').classList.add('active');
-    initNbaScores();
   } else if (page === 'admin') {
     loadPendingRequests();
     loadMissingPicks();
     loadAdminNbaStatus();
+    loadAdminMlbStatus();
     const p = document.getElementById('adminPage');
     p.style.display = 'flex';
     p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
@@ -2864,25 +2883,14 @@ async function showPage(page) {
     p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
     document.getElementById('navTeamData').classList.add('active');
     loadTeamData();
-  } else if (page === 'rules') {
-    const p = document.getElementById('rulesPage');
+  } else if (page === 'rulesRecords') {
+    const p = document.getElementById('rulesRecordsPage');
     p.style.display = 'flex';
     p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
-    document.getElementById('navRules').classList.add('active');
+    document.getElementById('navRulesRecords').classList.add('active');
     loadRules();
-  } else if (page === 'records') {
-    const p = document.getElementById('recordsPage');
-    p.style.display = 'flex';
-    p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
-    document.getElementById('navRecords').classList.add('active');
     loadRecords();
     loadStreakCards();
-  } else if (page === 'weeklyRecap') {
-    const p = document.getElementById('weeklyRecapPage');
-    p.style.display = 'flex';
-    p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
-    document.getElementById('navWeeklyRecap').classList.add('active');
-    initWeeklyRecap();
   } else if (page === 'trashTalk') {
     const p = document.getElementById('trashTalkPage');
     p.style.display = 'flex';
@@ -2899,22 +2907,21 @@ function logout() {
   document.getElementById('settingsBtn').style.display  = 'none';
   document.getElementById('settingsPanel').classList.remove('open');
   document.getElementById('loginPage').style.display    = 'flex';
-  document.getElementById('selectorPage').style.display = 'none';
-  document.getElementById('myPicksPage').style.display  = 'none';
-  document.getElementById('scoresPage').style.display   = 'none';
-  document.getElementById('nbaScoresPage').style.display = 'none';
-  document.getElementById('adminPage').style.display        = 'none';
-  document.getElementById('weeklyPicksPage').style.display  = 'none';
-  document.getElementById('resultsPage').style.display      = 'none';
-  document.getElementById('leaderboardPage').style.display  = 'none';
-  document.getElementById('usersPage').style.display         = 'none';
-  document.getElementById('teamDataPage').style.display       = 'none';
-  document.getElementById('rulesPage').style.display          = 'none';
-  document.getElementById('recordsPage').style.display        = 'none';
-  document.getElementById('weeklyRecapPage').style.display    = 'none';
-  document.getElementById('trashTalkPage').style.display      = 'none';
-  document.getElementById('navNbaScores').style.display  = 'none';
+  document.getElementById('selectorPage').style.display    = 'none';
+  document.getElementById('myPicksPage').style.display     = 'none';
+  document.getElementById('scoresPage').style.display      = 'none';
+  document.getElementById('adminPage').style.display       = 'none';
+  document.getElementById('weeklyPicksPage').style.display = 'none';
+  document.getElementById('resultsPage').style.display     = 'none';
+  document.getElementById('leaderboardPage').style.display = 'none';
+  document.getElementById('usersPage').style.display       = 'none';
+  document.getElementById('teamDataPage').style.display    = 'none';
+  document.getElementById('rulesRecordsPage').style.display = 'none';
+  document.getElementById('trashTalkPage').style.display   = 'none';
+  document.getElementById('nbaTab').style.display = 'none';
+  document.getElementById('mlbTab').style.display = 'none';
   clearInterval(nbaScoresRefreshTimer);
+  clearInterval(mlbScoresRefreshTimer);
   currentActiveWeek = null;
   document.getElementById('emailInput').value = '';
   document.getElementById('pinInput').value   = '';
@@ -3591,9 +3598,7 @@ async function initScores() {
   updateScoresSeasonLabel();
   updateScoresWeekLabel();
   updateScoresYearLabel();
-  fetchScores();
-  clearInterval(scoresRefreshTimer);
-  scoresRefreshTimer = setInterval(fetchScores, 15 * 60 * 1000);
+  switchScoresTab(activeScoresTab);
 }
 
 function updateScoresSeasonLabel() {
@@ -3790,6 +3795,38 @@ async function fetchScores() {
   }
 }
 
+// ── Scores tab state ──
+let activeScoresTab = 'nfl';
+
+function switchScoresTab(tab) {
+  activeScoresTab = tab;
+  clearInterval(scoresRefreshTimer);
+  clearInterval(nbaScoresRefreshTimer);
+  clearInterval(mlbScoresRefreshTimer);
+
+  ['nfl', 'nba', 'mlb'].forEach(function(t) {
+    const panel = document.getElementById(t + 'ScoresPanel');
+    const btn   = document.getElementById(t + 'Tab');
+    if (panel) panel.style.display = t === tab ? 'block' : 'none';
+    if (btn)   btn.classList.toggle('active', t === tab);
+  });
+
+  if (tab === 'nfl') {
+    fetchScores();
+    scoresRefreshTimer = setInterval(fetchScores, 15 * 60 * 1000);
+  } else if (tab === 'nba') {
+    if (!nbaScoresDate) nbaScoresDate = new Date();
+    updateNbaDateLabel();
+    fetchNbaScores();
+    nbaScoresRefreshTimer = setInterval(fetchNbaScores, 15 * 60 * 1000);
+  } else if (tab === 'mlb') {
+    if (!mlbScoresDate) mlbScoresDate = new Date();
+    updateMlbDateLabel();
+    fetchMlbScores();
+    mlbScoresRefreshTimer = setInterval(fetchMlbScores, 15 * 60 * 1000);
+  }
+}
+
 // ── NBA Scores ──
 let nbaScoresDate = null;
 let nbaScoresRefreshTimer = null;
@@ -3974,6 +4011,181 @@ async function fetchNbaScores() {
   }
 }
 
+// ── MLB Scores ──
+let mlbScoresDate = null;
+let mlbScoresRefreshTimer = null;
+
+function mlbDateToYMD(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return '' + y + m + day;
+}
+
+function mlbDateLabelStr(d) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const cmp = new Date(d); cmp.setHours(0,0,0,0);
+  const diff = Math.round((cmp - today) / 86400000);
+  if (diff === 0) return 'Today';
+  if (diff === -1) return 'Yesterday';
+  if (diff === 1) return 'Tomorrow';
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function updateMlbDateLabel() {
+  document.getElementById('mlbDateLabel').textContent = mlbDateLabelStr(mlbScoresDate);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const cmp = new Date(mlbScoresDate); cmp.setHours(0,0,0,0);
+  document.getElementById('mlbPrev').disabled = false;
+  document.getElementById('mlbNext').disabled = cmp >= today;
+}
+
+function changeMlbDate(dir) {
+  const d = new Date(mlbScoresDate);
+  d.setDate(d.getDate() + dir);
+  mlbScoresDate = d;
+  updateMlbDateLabel();
+  fetchMlbScores();
+}
+
+async function fetchMlbScores() {
+  const loadingEl = document.getElementById('mlbScoresLoading');
+  const errorEl   = document.getElementById('mlbScoresError');
+  const gridEl    = document.getElementById('mlbScoresGrid');
+  loadingEl.style.display = 'block';
+  errorEl.style.display   = 'none';
+  gridEl.innerHTML        = '';
+
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  document.getElementById('mlbRefreshInfo').textContent = 'Last updated ' + timeStr + ' · Auto-refreshes every 15 min';
+
+  try {
+    const dateStr = mlbDateToYMD(mlbScoresDate);
+    const url = 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates=' + dateStr;
+    const res  = await fetch(url);
+    if (!res.ok) throw new Error('ESPN API error');
+    const data   = await res.json();
+    const events = data.events || [];
+    loadingEl.style.display = 'none';
+
+    if (events.length === 0) {
+      gridEl.innerHTML = '<div class="scores-empty"><div class="icon">⚾</div><p>No games scheduled for this date.</p></div>';
+      return;
+    }
+
+    const grid = document.createElement('div');
+    grid.className = 'scores-grid';
+
+    events.forEach(function(event, ei) {
+      const comp      = event.competitions[0];
+      const status    = event.status;
+      const stateType = status.type.state;
+      const statusStr = status.type.shortDetail || '';
+      const broadcasts = comp.broadcasts || [];
+      const network   = broadcasts.length > 0 && broadcasts[0].names ? broadcasts[0].names[0] : '';
+
+      const home = comp.competitors.find(function(c) { return c.homeAway === 'home'; });
+      const away = comp.competitors.find(function(c) { return c.homeAway === 'away'; });
+
+      const homeScore = parseInt(home && home.score) || 0;
+      const awayScore = parseInt(away && away.score) || 0;
+      const isFinal = stateType === 'post';
+      const isLive  = stateType === 'in';
+      const isPre   = stateType === 'pre';
+      const homeWins = isFinal && homeScore > awayScore;
+      const awayWins = isFinal && awayScore > homeScore;
+
+      const card = document.createElement('div');
+      card.className = 'score-card' + (isLive ? ' live' : '');
+      card.style.animationDelay = (ei * 0.04) + 's';
+
+      const gameDate    = new Date(event.date);
+      const gameTimeStr = gameDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+      const awayName   = away && away.team ? away.team.shortDisplayName : 'Away';
+      const homeName   = home && home.team ? home.team.shortDisplayName : 'Home';
+      const awayRecord = away && away.records && away.records[0] ? away.records[0].summary : '';
+      const homeRecord = home && home.records && home.records[0] ? home.records[0].summary : '';
+      const awayLogoUrl = (away && away.team && away.team.logo) || ('https://a.espncdn.com/i/teamlogos/mlb/500/' + (away && away.team ? away.team.abbreviation.toLowerCase() : 'mlb') + '.png');
+      const homeLogoUrl = (home && home.team && home.team.logo) || ('https://a.espncdn.com/i/teamlogos/mlb/500/' + (home && home.team ? home.team.abbreviation.toLowerCase() : 'mlb') + '.png');
+
+      const cardHeader = document.createElement('div');
+      cardHeader.className = 'score-card-header';
+      const statusEl = document.createElement('span');
+      statusEl.className = 'game-status ' + (isLive ? 'live' : isFinal ? 'final' : 'scheduled');
+      statusEl.textContent = isLive ? statusStr : isFinal ? 'Final' : 'Scheduled';
+      const networkEl = document.createElement('span');
+      networkEl.className = 'game-network';
+      networkEl.textContent = network;
+      cardHeader.appendChild(statusEl);
+      cardHeader.appendChild(networkEl);
+
+      const cardBody = document.createElement('div');
+      cardBody.className = 'score-card-body';
+      const matchup = document.createElement('div');
+      matchup.className = 'score-matchup';
+
+      const awayRow = document.createElement('div');
+      awayRow.className = 'score-team';
+      const awayLogoEl = document.createElement('img');
+      awayLogoEl.className = 'score-team-logo'; awayLogoEl.src = awayLogoUrl; awayLogoEl.alt = awayName;
+      const awayInfo = document.createElement('div');
+      const awayNameEl = document.createElement('div');
+      awayNameEl.className = 'score-team-name' + (awayWins ? ' winner' : '');
+      awayNameEl.textContent = awayName;
+      const awayRecordEl = document.createElement('div');
+      awayRecordEl.className = 'score-team-record';
+      awayRecordEl.textContent = awayRecord;
+      awayInfo.appendChild(awayNameEl); awayInfo.appendChild(awayRecordEl);
+      const awayPts = document.createElement('div');
+      awayPts.className = 'score-points' + (awayWins ? ' winner' : '') + (isPre ? ' tbd' : '');
+      awayPts.textContent = isPre ? '—' : awayScore;
+      awayRow.appendChild(awayLogoEl); awayRow.appendChild(awayInfo); awayRow.appendChild(awayPts);
+
+      const dividerEl = document.createElement('div');
+      dividerEl.className = 'score-divider';
+
+      const homeRow = document.createElement('div');
+      homeRow.className = 'score-team';
+      const homeLogoEl = document.createElement('img');
+      homeLogoEl.className = 'score-team-logo'; homeLogoEl.src = homeLogoUrl; homeLogoEl.alt = homeName;
+      const homeInfo = document.createElement('div');
+      const homeNameEl = document.createElement('div');
+      homeNameEl.className = 'score-team-name' + (homeWins ? ' winner' : '');
+      homeNameEl.textContent = homeName;
+      const homeRecordEl = document.createElement('div');
+      homeRecordEl.className = 'score-team-record';
+      homeRecordEl.textContent = homeRecord;
+      homeInfo.appendChild(homeNameEl); homeInfo.appendChild(homeRecordEl);
+      const homePts = document.createElement('div');
+      homePts.className = 'score-points' + (homeWins ? ' winner' : '') + (isPre ? ' tbd' : '');
+      homePts.textContent = isPre ? '—' : homeScore;
+      homeRow.appendChild(homeLogoEl); homeRow.appendChild(homeInfo); homeRow.appendChild(homePts);
+
+      matchup.appendChild(awayRow); matchup.appendChild(dividerEl); matchup.appendChild(homeRow);
+      cardBody.appendChild(matchup);
+
+      if (isPre || isLive) {
+        const timeInfo = document.createElement('div');
+        timeInfo.className = 'game-time-info';
+        timeInfo.textContent = isPre ? gameTimeStr : statusStr;
+        cardBody.appendChild(timeInfo);
+      }
+
+      card.appendChild(cardHeader); card.appendChild(cardBody);
+      grid.appendChild(card);
+    });
+
+    gridEl.appendChild(grid);
+  } catch(err) {
+    loadingEl.style.display = 'none';
+    errorEl.style.display   = 'block';
+    errorEl.textContent     = 'Unable to load scores. Please try again later.';
+    console.error(err);
+  }
+}
+
 // ── Admin ──
 async function loadAdminWeekOverride() {
   loadAdminSpreadsWeek();
@@ -3995,8 +4207,29 @@ async function handleNbaToggle(checked) {
   try {
     await window.fbSaveNbaVisible(checked);
     if (lbl) lbl.textContent = checked ? 'NBA Scores visible to all users' : 'NBA Scores hidden from regular users';
-    // Update nav button visibility for the current session
-    document.getElementById('navNbaScores').style.display = checked ? '' : 'none';
+    document.getElementById('nbaTab').style.display = checked ? '' : 'none';
+  } catch(e) {
+    if (lbl) lbl.textContent = 'Error saving — try again';
+  }
+}
+
+async function loadAdminMlbStatus() {
+  try {
+    const visible = window.fbGetMlbVisible ? await window.fbGetMlbVisible() : false;
+    const cb = document.getElementById('mlbVisibleToggle');
+    const lbl = document.getElementById('mlbVisibleLabel');
+    if (cb) cb.checked = !!visible;
+    if (lbl) lbl.textContent = visible ? 'MLB Scores visible to all users' : 'MLB Scores hidden from regular users';
+  } catch(e) {}
+}
+
+async function handleMlbToggle(checked) {
+  const lbl = document.getElementById('mlbVisibleLabel');
+  if (lbl) lbl.textContent = 'Saving…';
+  try {
+    await window.fbSaveMlbVisible(checked);
+    if (lbl) lbl.textContent = checked ? 'MLB Scores visible to all users' : 'MLB Scores hidden from regular users';
+    document.getElementById('mlbTab').style.display = checked ? '' : 'none';
   } catch(e) {
     if (lbl) lbl.textContent = 'Error saving — try again';
   }
@@ -5468,348 +5701,11 @@ async function loadWeeklyPicks() {
   }
 }
 
-// ── Weekly Recap ──
-let recapAllPicks = null;
-let recapWeeks    = [];
-let recapWeekIdx  = 0;
-
-async function initWeeklyRecap() {
-  const loadingEl  = document.getElementById('recapLoading');
-  const errorEl    = document.getElementById('recapError');
-  const contentEl  = document.getElementById('recapContent');
-  const subtitleEl = document.getElementById('recapSubtitle');
-
-  loadingEl.style.display = 'block';
-  errorEl.style.display   = 'none';
-  contentEl.innerHTML     = '';
-  subtitleEl.textContent  = 'Loading…';
-
-  try {
-    recapAllPicks = await fetchAllPicks();
-
-    if (!recapAllPicks || recapAllPicks.length === 0) {
-      loadingEl.style.display = 'none';
-      contentEl.innerHTML = '<div class="wp-empty">No picks available yet.</div>';
-      return;
-    }
-
-    const unique = [...new Set(recapAllPicks.map(function(d) { return d.week; }).filter(Boolean))];
-    recapWeeks = unique.sort(function(a, b) {
-      const ord = function(s) {
-        if (!s) return 999;
-        if (s.toLowerCase().includes('pre')) return -1;
-        return parseInt(s.replace(/[^0-9]/g, '')) || 999;
-      };
-      return ord(a) - ord(b);
-    });
-
-    if (recapWeeks.length === 0) {
-      loadingEl.style.display = 'none';
-      contentEl.innerHTML = '<div class="wp-empty">No weeks available.</div>';
-      return;
-    }
-
-    recapWeekIdx = recapWeeks.length - 1;
-    await renderRecapWeek();
-
-  } catch(err) {
-    loadingEl.style.display = 'none';
-    errorEl.style.display   = 'block';
-    errorEl.textContent     = 'Unable to load recap. Please try again.';
-    console.error(err);
-  }
-}
-
-async function changeRecapWeek(dir) {
-  const next = recapWeekIdx + dir;
-  if (next < 0 || next >= recapWeeks.length) return;
-  recapWeekIdx = next;
-  await renderRecapWeek();
-}
-
-function makeRecapCard(cls, label, value, sub) {
-  const card = document.createElement('div');
-  card.className = 'recap-card ' + cls;
-  card.innerHTML =
-    '<div class="recap-card-label">' + label + '</div>' +
-    '<div class="recap-card-value">' + value + '</div>' +
-    (sub ? '<div class="recap-card-sub">' + sub + '</div>' : '');
-  return card;
-}
-
-async function renderRecapWeek() {
-  try {
-    const loadingEl  = document.getElementById('recapLoading');
-    const errorEl    = document.getElementById('recapError');
-    const contentEl  = document.getElementById('recapContent');
-    const subtitleEl = document.getElementById('recapSubtitle');
-    const weekLbl    = document.getElementById('recapWeekLabel');
-    const week       = recapWeeks[recapWeekIdx];
-
-    if (loadingEl) loadingEl.style.display = 'block';
-    if (errorEl)   errorEl.style.display   = 'none';
-    if (contentEl) contentEl.innerHTML     = '';
-
-    const prevBtn = document.getElementById('recapPrev');
-    const nextBtn = document.getElementById('recapNext');
-    if (prevBtn) prevBtn.disabled = recapWeekIdx === 0;
-    if (nextBtn) nextBtn.disabled = recapWeekIdx === recapWeeks.length - 1;
-    if (weekLbl)    weekLbl.textContent    = week || '—';
-    if (subtitleEl) subtitleEl.textContent = (week || '—') + ' · Recap';
-
-    const weekPicks = (recapAllPicks || []).filter(function(d) { return d.week === week; });
-    const scoresMap = await fetchESPNScoresMap(week);
-    if (loadingEl) loadingEl.style.display = 'none';
-
-    if (weekPicks.length === 0) {
-      contentEl.innerHTML = '<div class="wp-empty">No picks found for ' + week + '.</div>';
-      return;
-    }
-
-    // Dedupe to latest per user
-    const byUser = {};
-    weekPicks.forEach(function(doc) {
-      const email = doc.email || 'unknown';
-      if (!byUser[email] || (doc.timestamp || 0) > (byUser[email].timestamp || 0)) {
-        byUser[email] = doc;
-      }
-    });
-    const users = Object.values(byUser);
-
-    // Per-user records
-    const userRecords = users.map(function(doc) {
-      const picks   = [doc.pick1,   doc.pick2,   doc.pick3,   doc.pick4,   doc.pick5];
-      const spreads = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5];
-      let wins = 0, losses = 0, pending = 0;
-      picks.forEach(function(pick, i) {
-        if (!pick || !pick.trim()) { losses++; return; }
-        const r = getPickResult(pick.trim().toUpperCase(), spreads[i] || '', scoresMap);
-        if (r === 'win') wins++;
-        else if (r === 'loss') losses++;
-        else pending++;
-      });
-      const actualTotal = getActualTiebreaker(scoresMap);
-      const tbDiff = (doc.tiebreaker !== undefined && doc.tiebreaker !== '' && actualTotal !== null)
-        ? Math.abs(parseInt(doc.tiebreaker) - actualTotal) : null;
-      return { doc, wins, losses, pending, tbDiff };
-    });
-
-    // ── Highlights ──
-    const maxWins   = Math.max(...userRecords.map(function(r) { return r.wins; }));
-    const bestUsers = userRecords.filter(function(r) { return r.wins === maxWins && maxWins > 0; });
-
-    const allFinal  = userRecords.every(function(r) { return r.pending === 0; });
-    const minWins   = allFinal ? Math.min(...userRecords.map(function(r) { return r.wins; })) : null;
-    const worstUsers = (allFinal && minWins !== null)
-      ? userRecords.filter(function(r) { return r.wins === minWins; }) : [];
-
-    const tbUsers   = userRecords.filter(function(r) { return r.tbDiff !== null; });
-    const minTbDiff = tbUsers.length > 0 ? Math.min(...tbUsers.map(function(r) { return r.tbDiff; })) : null;
-    const tbKings   = tbUsers.filter(function(r) { return r.tbDiff === minTbDiff; });
-
-    const pickCounts = {};
-    users.forEach(function(doc) {
-      [doc.pick1, doc.pick2, doc.pick3, doc.pick4, doc.pick5].forEach(function(p) {
-        if (p && p.trim()) {
-          const abbr = p.trim().toUpperCase();
-          pickCounts[abbr] = (pickCounts[abbr] || 0) + 1;
-        }
-      });
-    });
-    const maxCount  = Math.max(...Object.values(pickCounts));
-    const hotPicks  = Object.keys(pickCounts).filter(function(k) { return pickCounts[k] === maxCount; });
-
-    // ── Cards ──
-    const cards = document.createElement('div');
-    cards.className = 'recap-cards';
-
-    if (bestUsers.length > 0) {
-      const names = bestUsers.map(function(r) { return r.doc.teamName || r.doc.email; }).join(', ');
-      const perfect = maxWins === 5 && bestUsers[0].losses === 0;
-      cards.appendChild(makeRecapCard(
-        perfect ? 'gold' : 'green',
-        perfect ? '🏆 Perfect Week' : '🏆 Best of the Week',
-        names,
-        maxWins + '-' + bestUsers[0].losses + (bestUsers[0].pending > 0 ? ' (' + bestUsers[0].pending + ' pending)' : '')
-      ));
-    }
-
-    if (worstUsers.length > 0 && allFinal && !(worstUsers.length === users.length)) {
-      const names = worstUsers.map(function(r) { return r.doc.teamName || r.doc.email; }).join(', ');
-      cards.appendChild(makeRecapCard(
-        'red',
-        minWins === 0 ? '💀 Winless' : '📉 Rough Week',
-        names,
-        minWins + '-' + worstUsers[0].losses
-      ));
-    }
-
-    if (tbKings.length > 0 && minTbDiff !== null) {
-      const names = tbKings.map(function(r) { return r.doc.teamName || r.doc.email; }).join(', ');
-      const exact = minTbDiff === 0;
-      cards.appendChild(makeRecapCard(
-        exact ? 'gold' : '',
-        '🎯 Tiebreaker',
-        names,
-        exact ? 'Exact! (' + tbKings[0].doc.tiebreaker + ')' : '+' + minTbDiff + ' off (' + tbKings[0].doc.tiebreaker + ')'
-      ));
-    }
-
-    if (hotPicks.length > 0 && maxCount > 1) {
-      const logoHtml = hotPicks.map(function(abbr) {
-        const logo = getTeamLogo(abbr);
-        return (logo ? '<img src="' + logo + '" style="width:18px;height:18px;object-fit:contain;vertical-align:middle;margin-right:3px;">' : '') + abbr;
-      }).join(', ');
-      cards.appendChild(makeRecapCard(
-        '',
-        '🔥 Most Popular Pick',
-        logoHtml,
-        maxCount + ' of ' + users.length + ' teams'
-      ));
-    }
-
-    if (cards.children.length > 0) contentEl.appendChild(cards);
-
-    // ── Picks Table ──
-    userRecords.sort(function(a, b) {
-      if (b.wins !== a.wins) return b.wins - a.wins;
-      return a.losses - b.losses;
-    });
-
-    const wrap  = document.createElement('div');
-    wrap.className = 'wp-table-wrap';
-    const table = document.createElement('table');
-    table.className = 'wp-table';
-
-    const thead = document.createElement('thead');
-    const hrow  = document.createElement('tr');
-    ['User','Pick 1','Pick 2','Pick 3','Pick 4','Pick 5','Record','Tiebreaker'].forEach(function(h) {
-      const th = document.createElement('th');
-      th.textContent = h;
-      hrow.appendChild(th);
-    });
-    thead.appendChild(hrow);
-    table.appendChild(thead);
-
-    const tbody = document.createElement('tbody');
-    userRecords.forEach(function(rec) {
-      const doc = rec.doc;
-      const tr  = document.createElement('tr');
-
-      const nameTd = document.createElement('td');
-      nameTd.className  = 'wp-email';
-      nameTd.textContent = doc.teamName || doc.email || '—';
-      tr.appendChild(nameTd);
-
-      const picks   = [doc.pick1,   doc.pick2,   doc.pick3,   doc.pick4,   doc.pick5];
-      const spreads = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5];
-
-      picks.forEach(function(pick, pi) {
-        const td = document.createElement('td');
-        if (pick && pick.trim()) {
-          const chip    = document.createElement('span');
-          chip.className = 'wp-pick';
-          const spread   = spreads[pi] || '';
-          const abbr     = pick.trim().toUpperCase();
-          const gameData = scoresMap && scoresMap[abbr];
-
-          if (!gameData || !gameData.started) {
-            chip.classList.add('hidden');
-            chip.textContent = 'Not started';
-          } else {
-            const logo = getTeamLogo(abbr);
-            if (logo) {
-              const img = document.createElement('img');
-              img.src = logo; img.alt = abbr;
-              chip.appendChild(img);
-            }
-            chip.appendChild(document.createTextNode(abbr + (spread ? ' ' + spread : '')));
-            const result = getPickResult(abbr, spread, scoresMap);
-            if (result === 'win')  chip.classList.add('win');
-            else if (result === 'loss') chip.classList.add('loss');
-          }
-          td.appendChild(chip);
-        } else {
-          td.textContent = '—';
-          td.style.color = 'var(--muted)';
-        }
-        tr.appendChild(td);
-      });
-
-      const recordTd = document.createElement('td');
-      recordTd.className = 'wp-record';
-      if (rec.wins > 0 || rec.losses > 0) {
-        recordTd.innerHTML =
-          '<span class="wins">'   + rec.wins   + 'W</span> ' +
-          '<span class="losses">' + rec.losses + 'L</span>' +
-          (rec.pending > 0 ? ' <span class="pending">(' + rec.pending + ' pending)</span>' : '');
-      } else {
-        recordTd.innerHTML = '<span class="pending">Pending</span>';
-      }
-      tr.appendChild(recordTd);
-
-      const tbTd = document.createElement('td');
-      if (doc.tiebreaker !== undefined && doc.tiebreaker !== '') {
-        const actualTotal = getActualTiebreaker(scoresMap);
-        if (actualTotal !== null) {
-          const diff = Math.abs(parseInt(doc.tiebreaker) - actualTotal);
-          tbTd.innerHTML = '<strong>' + doc.tiebreaker + '</strong> <span class="' + (diff === 0 ? 'tb-diff-exact' : 'tb-diff-normal') + '">(' + (diff === 0 ? 'exact!' : '+' + diff) + ')</span>';
-        } else {
-          tbTd.innerHTML = '<strong>' + doc.tiebreaker + '</strong>';
-        }
-        tbTd.style.fontSize = '16px';
-        tbTd.style.color    = 'var(--text)';
-      } else {
-        tbTd.textContent   = '—';
-        tbTd.style.color   = 'var(--muted)';
-      }
-      tr.appendChild(tbTd);
-
-      tbody.appendChild(tr);
-    });
-
-    table.appendChild(tbody);
-    wrap.appendChild(table);
-    contentEl.appendChild(wrap);
-
-  } catch(err) {
-    const loadingEl = document.getElementById('recapLoading');
-    const errorEl   = document.getElementById('recapError');
-    if (loadingEl) loadingEl.style.display = 'none';
-    if (errorEl) { errorEl.style.display = 'block'; errorEl.textContent = 'Unable to load recap. Please try again.'; }
-    console.error(err);
-  }
-}
 
 </script>
 
 
 
-<!-- ═══ WEEKLY RECAP PAGE ═══ -->
-<div class="page with-nav" id="weeklyRecapPage">
-  <div class="container" style="max-width:900px;">
-    <div class="page-header">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
-        <div>
-          <div class="page-title">Weekly Recap</div>
-          <div class="page-subtitle" id="recapSubtitle">Loading…</div>
-          <div class="page-divider"></div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;padding-top:6px;">
-          <button class="week-nav-btn" id="recapPrev" onclick="changeRecapWeek(-1)">&#8592;</button>
-          <span id="recapWeekLabel" style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:0.1em;color:var(--text);min-width:80px;text-align:center;">—</span>
-          <button class="week-nav-btn" id="recapNext" onclick="changeRecapWeek(1)">&#8594;</button>
-        </div>
-      </div>
-    </div>
-    <div id="recapLoading" class="picks-loading">
-      <div class="loading-spinner"></div>
-      <p>Loading recap…</p>
-    </div>
-    <div id="recapError" class="picks-error" style="display:none;"></div>
-    <div id="recapContent"></div>
-  </div>
-</div>
 
 
 <!-- ═══ WEEKLY PICKS PAGE ═══ -->
@@ -5880,74 +5776,74 @@ async function renderRecapWeek() {
 <div class="page with-nav" id="scoresPage">
   <div class="container" style="max-width:860px;">
     <div class="page-header">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
-        <div>
-          <div class="page-title">NFL Scores</div>
-          <div class="page-subtitle">Live &amp; Final Results</div>
-          <div class="page-divider"></div>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;margin-top:4px;">
-          <div style="display:flex;gap:8px;align-items:center;">
-            <div class="scores-week-nav">
-              <button class="week-nav-btn" id="yearPrev" onclick="changeScoresYear(-1)">&#8592;</button>
-              <span class="week-nav-label" id="scoresYearLabel" style="min-width:52px;">——</span>
-              <button class="week-nav-btn" id="yearNext" onclick="changeScoresYear(1)">&#8594;</button>
-            </div>
-            <div class="scores-week-nav">
-              <button class="week-nav-btn" id="seasonPrev" onclick="changeSeasonType(-1)">&#8592;</button>
-              <span class="week-nav-label" id="scoresSeasonLabel" style="min-width:70px;font-size:13px;">Regular</span>
-              <button class="week-nav-btn" id="seasonNext" onclick="changeSeasonType(1)">&#8594;</button>
-            </div>
-            <div class="scores-week-nav">
-              <button class="week-nav-btn" id="weekPrev" onclick="changeScoresWeek(-1)">&#8592;</button>
-              <span class="week-nav-label" id="scoresWeekLabel">Week —</span>
-              <button class="week-nav-btn" id="weekNext" onclick="changeScoresWeek(1)">&#8594;</button>
-            </div>
+      <div class="page-title">Scores</div>
+      <div class="page-subtitle">Live &amp; Final Results</div>
+      <div class="page-divider"></div>
+    </div>
+
+    <div class="scores-tabs">
+      <button class="scores-tab active" id="nflTab" onclick="switchScoresTab('nfl')">NFL</button>
+      <button class="scores-tab" id="nbaTab" onclick="switchScoresTab('nba')" style="display:none;">NBA</button>
+      <button class="scores-tab" id="mlbTab" onclick="switchScoresTab('mlb')" style="display:none;">MLB</button>
+    </div>
+
+    <!-- NFL Panel -->
+    <div id="nflScoresPanel">
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;margin-bottom:16px;">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div class="scores-week-nav">
+            <button class="week-nav-btn" id="yearPrev" onclick="changeScoresYear(-1)">&#8592;</button>
+            <span class="week-nav-label" id="scoresYearLabel" style="min-width:52px;">——</span>
+            <button class="week-nav-btn" id="yearNext" onclick="changeScoresYear(1)">&#8594;</button>
           </div>
-          <div class="scores-refresh-info" id="scoresRefreshInfo">Refreshes every 15 min</div>
-        </div>
-      </div>
-    </div>
-
-    <div id="scoresLoading" class="picks-loading">
-      <div class="loading-spinner"></div>
-      <p>Loading scores…</p>
-    </div>
-    <div id="scoresError" class="picks-error" style="display:none;"></div>
-    <div id="scoresGrid"></div>
-  </div>
-</div>
-
-
-<!-- ═══ NBA SCORES PAGE ═══ -->
-<div class="page with-nav" id="nbaScoresPage">
-  <div class="container" style="max-width:860px;">
-    <div class="page-header">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
-        <div>
-          <div class="page-title">NBA Scores</div>
-          <div class="page-subtitle">Live &amp; Final Results</div>
-          <div class="page-divider"></div>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;margin-top:4px;">
-          <div style="display:flex;gap:8px;align-items:center;">
-            <div class="scores-week-nav">
-              <button class="week-nav-btn" id="nbaPrev" onclick="changeNbaDate(-1)">&#8592;</button>
-              <span class="week-nav-label" id="nbaDateLabel" style="min-width:90px;">——</span>
-              <button class="week-nav-btn" id="nbaNext" onclick="changeNbaDate(1)">&#8594;</button>
-            </div>
+          <div class="scores-week-nav">
+            <button class="week-nav-btn" id="seasonPrev" onclick="changeSeasonType(-1)">&#8592;</button>
+            <span class="week-nav-label" id="scoresSeasonLabel" style="min-width:70px;font-size:13px;">Regular</span>
+            <button class="week-nav-btn" id="seasonNext" onclick="changeSeasonType(1)">&#8594;</button>
           </div>
-          <div class="scores-refresh-info" id="nbaRefreshInfo">Refreshes every 15 min</div>
+          <div class="scores-week-nav">
+            <button class="week-nav-btn" id="weekPrev" onclick="changeScoresWeek(-1)">&#8592;</button>
+            <span class="week-nav-label" id="scoresWeekLabel">Week —</span>
+            <button class="week-nav-btn" id="weekNext" onclick="changeScoresWeek(1)">&#8594;</button>
+          </div>
         </div>
+        <div class="scores-refresh-info" id="scoresRefreshInfo">Refreshes every 15 min</div>
       </div>
+      <div id="scoresLoading" class="picks-loading"><div class="loading-spinner"></div><p>Loading scores…</p></div>
+      <div id="scoresError" class="picks-error" style="display:none;"></div>
+      <div id="scoresGrid"></div>
     </div>
 
-    <div id="nbaScoresLoading" class="picks-loading">
-      <div class="loading-spinner"></div>
-      <p>Loading scores…</p>
+    <!-- NBA Panel -->
+    <div id="nbaScoresPanel" style="display:none;">
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;margin-bottom:16px;">
+        <div class="scores-week-nav">
+          <button class="week-nav-btn" id="nbaPrev" onclick="changeNbaDate(-1)">&#8592;</button>
+          <span class="week-nav-label" id="nbaDateLabel" style="min-width:90px;">——</span>
+          <button class="week-nav-btn" id="nbaNext" onclick="changeNbaDate(1)">&#8594;</button>
+        </div>
+        <div class="scores-refresh-info" id="nbaRefreshInfo">Refreshes every 15 min</div>
+      </div>
+      <div id="nbaScoresLoading" class="picks-loading"><div class="loading-spinner"></div><p>Loading scores…</p></div>
+      <div id="nbaScoresError" class="picks-error" style="display:none;"></div>
+      <div id="nbaScoresGrid"></div>
     </div>
-    <div id="nbaScoresError" class="picks-error" style="display:none;"></div>
-    <div id="nbaScoresGrid"></div>
+
+    <!-- MLB Panel -->
+    <div id="mlbScoresPanel" style="display:none;">
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;margin-bottom:16px;">
+        <div class="scores-week-nav">
+          <button class="week-nav-btn" id="mlbPrev" onclick="changeMlbDate(-1)">&#8592;</button>
+          <span class="week-nav-label" id="mlbDateLabel" style="min-width:90px;">——</span>
+          <button class="week-nav-btn" id="mlbNext" onclick="changeMlbDate(1)">&#8594;</button>
+        </div>
+        <div class="scores-refresh-info" id="mlbRefreshInfo">Refreshes every 15 min</div>
+      </div>
+      <div id="mlbScoresLoading" class="picks-loading"><div class="loading-spinner"></div><p>Loading scores…</p></div>
+      <div id="mlbScoresError" class="picks-error" style="display:none;"></div>
+      <div id="mlbScoresGrid"></div>
+    </div>
+
   </div>
 </div>
 
@@ -6027,12 +5923,25 @@ async function renderRecapWeek() {
     <!-- NBA Scores Visibility -->
     <div class="admin-card">
       <div class="admin-card-title">🏀 NBA Scores</div>
-      <p class="admin-card-desc">Toggle whether the NBA Scores page is visible to regular users. Admins can always access it regardless of this setting.</p>
+      <p class="admin-card-desc">Toggle whether the NBA tab on the Scores page is visible to regular users. Admins can always access it.</p>
       <div style="display:flex;align-items:center;gap:14px;margin-top:12px;">
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;">
           <input type="checkbox" id="nbaVisibleToggle" onchange="handleNbaToggle(this.checked)"
             style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;" />
           <span style="font-size:14px;color:var(--text);font-weight:600;" id="nbaVisibleLabel">Loading…</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- MLB Scores Visibility -->
+    <div class="admin-card">
+      <div class="admin-card-title">⚾ MLB Scores</div>
+      <p class="admin-card-desc">Toggle whether the MLB tab on the Scores page is visible to regular users. Admins can always access it.</p>
+      <div style="display:flex;align-items:center;gap:14px;margin-top:12px;">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;">
+          <input type="checkbox" id="mlbVisibleToggle" onchange="handleMlbToggle(this.checked)"
+            style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;" />
+          <span style="font-size:14px;color:var(--text);font-weight:600;" id="mlbVisibleLabel">Loading…</span>
         </label>
       </div>
     </div>
@@ -6070,14 +5979,17 @@ async function renderRecapWeek() {
   </div>
 </div>
 
-<div class="page with-nav" id="recordsPage">
+<div class="page with-nav" id="rulesRecordsPage">
   <div class="container" style="max-width:900px;">
     <div class="page-header">
-      <div class="page-title">Records</div>
-      <div class="page-subtitle">All-time league records</div>
+      <div class="page-title">Rules / Records</div>
+      <div class="page-subtitle">League rules, guidelines &amp; all-time records</div>
       <div class="page-divider"></div>
     </div>
     <div class="admin-card">
+      <div id="rulesContent"><div class="rules-loading">Loading rules…</div></div>
+    </div>
+    <div class="admin-card" style="margin-top:20px;">
       <div id="recordsContent"><div class="rules-loading">Loading records…</div></div>
     </div>
 
@@ -6091,19 +6003,6 @@ async function renderRecapWeek() {
         <div class="admin-card-title" style="margin-bottom:14px;">💀 0-5 Weeks</div>
         <div id="streak05Content"><div class="rules-loading">Loading…</div></div>
       </div>
-    </div>
-  </div>
-</div>
-
-<div class="page with-nav" id="rulesPage">
-  <div class="container" style="max-width:720px;">
-    <div class="page-header">
-      <div class="page-title">Rules</div>
-      <div class="page-subtitle">League rules &amp; guidelines</div>
-      <div class="page-divider"></div>
-    </div>
-    <div class="admin-card">
-      <div id="rulesContent"><div class="rules-loading">Loading rules…</div></div>
     </div>
   </div>
 </div>
