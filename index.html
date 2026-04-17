@@ -851,13 +851,13 @@
     object-fit: contain;
   }
   .gd-team-name {
-    font-size: 14px;
+    font-size: 17px;
     font-weight: 600;
     letter-spacing: 0.04em;
     color: var(--text);
   }
   .gd-team-record {
-    font-size: 11px;
+    font-size: 13px;
     color: var(--muted);
     letter-spacing: 0.04em;
   }
@@ -900,15 +900,15 @@
   .gd-linescore {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: 15px;
   }
   .gd-linescore th, .gd-linescore td {
     text-align: center;
-    padding: 6px 8px;
+    padding: 7px 9px;
     border-bottom: 1px solid var(--border);
   }
   .gd-linescore th {
-    font-size: 10px;
+    font-size: 12px;
     letter-spacing: 0.1em;
     color: var(--muted);
     font-weight: 600;
@@ -918,12 +918,12 @@
   .gd-stats-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: 15px;
   }
   .gd-stats-table th {
     text-align: right;
-    padding: 5px 8px;
-    font-size: 10px;
+    padding: 6px 9px;
+    font-size: 12px;
     letter-spacing: 0.1em;
     color: var(--muted);
     font-weight: 600;
@@ -931,7 +931,7 @@
   .gd-stats-table th:first-child { text-align: left; }
   .gd-stats-table td {
     text-align: right;
-    padding: 5px 8px;
+    padding: 6px 9px;
     border-bottom: 1px solid var(--border);
     color: var(--text);
   }
@@ -4777,15 +4777,17 @@ function renderGameDetail(data, sport) {
     }
     html += '</tr></thead><tbody>';
 
-    function scoreRow(teamName, linescores, total, extras) {
+    function lsVal(ls, i) {
+      const obj = ls[i];
+      if (!obj) return '—';
+      const v = obj.displayValue !== undefined ? obj.displayValue : obj.value;
+      return (v !== undefined && v !== null) ? v : '—';
+    }
+
+    function scoreRow(teamName, linescores, total) {
       let row = '<tr><td>' + escHtml(teamName) + '</td>';
-      for (let i = 0; i < periods; i++) {
-        const v = linescores[i] !== undefined ? linescores[i].value : '—';
-        row += '<td>' + (v !== undefined && v !== null ? v : '—') + '</td>';
-      }
-      row += '<td class="total-col">' + total + '</td>';
-      if (extras) row += extras;
-      row += '</tr>';
+      for (let i = 0; i < periods; i++) row += '<td>' + lsVal(linescores, i) + '</td>';
+      row += '<td class="total-col">' + total + '</td></tr>';
       return row;
     }
 
@@ -4798,22 +4800,13 @@ function renderGameDetail(data, sport) {
         const s = stats.find(function(x) { return x.name === name || x.abbreviation === name; });
         return s ? s.displayValue : '—';
       }
-      html += '<tr><td></td>';
-      for (let i = 0; i < periods; i++) html += '<th>' + (i + 1) + '</th>';
-      html += '<th class="total-col">R</th><th>H</th><th>E</th></tr>';
       html += '<tr><td>' + escHtml(awayTeam.abbreviation || 'Away') + '</td>';
-      for (let i = 0; i < periods; i++) {
-        const v = awayLinescores[i] !== undefined ? awayLinescores[i].value : '—';
-        html += '<td>' + v + '</td>';
-      }
+      for (let i = 0; i < periods; i++) html += '<td>' + lsVal(awayLinescores, i) + '</td>';
       html += '<td class="total-col">' + awayScore + '</td>';
       html += '<td>' + bsStat(awayBs, 'hits') + '</td>';
       html += '<td>' + bsStat(awayBs, 'errors') + '</td></tr>';
       html += '<tr><td>' + escHtml(homeTeam.abbreviation || 'Home') + '</td>';
-      for (let i = 0; i < periods; i++) {
-        const v = homeLinescores[i] !== undefined ? homeLinescores[i].value : '—';
-        html += '<td>' + v + '</td>';
-      }
+      for (let i = 0; i < periods; i++) html += '<td>' + lsVal(homeLinescores, i) + '</td>';
       html += '<td class="total-col">' + homeScore + '</td>';
       html += '<td>' + bsStat(homeBs, 'hits') + '</td>';
       html += '<td>' + bsStat(homeBs, 'errors') + '</td></tr>';
@@ -6787,7 +6780,7 @@ document.addEventListener('keydown', function(e) {
   </div>
 </div>
 
-<div class="version-badge">v1.0.4</div>
+<div class="version-badge">v1.0.5</div>
 
 <!-- ═══ GAME DETAIL MODAL ═══ -->
 <div id="gameDetailOverlay" style="display:none;" onclick="if(event.target===this)closeGameModal()">
