@@ -1725,7 +1725,7 @@
   .wp-record {
     white-space: nowrap;
     font-family: 'Bebas Neue', sans-serif;
-    font-size: 15px;
+    font-size: 20px;
     letter-spacing: 0.1em;
   }
   .wp-record .wins  { color: #4caf7d; }
@@ -6745,7 +6745,10 @@ async function loadWeeklyPicks() {
           }
           td.appendChild(chip);
         } else {
-          td.textContent = '—'; td.style.color = 'var(--muted)';
+          const chip = document.createElement('span');
+          chip.className = 'wp-pick loss';
+          chip.textContent = 'No Pick';
+          td.appendChild(chip);
           losses++;
         }
         tr.appendChild(td);
