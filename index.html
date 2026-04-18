@@ -5120,33 +5120,40 @@ function escHtml(str) {
 }
 
 // ── Standings ──
+const STANDINGS_BASE = 'https://site.web.api.espn.com/apis/v2/sports/';
+const STANDINGS_SUFFIX = '/standings?level=3&seasontype=2&lang=en&region=us';
 const STANDINGS_URLS = {
-  nfl: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/standings',
-  nba: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/standings',
-  mlb: 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/standings'
+  nfl: STANDINGS_BASE + 'football/nfl'      + STANDINGS_SUFFIX,
+  nba: STANDINGS_BASE + 'basketball/nba'    + STANDINGS_SUFFIX,
+  mlb: STANDINGS_BASE + 'baseball/mlb'      + STANDINGS_SUFFIX
 };
+function fmtStreak(v) {
+  const n = +v;
+  if (isNaN(n) || n === 0) return '—';
+  return (n > 0 ? 'W' : 'L') + Math.abs(n);
+}
 const STANDINGS_COLS = {
   nfl: [
-    { key: 'wins',            label: 'W' },
-    { key: 'losses',          label: 'L' },
-    { key: 'ties',            label: 'T' },
-    { key: 'winPercent',      label: 'PCT', fmt: v => (+v).toFixed(3).replace(/^0/, '') },
-    { key: 'pointsFor',       label: 'PF',  fmt: v => Math.round(+v) },
-    { key: 'pointsAgainst',   label: 'PA',  fmt: v => Math.round(+v) }
+    { key: 'wins',          label: 'W' },
+    { key: 'losses',        label: 'L' },
+    { key: 'ties',          label: 'T' },
+    { key: 'winPercent',    label: 'PCT', fmt: v => (+v).toFixed(3).replace(/^0/, '') },
+    { key: 'pointsFor',     label: 'PF',  fmt: v => Math.round(+v) },
+    { key: 'pointsAgainst', label: 'PA',  fmt: v => Math.round(+v) }
   ],
   nba: [
-    { key: 'wins',            label: 'W' },
-    { key: 'losses',          label: 'L' },
-    { key: 'winPercent',      label: 'PCT', fmt: v => (+v).toFixed(3).replace(/^0/, '') },
-    { key: 'gamesBehind',     label: 'GB',  fmt: v => (+v === 0 ? '—' : (+v).toFixed(1)) },
-    { key: 'streak',          label: 'STK' }
+    { key: 'wins',          label: 'W' },
+    { key: 'losses',        label: 'L' },
+    { key: 'winPercent',    label: 'PCT', fmt: v => (+v).toFixed(3).replace(/^0/, '') },
+    { key: 'gamesBehind',   label: 'GB',  fmt: v => (+v === 0 ? '—' : (+v).toFixed(1)) },
+    { key: 'streak',        label: 'STRK', fmt: fmtStreak }
   ],
   mlb: [
-    { key: 'wins',            label: 'W' },
-    { key: 'losses',          label: 'L' },
-    { key: 'winPercent',      label: 'PCT', fmt: v => (+v).toFixed(3).replace(/^0/, '') },
-    { key: 'gamesBehind',     label: 'GB',  fmt: v => (+v === 0 ? '—' : (+v).toFixed(1)) },
-    { key: 'streak',          label: 'STK' }
+    { key: 'wins',          label: 'W' },
+    { key: 'losses',        label: 'L' },
+    { key: 'winPercent',    label: 'PCT', fmt: v => (+v).toFixed(3).replace(/^0/, '') },
+    { key: 'gamesBehind',   label: 'GB',  fmt: v => (+v === 0 ? '—' : (+v).toFixed(1)) },
+    { key: 'streak',        label: 'STRK', fmt: fmtStreak }
   ]
 };
 
