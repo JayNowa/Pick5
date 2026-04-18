@@ -398,7 +398,7 @@
   .container { width: 100%; max-width: 680px; }
 
   #loginPage  { display: flex; }
-  #selectorPage, #myPicksPage, #scoresPage, #nbaScoresPage, #standingsPage, #adminPage, #weeklyPicksPage, #resultsPage, #leaderboardPage, #usersPage, #teamDataPage, #rulesRecordsPage, #trashTalkPage { display: none; }
+  #selectorPage, #myPicksPage, #scoresPage, #standingsPage, #adminPage, #weeklyPicksPage, #resultsPage, #leaderboardPage, #usersPage, #teamDataPage, #rulesRecordsPage, #trashTalkPage { display: none; }
 
   .pending-req-row {
     display: flex;
@@ -3237,7 +3237,6 @@ async function showPage(page) {
   document.getElementById('selectorPage').style.display     = 'none';
   document.getElementById('myPicksPage').style.display      = 'none';
   document.getElementById('scoresPage').style.display       = 'none';
-  document.getElementById('nbaScoresPage').style.display    = 'none';
   document.getElementById('standingsPage').style.display    = 'none';
   document.getElementById('adminPage').style.display        = 'none';
   document.getElementById('weeklyPicksPage').style.display  = 'none';
@@ -3299,12 +3298,6 @@ async function showPage(page) {
     p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
     document.getElementById('navScores').classList.add('active');
     initScores();
-  } else if (page === 'nbaScores') {
-    const p = document.getElementById('nbaScoresPage');
-    p.style.display = 'flex';
-    p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
-    document.getElementById('navNbaScores').classList.add('active');
-    initNbaScores();
   } else if (page === 'standings') {
     const p = document.getElementById('standingsPage');
     p.style.display = 'flex';
@@ -3361,7 +3354,6 @@ function logout() {
   document.getElementById('selectorPage').style.display    = 'none';
   document.getElementById('myPicksPage').style.display     = 'none';
   document.getElementById('scoresPage').style.display      = 'none';
-  document.getElementById('nbaScoresPage').style.display   = 'none';
   document.getElementById('standingsPage').style.display   = 'none';
   document.getElementById('adminPage').style.display       = 'none';
   document.getElementById('weeklyPicksPage').style.display = 'none';
