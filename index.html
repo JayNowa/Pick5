@@ -398,7 +398,7 @@
   .container { width: 100%; max-width: 680px; }
 
   #loginPage  { display: flex; }
-  #selectorPage, #myPicksPage, #scoresPage, #adminPage, #weeklyPicksPage, #resultsPage, #leaderboardPage, #usersPage, #teamDataPage, #rulesRecordsPage, #trashTalkPage { display: none; }
+  #selectorPage, #myPicksPage, #scoresPage, #nbaScoresPage, #standingsPage, #adminPage, #weeklyPicksPage, #resultsPage, #leaderboardPage, #usersPage, #teamDataPage, #rulesRecordsPage, #trashTalkPage { display: none; }
 
   .pending-req-row {
     display: flex;
@@ -541,6 +541,9 @@
   .btn-login { width: 100%; background: linear-gradient(135deg, var(--accent) 0%, #a07830 100%); color: #0a0c10; box-shadow: 0 4px 20px rgba(200,169,74,0.25); margin-top: 6px; }
   .btn-login:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(200,169,74,0.4); }
   .btn-login:disabled { opacity: 0.5; cursor: not-allowed; }
+  .remember-me-row { display: flex; align-items: center; margin-top: 10px; font-size: 13px; color: var(--muted); }
+  .remember-me-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .remember-me-row input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer; }
 
   /* ── SELECTOR ── */
   .page-header { margin-bottom: 36px; }
@@ -987,6 +990,53 @@
   [data-theme="light"] .game-detail-modal { background: #fff; }
   [data-theme="light"] .gd-close { color: #666; }
   [data-theme="light"] .gd-close:hover { color: #111; }
+
+  /* ── STANDINGS PAGE ── */
+  .standings-tabs { display: flex; gap: 8px; margin-bottom: 24px; }
+  .standings-tab {
+    padding: 7px 18px; border-radius: 6px; border: 1px solid var(--border);
+    background: transparent; color: var(--muted); font-size: 13px; letter-spacing: 0.08em;
+    cursor: pointer; transition: all 0.15s; font-family: inherit;
+  }
+  .standings-tab:hover { border-color: var(--accent); color: var(--text); }
+  .standings-tab.active { background: var(--accent); border-color: var(--accent); color: #0a0c10; font-weight: 600; }
+  .standings-conference { margin-bottom: 32px; }
+  .standings-conf-name {
+    font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 12px; font-weight: 600;
+  }
+  .standings-division { margin-bottom: 20px; }
+  .standings-div-name {
+    font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 8px; padding-left: 4px;
+  }
+  .standings-table { width: 100%; border-collapse: collapse; }
+  .standings-table th {
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); font-weight: 500; padding: 5px 10px; text-align: right;
+    border-bottom: 1px solid var(--border);
+  }
+  .standings-table th:first-child { text-align: left; }
+  .standings-table td {
+    padding: 9px 10px; font-size: 14px; text-align: right;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .standings-table td:first-child { text-align: left; }
+  .standings-table tr:last-child td { border-bottom: none; }
+  .standings-team-cell { display: flex; align-items: center; gap: 10px; }
+  .standings-team-logo { width: 24px; height: 24px; object-fit: contain; }
+  .standings-team-name { font-size: 14px; }
+  .standings-team-abbr { font-size: 11px; color: var(--muted); margin-left: 2px; display: none; }
+  .standings-gb { color: var(--muted); font-size: 13px; }
+  .standings-pct { color: var(--text); }
+  [data-theme="light"] .standings-tab { color: var(--muted); }
+  [data-theme="light"] .standings-table td, [data-theme="light"] .standings-table th { color: var(--text); }
+  [data-theme="light"] .standings-gb { color: var(--muted); }
+  @media (max-width: 500px) {
+    .standings-team-name { display: none; }
+    .standings-team-abbr { display: inline; }
+    .standings-table th, .standings-table td { padding: 7px 6px; font-size: 13px; }
+  }
 
   /* ── MY PICKS PAGE ── */
   .picks-loading {
@@ -2559,6 +2609,8 @@
     <button class="nav-link" id="navTeamData" onclick="showPage('teamData')">Team Data</button>
     <button class="nav-link" id="navRulesRecords" onclick="showPage('rulesRecords')">Rules/Records</button>
     <button class="nav-link" id="navTrashTalk" onclick="showPage('trashTalk')">💬 Trash Talk <span class="tt-new-badge" id="ttNewBadge" style="display:none;">NEW</span></button>
+    <button class="nav-link" id="navNbaScores" onclick="showPage('nbaScores')" style="display:none;">NBA Scores</button>
+    <button class="nav-link" id="navStandings" onclick="showPage('standings')">Standings</button>
   </div>
   <div class="nav-right">
     <span class="nav-user">Signed in as <strong id="navEmail" data-email="" data-teamname=""></strong></span>
@@ -2594,6 +2646,9 @@
         <div class="pin-hint">Enter the PIN assigned to your email</div>
       </div>
       <button class="btn-login" id="loginBtn" onclick="handleLogin()">Enter</button>
+      <div class="remember-me-row">
+        <label><input type="checkbox" id="rememberMe" checked /> Remember me</label>
+      </div>
       <div class="request-access-link">
         Don't have access? <span onclick="openRequestAccess()">Request Access</span>
       </div>
@@ -3071,6 +3126,10 @@ async function handleLogin() {
     const user = await fbGetApprovedUser(email);
     if (user && user.pin === pin) {
       staEl.textContent = '';
+      if (document.getElementById('rememberMe').checked) {
+        localStorage.setItem('pick5-session-email', email);
+        localStorage.setItem('pick5-session-team', user.teamName || '');
+      }
       afterLogin(email, user.teamName || '');
     } else if (user) {
       showError('Incorrect PIN. Please try again.');
@@ -3098,6 +3157,36 @@ document.addEventListener('DOMContentLoaded', () => {
       if (e.key === 'Enter') handleLogin();
     });
   });
+
+  // Auto-login if a remembered session exists
+  const savedEmail = localStorage.getItem('pick5-session-email');
+  const savedTeam  = localStorage.getItem('pick5-session-team');
+  if (savedEmail) {
+    const staEl = document.getElementById('statusMsg');
+    staEl.textContent = 'Signing you in…';
+    (async function tryAutoLogin() {
+      let tries = 0;
+      while (typeof fbGetApprovedUser === 'undefined' && tries < 30) {
+        await new Promise(r => setTimeout(r, 100));
+        tries++;
+      }
+      try {
+        const user = await fbGetApprovedUser(savedEmail);
+        if (user) {
+          afterLogin(savedEmail, user.teamName || savedTeam || '');
+        } else {
+          // No longer an approved user — clear session
+          localStorage.removeItem('pick5-session-email');
+          localStorage.removeItem('pick5-session-team');
+          staEl.textContent = '';
+        }
+      } catch(e) {
+        // Network error — clear status but stay on login page
+        staEl.textContent = '';
+        console.error('Auto-login failed:', e);
+      }
+    })();
+  }
 });
 
 // ── After Login ──
@@ -3148,6 +3237,8 @@ async function showPage(page) {
   document.getElementById('selectorPage').style.display     = 'none';
   document.getElementById('myPicksPage').style.display      = 'none';
   document.getElementById('scoresPage').style.display       = 'none';
+  document.getElementById('nbaScoresPage').style.display    = 'none';
+  document.getElementById('standingsPage').style.display    = 'none';
   document.getElementById('adminPage').style.display        = 'none';
   document.getElementById('weeklyPicksPage').style.display  = 'none';
   document.getElementById('resultsPage').style.display      = 'none';
@@ -3160,6 +3251,8 @@ async function showPage(page) {
   document.getElementById('navSelector').classList.remove('active');
   document.getElementById('navMyPicks').classList.remove('active');
   document.getElementById('navScores').classList.remove('active');
+  document.getElementById('navNbaScores').classList.remove('active');
+  document.getElementById('navStandings').classList.remove('active');
   document.getElementById('navWeeklyPicks').classList.remove('active');
   document.getElementById('navResults').classList.remove('active');
   document.getElementById('navLeaderboard').classList.remove('active');
@@ -3206,6 +3299,18 @@ async function showPage(page) {
     p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
     document.getElementById('navScores').classList.add('active');
     initScores();
+  } else if (page === 'nbaScores') {
+    const p = document.getElementById('nbaScoresPage');
+    p.style.display = 'flex';
+    p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
+    document.getElementById('navNbaScores').classList.add('active');
+    initNbaScores();
+  } else if (page === 'standings') {
+    const p = document.getElementById('standingsPage');
+    p.style.display = 'flex';
+    p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
+    document.getElementById('navStandings').classList.add('active');
+    initStandings();
   } else if (page === 'admin') {
     loadPendingRequests();
     loadMissingPicks();
@@ -3256,6 +3361,8 @@ function logout() {
   document.getElementById('selectorPage').style.display    = 'none';
   document.getElementById('myPicksPage').style.display     = 'none';
   document.getElementById('scoresPage').style.display      = 'none';
+  document.getElementById('nbaScoresPage').style.display   = 'none';
+  document.getElementById('standingsPage').style.display   = 'none';
   document.getElementById('adminPage').style.display       = 'none';
   document.getElementById('weeklyPicksPage').style.display = 'none';
   document.getElementById('resultsPage').style.display     = 'none';
@@ -3264,11 +3371,15 @@ function logout() {
   document.getElementById('teamDataPage').style.display    = 'none';
   document.getElementById('rulesRecordsPage').style.display = 'none';
   document.getElementById('trashTalkPage').style.display   = 'none';
+  document.getElementById('navNbaScores').style.display    = 'none';
   document.getElementById('nbaTab').style.display = 'none';
   document.getElementById('mlbTab').style.display = 'none';
+  stopWeekPolling();
   clearInterval(nbaScoresRefreshTimer);
   clearInterval(mlbScoresRefreshTimer);
   currentActiveWeek = null;
+  localStorage.removeItem('pick5-session-email');
+  localStorage.removeItem('pick5-session-team');
   document.getElementById('emailInput').value = '';
   document.getElementById('pinInput').value   = '';
   document.getElementById('errorMsg').classList.remove('show');
@@ -5016,6 +5127,192 @@ function escHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── Standings ──
+const STANDINGS_URLS = {
+  nfl: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/standings',
+  nba: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/standings',
+  mlb: 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/standings'
+};
+const STANDINGS_COLS = {
+  nfl: [
+    { key: 'wins',            label: 'W' },
+    { key: 'losses',          label: 'L' },
+    { key: 'ties',            label: 'T' },
+    { key: 'winPercent',      label: 'PCT', fmt: v => (+v).toFixed(3).replace(/^0/, '') },
+    { key: 'pointsFor',       label: 'PF',  fmt: v => Math.round(+v) },
+    { key: 'pointsAgainst',   label: 'PA',  fmt: v => Math.round(+v) }
+  ],
+  nba: [
+    { key: 'wins',            label: 'W' },
+    { key: 'losses',          label: 'L' },
+    { key: 'winPercent',      label: 'PCT', fmt: v => (+v).toFixed(3).replace(/^0/, '') },
+    { key: 'gamesBehind',     label: 'GB',  fmt: v => (+v === 0 ? '—' : (+v).toFixed(1)) },
+    { key: 'streak',          label: 'STK' }
+  ],
+  mlb: [
+    { key: 'wins',            label: 'W' },
+    { key: 'losses',          label: 'L' },
+    { key: 'winPercent',      label: 'PCT', fmt: v => (+v).toFixed(3).replace(/^0/, '') },
+    { key: 'gamesBehind',     label: 'GB',  fmt: v => (+v === 0 ? '—' : (+v).toFixed(1)) },
+    { key: 'streak',          label: 'STK' }
+  ]
+};
+
+let standingsCache   = {};
+let standingsActiveSport = 'nfl';
+
+function initStandings() {
+  switchStandingsTab(standingsActiveSport);
+}
+
+function switchStandingsTab(sport) {
+  standingsActiveSport = sport;
+  ['nfl','nba','mlb'].forEach(s => {
+    document.getElementById('standingsTab' + s.charAt(0).toUpperCase() + s.slice(1))
+      .classList.toggle('active', s === sport);
+  });
+  if (standingsCache[sport]) {
+    renderStandings(sport, standingsCache[sport]);
+  } else {
+    fetchStandings(sport);
+  }
+}
+
+async function fetchStandings(sport) {
+  const loadingEl = document.getElementById('standingsLoading');
+  const errorEl   = document.getElementById('standingsError');
+  const contentEl = document.getElementById('standingsContent');
+  loadingEl.style.display = 'block';
+  errorEl.style.display   = 'none';
+  contentEl.innerHTML     = '';
+
+  try {
+    const res  = await fetch(STANDINGS_URLS[sport]);
+    if (!res.ok) throw new Error('ESPN API error');
+    const data = await res.json();
+    standingsCache[sport] = data;
+    loadingEl.style.display = 'none';
+    renderStandings(sport, data);
+  } catch(err) {
+    loadingEl.style.display = 'none';
+    errorEl.style.display   = 'block';
+    errorEl.textContent     = 'Unable to load standings. Please try again later.';
+    console.error(err);
+  }
+}
+
+function getStatVal(stats, key) {
+  const s = (stats || []).find(x => x.name === key || x.abbreviation === key);
+  return s != null ? s.value : null;
+}
+
+function renderStandings(sport, data) {
+  const loadingEl = document.getElementById('standingsLoading');
+  const contentEl = document.getElementById('standingsContent');
+  loadingEl.style.display = 'none';
+  contentEl.innerHTML = '';
+
+  const cols = STANDINGS_COLS[sport];
+  const conferences = data.children || [];
+
+  conferences.forEach(function(conf) {
+    const confDiv = document.createElement('div');
+    confDiv.className = 'standings-conference';
+
+    const confName = document.createElement('div');
+    confName.className = 'standings-conf-name';
+    confName.textContent = conf.name || conf.abbreviation || '';
+    confDiv.appendChild(confName);
+
+    const divisions = conf.children || [conf];
+    divisions.forEach(function(div) {
+      const entries = (div.standings && div.standings.entries) || [];
+      if (!entries.length) return;
+
+      const divWrap = document.createElement('div');
+      divWrap.className = 'standings-division';
+
+      if (divisions.length > 1 && div.name) {
+        const divName = document.createElement('div');
+        divName.className = 'standings-div-name';
+        divName.textContent = div.name;
+        divWrap.appendChild(divName);
+      }
+
+      const table = document.createElement('table');
+      table.className = 'standings-table';
+
+      const thead = document.createElement('thead');
+      const hRow  = document.createElement('tr');
+      const thTeam = document.createElement('th');
+      thTeam.textContent = 'Team';
+      hRow.appendChild(thTeam);
+      cols.forEach(function(col) {
+        const th = document.createElement('th');
+        th.textContent = col.label;
+        hRow.appendChild(th);
+      });
+      thead.appendChild(hRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      entries.forEach(function(entry) {
+        const team  = entry.team || {};
+        const stats = entry.stats || [];
+        const tr    = document.createElement('tr');
+
+        const tdTeam = document.createElement('td');
+        const cell   = document.createElement('div');
+        cell.className = 'standings-team-cell';
+        const logos = team.logos || [];
+        if (logos.length) {
+          const img = document.createElement('img');
+          img.src = logos[0].href;
+          img.className = 'standings-team-logo';
+          img.alt = team.abbreviation || '';
+          cell.appendChild(img);
+        }
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'standings-team-name';
+        nameSpan.textContent = team.shortDisplayName || team.displayName || team.name || '';
+        const abbrSpan = document.createElement('span');
+        abbrSpan.className = 'standings-team-abbr';
+        abbrSpan.textContent = team.abbreviation || '';
+        cell.appendChild(nameSpan);
+        cell.appendChild(abbrSpan);
+        tdTeam.appendChild(cell);
+        tr.appendChild(tdTeam);
+
+        cols.forEach(function(col) {
+          const td = document.createElement('td');
+          const raw = getStatVal(stats, col.key);
+          if (raw == null) {
+            td.textContent = '—';
+            td.className = 'standings-gb';
+          } else {
+            const formatted = col.fmt ? col.fmt(raw) : raw;
+            td.textContent = formatted;
+            if (col.key === 'gamesBehind') td.className = 'standings-gb';
+            if (col.key === 'winPercent')  td.className = 'standings-pct';
+          }
+          tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      divWrap.appendChild(table);
+      confDiv.appendChild(divWrap);
+    });
+
+    contentEl.appendChild(confDiv);
+  });
+
+  if (!contentEl.innerHTML) {
+    contentEl.innerHTML = '<div class="scores-empty"><p>No standings data available.</p></div>';
+  }
+}
+
 // ── Admin ──
 async function loadAdminWeekOverride() {
   loadAdminSpreadsWeek();
@@ -6681,6 +6978,29 @@ document.addEventListener('keydown', function(e) {
       <div id="mlbScoresGrid"></div>
     </div>
 
+  </div>
+</div>
+
+
+<!-- ═══ STANDINGS PAGE ═══ -->
+<div class="page with-nav" id="standingsPage">
+  <div class="container" style="max-width:860px;">
+    <div class="page-header">
+      <div class="page-title">Standings</div>
+      <div class="page-subtitle">Current Season Records</div>
+      <div class="page-divider"></div>
+    </div>
+    <div class="standings-tabs">
+      <button class="standings-tab active" id="standingsTabNfl" onclick="switchStandingsTab('nfl')">NFL</button>
+      <button class="standings-tab" id="standingsTabNba" onclick="switchStandingsTab('nba')">NBA</button>
+      <button class="standings-tab" id="standingsTabMlb" onclick="switchStandingsTab('mlb')">MLB</button>
+    </div>
+    <div id="standingsLoading" class="picks-loading">
+      <div class="loading-spinner"></div>
+      <p>Loading standings…</p>
+    </div>
+    <div id="standingsError" class="picks-error" style="display:none;"></div>
+    <div id="standingsContent"></div>
   </div>
 </div>
 
