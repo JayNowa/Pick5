@@ -1618,7 +1618,7 @@
     border-radius: 4px;
     padding: 4px 10px;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 16px;
     white-space: nowrap;
   }
   .wp-pick img {
@@ -4214,6 +4214,7 @@ async function loadMyPicks() {
         const chipsEl = document.createElement('div');
         chipsEl.className = 'submission-picks';
         const spreadFields = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5];
+        let wins = 0, losses = 0, pending = 0;
         picks.forEach((pick, pi) => {
           const chip = document.createElement('div');
           chip.className = 'pick-chip';
@@ -4230,12 +4231,22 @@ async function loadMyPicks() {
           }
           const spread = spreadFields[pi] || '';
           const result = getPickResult(pick, spread, scoresMap);
-          if (result === 'win') chip.classList.add('win');
-          else if (result === 'loss') chip.classList.add('loss');
+          if (result === 'win') { chip.classList.add('win'); wins++; }
+          else if (result === 'loss') { chip.classList.add('loss'); losses++; }
+          else { pending++; }
           chip.appendChild(document.createTextNode(pick + (spread ? ' ' + spread : '')));
           chipsEl.appendChild(chip);
         });
         sub.appendChild(chipsEl);
+
+        if (wins > 0 || losses > 0) {
+          const recEl = document.createElement('div');
+          recEl.className = 'wp-record';
+          recEl.style.cssText = 'margin-top:8px;font-size:20px;';
+          recEl.innerHTML = '<span class="wins">' + wins + 'W</span> <span class="losses">' + losses + 'L</span>' +
+            (pending > 0 ? ' <span class="pending">(' + pending + ' pending)</span>' : '');
+          sub.appendChild(recEl);
+        }
 
         const missingCount = 5 - picks.length;
         if (missingCount > 0) {
