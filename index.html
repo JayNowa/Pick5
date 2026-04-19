@@ -2131,7 +2131,6 @@
     color: var(--text);
     line-height: 1;
     overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
   }
   .lb-email {
@@ -6413,6 +6412,15 @@ async function loadLeaderboard() {
         '</div>';
 
       contentEl.appendChild(row);
+    });
+
+    // Shrink team names that overflow their container
+    contentEl.querySelectorAll('.lb-name').forEach(function(el) {
+      let size = 22;
+      while (el.scrollWidth > el.offsetWidth && size > 13) {
+        size--;
+        el.style.fontSize = size + 'px';
+      }
     });
 
   } catch(err) {
