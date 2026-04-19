@@ -2977,23 +2977,27 @@
     await setDoc(doc(db, "settings", "spreadsWeek"), { value: value, updatedAt: Date.now() });
   };
 
+  // Cached by onSnapshot below — avoids repeated Firestore reads as users navigate
+  let _cachedWeek = null;
+  let _weekListenerReady = false;
+
   window.fbGetSpreadsWeek = async function() {
+    if (_cachedWeek !== null) return _cachedWeek;
+    // Fallback for the brief window before the listener fires on first load
     const snap = await getDoc(doc(db, "settings", "spreadsWeek"));
     return snap.exists() ? snap.data().value : null;
   };
 
-  // Real-time listener — show banner when admin changes the active week
-  let _weekListenerInitialized = false;
-  let _lastKnownWeek = null;
+  // Real-time listener — keeps cache current and shows banner on week change
   onSnapshot(doc(db, "settings", "spreadsWeek"), function(snap) {
     const newWeek = snap.exists() ? snap.data().value : null;
-    if (!_weekListenerInitialized) {
-      _lastKnownWeek = newWeek;
-      _weekListenerInitialized = true;
+    if (!_weekListenerReady) {
+      _cachedWeek = newWeek;
+      _weekListenerReady = true;
       return;
     }
-    if (newWeek && newWeek !== _lastKnownWeek) {
-      _lastKnownWeek = newWeek;
+    if (newWeek && newWeek !== _cachedWeek) {
+      _cachedWeek = newWeek;
       showWeekBanner(newWeek);
     }
   });
