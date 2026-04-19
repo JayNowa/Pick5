@@ -6417,7 +6417,7 @@ async function loadLeaderboard() {
     // Shrink team names that overflow their container
     contentEl.querySelectorAll('.lb-name').forEach(function(el) {
       let size = 22;
-      while (el.scrollWidth > el.offsetWidth && size > 13) {
+      while (el.scrollWidth + 4 > el.offsetWidth && size > 13) {
         size--;
         el.style.fontSize = size + 'px';
       }
