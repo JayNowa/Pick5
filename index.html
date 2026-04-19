@@ -159,7 +159,7 @@
   [data-theme="light"] .theme-toggle-btn.active { background: var(--surface); }
   [data-theme="light"] .font-btn { color: var(--text); border-color: var(--border); }
   [data-theme="light"] .version-badge { color: var(--muted); }
-  [data-theme="light"] #settingsBtn { color: var(--muted); border-color: var(--border); }
+  [data-theme="light"] #settingsBtn { color: var(--muted); border-color: var(--border); opacity: 0.85; }
   [data-theme="light"] .admin-corner-btn { color: var(--muted); border-color: var(--border); }
 
   /* ── FONT SCALE ── */
@@ -173,20 +173,20 @@
     bottom: 12px;
     right: 16px;
     z-index: 1000;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.12em;
     background: transparent;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    font-size: 18px;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.4);
+    color: #fff;
+    border-radius: 4px;
     cursor: pointer;
     display: none;
     align-items: center;
     justify-content: center;
     transition: all 0.18s;
-    opacity: 0.6;
-    padding: 0;
+    opacity: 0.85;
+    padding: 6px 14px;
   }
   #settingsBtn:hover { color: var(--accent); border-color: var(--accent); opacity: 1; }
 
