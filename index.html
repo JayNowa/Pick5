@@ -1154,6 +1154,22 @@
     align-items: center;
     gap: 8px;
   }
+  .pick-chip.win  { border-color: #4caf7d; background: rgba(76,175,125,0.12); }
+  .pick-chip.loss { border-color: #e05555; background: rgba(224,85,85,0.12); }
+  .pick-chip.win  img { filter: none; }
+  .pick-chip.loss img { filter: grayscale(0.4); }
+  .missing-picks-badge {
+    margin-top: 8px;
+    font-size: 12px;
+    font-family: 'Barlow Condensed', sans-serif;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #e05555;
+    border: 1px solid rgba(224,85,85,0.35);
+    border-radius: 4px;
+    padding: 3px 10px;
+    display: inline-block;
+  }
 
   .pick-num {
     font-family: 'Bebas Neue', sans-serif;
@@ -4159,9 +4175,17 @@ async function loadMyPicks() {
       grouped[week].push(doc);
     });
 
+    // Fetch scores for all unique weeks in parallel
+    const uniqueWeeks = [...new Set(weekOrder)];
+    const scoresByWeek = {};
+    await Promise.all(uniqueWeeks.map(async function(wk) {
+      try { scoresByWeek[wk] = await fetchESPNScoresMap(wk); } catch(e) { scoresByWeek[wk] = {}; }
+    }));
+
     const sortedWeeks = [...new Set(weekOrder)];
     sortedWeeks.forEach((week, wi) => {
       const submissions = grouped[week];
+      const scoresMap = scoresByWeek[week] || {};
       const group = document.createElement('div');
       group.className = 'week-group';
       group.style.animationDelay = (wi * 0.08) + 's';
@@ -4179,7 +4203,8 @@ async function loadMyPicks() {
       group.appendChild(header);
 
       submissions.forEach(doc => {
-        const picks = [doc.pick1, doc.pick2, doc.pick3, doc.pick4, doc.pick5].filter(p => p && p.trim());
+        const allPicks = [doc.pick1, doc.pick2, doc.pick3, doc.pick4, doc.pick5];
+        const picks = allPicks.filter(p => p && p.trim());
         const sub = document.createElement('div');
         sub.className = 'picks-submission';
         const meta = document.createElement('div');
@@ -4204,10 +4229,21 @@ async function loadMyPicks() {
             chip.appendChild(img);
           }
           const spread = spreadFields[pi] || '';
+          const result = getPickResult(pick, spread, scoresMap);
+          if (result === 'win') chip.classList.add('win');
+          else if (result === 'loss') chip.classList.add('loss');
           chip.appendChild(document.createTextNode(pick + (spread ? ' ' + spread : '')));
           chipsEl.appendChild(chip);
         });
         sub.appendChild(chipsEl);
+
+        const missingCount = 5 - picks.length;
+        if (missingCount > 0) {
+          const missingEl = document.createElement('div');
+          missingEl.className = 'missing-picks-badge';
+          missingEl.textContent = 'Missing ' + missingCount + ' pick' + (missingCount !== 1 ? 's' : '');
+          sub.appendChild(missingEl);
+        }
 
         // Show tiebreaker if submitted
         if (doc.tiebreaker !== undefined && doc.tiebreaker !== '') {
