@@ -1262,6 +1262,50 @@
   .toast.error   { border-color: #e05555; color: #e05555; }
   [data-theme="light"] .toast { background: #fff; }
 
+  /* ── WEEK CHANGE BANNER ── */
+  .week-banner {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 9998;
+    background: linear-gradient(135deg, #1a2a1a, #1e3a1e);
+    border-bottom: 2px solid #4caf7d;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    transform: translateY(-100%);
+    transition: transform 0.35s ease;
+  }
+  .week-banner.show { transform: translateY(0); }
+  .week-banner-text {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 16px;
+    letter-spacing: 0.06em;
+    color: #4caf7d;
+  }
+  .week-banner-text strong {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    letter-spacing: 0.1em;
+    color: #fff;
+    margin-left: 6px;
+  }
+  .week-banner-actions { display: flex; gap: 10px; flex-shrink: 0; }
+  .week-banner-btn {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    border-radius: 4px;
+    padding: 6px 14px;
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.18s;
+  }
+  .week-banner-btn:hover { opacity: 0.85; }
+  .week-banner-btn.primary { background: #4caf7d; color: #0a0c10; }
+  .week-banner-btn.dismiss { background: transparent; border: 1px solid rgba(76,175,125,0.4); color: #4caf7d; }
+
   /* ── ADMIN PAGE ── */
   .admin-corner-btn {
     font-family: 'Bebas Neue', sans-serif;
@@ -2865,7 +2909,7 @@
 </div>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, query, where, getDocs, doc, setDoc, getDoc, updateDoc, deleteDoc, orderBy, limit, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, collection, addDoc, query, where, getDocs, doc, setDoc, getDoc, updateDoc, deleteDoc, orderBy, limit, arrayUnion, arrayRemove, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyC6wED6bBvMNGiQFFEGHdQGSP7iKGSIdvk",
@@ -2937,6 +2981,22 @@
     const snap = await getDoc(doc(db, "settings", "spreadsWeek"));
     return snap.exists() ? snap.data().value : null;
   };
+
+  // Real-time listener — show banner when admin changes the active week
+  let _weekListenerInitialized = false;
+  let _lastKnownWeek = null;
+  onSnapshot(doc(db, "settings", "spreadsWeek"), function(snap) {
+    const newWeek = snap.exists() ? snap.data().value : null;
+    if (!_weekListenerInitialized) {
+      _lastKnownWeek = newWeek;
+      _weekListenerInitialized = true;
+      return;
+    }
+    if (newWeek && newWeek !== _lastKnownWeek) {
+      _lastKnownWeek = newWeek;
+      showWeekBanner(newWeek);
+    }
+  });
 
   window.fbSaveNbaVisible = async function(visible) {
     await setDoc(doc(db, "settings", "nbaVisible"), { value: visible, updatedAt: Date.now() });
@@ -3748,6 +3808,18 @@ function showToast(msg, type) {
   el.classList.add('show');
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(function() { el.classList.remove('show'); }, 3000);
+}
+
+function showWeekBanner(week) {
+  const banner = document.getElementById('weekBanner');
+  const label  = document.getElementById('weekBannerLabel');
+  if (!banner || !label) return;
+  label.textContent = week;
+  banner.classList.add('show');
+}
+function dismissWeekBanner() {
+  const banner = document.getElementById('weekBanner');
+  if (banner) banner.classList.remove('show');
 }
 
 // ── Picks: toggle, render, counter ──
@@ -7315,6 +7387,13 @@ document.addEventListener('keydown', function(e) {
 
 <div class="version-badge">v1.0.9</div>
 <div class="toast" id="toast"></div>
+<div class="week-banner" id="weekBanner">
+  <div class="week-banner-text">Picks are now open for<strong id="weekBannerLabel"></strong></div>
+  <div class="week-banner-actions">
+    <button class="week-banner-btn primary" onclick="showPage('selector');dismissWeekBanner();">View Picks</button>
+    <button class="week-banner-btn dismiss" onclick="dismissWeekBanner()">Dismiss</button>
+  </div>
+</div>
 
 <!-- ═══ GAME DETAIL MODAL ═══ -->
 <div id="gameDetailOverlay" style="display:none;" onclick="if(event.target===this)closeGameModal()">
