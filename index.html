@@ -3173,6 +3173,9 @@ let scoresYear = null;
 let scoresSeasonType = 2; // 1=pre, 2=regular, 3=post
 let scoresRefreshTimer = null;
 
+const SCORES_CACHE_MS = 2 * 60 * 1000;
+const scoresCache = {}; // key -> { data, ts }
+
 let currentActiveWeek = null;
 
 // ── Picks state ──
@@ -4503,9 +4506,17 @@ async function fetchScores() {
 
   try {
     const url = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=' + scoresYear + '&seasontype=' + scoresSeasonType + '&week=' + scoresWeek;
-    const res  = await fetch(url);
-    if (!res.ok) throw new Error('ESPN API error');
-    const data   = await res.json();
+    const cacheKey = url;
+    const cached = scoresCache[cacheKey];
+    let data;
+    if (cached && (Date.now() - cached.ts < SCORES_CACHE_MS)) {
+      data = cached.data;
+    } else {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('ESPN API error');
+      data = await res.json();
+      scoresCache[cacheKey] = { data, ts: Date.now() };
+    }
     const events = data.events || [];
     loadingEl.style.display = 'none';
 
@@ -4729,9 +4740,16 @@ async function fetchNbaScores() {
   try {
     const dateStr = nbaDateToYMD(nbaScoresDate);
     const url = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=' + dateStr;
-    const res  = await fetch(url);
-    if (!res.ok) throw new Error('ESPN API error');
-    const data   = await res.json();
+    const cached = scoresCache[url];
+    let data;
+    if (cached && (Date.now() - cached.ts < SCORES_CACHE_MS)) {
+      data = cached.data;
+    } else {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('ESPN API error');
+      data = await res.json();
+      scoresCache[url] = { data, ts: Date.now() };
+    }
     const events = data.events || [];
     loadingEl.style.display = 'none';
 
@@ -4913,9 +4931,16 @@ async function fetchMlbScores() {
   try {
     const dateStr = mlbDateToYMD(mlbScoresDate);
     const url = 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates=' + dateStr;
-    const res  = await fetch(url);
-    if (!res.ok) throw new Error('ESPN API error');
-    const data   = await res.json();
+    const cached = scoresCache[url];
+    let data;
+    if (cached && (Date.now() - cached.ts < SCORES_CACHE_MS)) {
+      data = cached.data;
+    } else {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('ESPN API error');
+      data = await res.json();
+      scoresCache[url] = { data, ts: Date.now() };
+    }
     const events = data.events || [];
     loadingEl.style.display = 'none';
 
@@ -5052,8 +5077,12 @@ function openGameModal(eventId, sport, league) {
   document.body.style.overflow = 'hidden';
 
   const url = 'https://site.api.espn.com/apis/site/v2/sports/' + sport + '/' + league + '/summary?event=' + eventId;
-  fetch(url)
-    .then(function(r) { if (!r.ok) throw new Error('API error'); return r.json(); })
+  const cachedDetail = scoresCache[url];
+  const detailPromise = (cachedDetail && (Date.now() - cachedDetail.ts < SCORES_CACHE_MS))
+    ? Promise.resolve(cachedDetail.data)
+    : fetch(url).then(function(r) { if (!r.ok) throw new Error('API error'); return r.json(); })
+        .then(function(d) { scoresCache[url] = { data: d, ts: Date.now() }; return d; });
+  detailPromise
     .then(function(data) { content.innerHTML = renderGameDetail(data, sport); })
     .catch(function() {
       content.innerHTML = '<div class="gd-error">Could not load game details. Try again later.</div>';
