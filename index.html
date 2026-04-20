@@ -4514,6 +4514,11 @@ async function fetchScores() {
       return;
     }
 
+    const stateOrder = { 'in': 0, 'pre': 1, 'post': 2 };
+    events.sort(function(a, b) {
+      return (stateOrder[a.status.type.state] ?? 1) - (stateOrder[b.status.type.state] ?? 1);
+    });
+
     const grid = document.createElement('div');
     grid.className = 'scores-grid';
 
@@ -4735,6 +4740,11 @@ async function fetchNbaScores() {
       return;
     }
 
+    const stateOrder = { 'in': 0, 'pre': 1, 'post': 2 };
+    events.sort(function(a, b) {
+      return (stateOrder[a.status.type.state] ?? 1) - (stateOrder[b.status.type.state] ?? 1);
+    });
+
     const grid = document.createElement('div');
     grid.className = 'scores-grid';
 
@@ -4913,6 +4923,11 @@ async function fetchMlbScores() {
       gridEl.innerHTML = '<div class="scores-empty"><div class="icon">⚾</div><p>No games scheduled for this date.</p></div>';
       return;
     }
+
+    const stateOrder = { 'in': 0, 'pre': 1, 'post': 2 };
+    events.sort(function(a, b) {
+      return (stateOrder[a.status.type.state] ?? 1) - (stateOrder[b.status.type.state] ?? 1);
+    });
 
     const grid = document.createElement('div');
     grid.className = 'scores-grid';
@@ -7389,7 +7404,7 @@ document.addEventListener('keydown', function(e) {
   </div>
 </div>
 
-<div class="version-badge">v1.1.0</div>
+<div class="version-badge">v1.1.1</div>
 <div class="toast" id="toast"></div>
 <div class="week-banner" id="weekBanner">
   <div class="week-banner-text">Picks are now open for<strong id="weekBannerLabel"></strong></div>
