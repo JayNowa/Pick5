@@ -3066,6 +3066,15 @@
     return snap.exists() ? snap.data().value : false;
   };
 
+  window.fbSaveStreakBannerVisible = async function(visible) {
+    await setDoc(doc(db, "settings", "streakBannerVisible"), { value: visible, updatedAt: Date.now() });
+  };
+
+  window.fbGetStreakBannerVisible = async function() {
+    const snap = await getDoc(doc(db, "settings", "streakBannerVisible"));
+    return snap.exists() ? snap.data().value : true;
+  };
+
   // ── Auth helpers ──
   window.fbGetApprovedUser = async function(email) {
     try {
@@ -3375,8 +3384,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Show Phillies streak banner (fetched from ESPN)
-  fetchAndShowPhilliesStreak();
+  // Show Phillies streak banner if enabled
+  (async function() {
+    const visible = window.fbGetStreakBannerVisible ? await window.fbGetStreakBannerVisible() : true;
+    if (visible) fetchAndShowPhilliesStreak();
+  })();
 
   // Auto-login if a remembered session exists
   const savedEmail = localStorage.getItem('pick5-session-email');
@@ -7402,6 +7414,10 @@ document.addEventListener('keydown', function(e) {
     <div class="admin-card">
       <div class="admin-card-title">⚾ Phillies Streak Banner</div>
       <p class="admin-card-desc">Auto-fetched from ESPN on every page load. Shows a scrolling banner on all screens.</p>
+      <div style="margin-top:12px;display:flex;align-items:center;gap:10px;">
+        <input type="checkbox" id="streakBannerVisibleToggle" onchange="handleStreakBannerToggle(this.checked)" style="width:18px;height:18px;cursor:pointer;accent-color:var(--accent);">
+        <label for="streakBannerVisibleToggle" id="streakBannerVisibleLabel" style="font-size:14px;color:var(--muted);cursor:pointer;">Loading…</label>
+      </div>
       <div style="margin-top:12px;font-size:15px;font-weight:600;color:var(--text);">Current streak: <span id="philliesStreakCurrent">—</span></div>
       <div style="margin-top:14px;">
         <button class="btn-submit" style="min-width:120px;" onclick="fetchAndShowPhilliesStreak(true)">Refresh Now</button>
@@ -7590,6 +7606,25 @@ function showPhilliesStreakBar(type, count) {
 
 async function loadAdminPhilliesStreak() {
   fetchAndShowPhilliesStreak(true);
+  const visible = window.fbGetStreakBannerVisible ? await window.fbGetStreakBannerVisible() : true;
+  const cb  = document.getElementById('streakBannerVisibleToggle');
+  const lbl = document.getElementById('streakBannerVisibleLabel');
+  if (cb)  cb.checked = !!visible;
+  if (lbl) lbl.textContent = visible ? 'Banner visible to all users' : 'Banner hidden from users';
+}
+
+async function handleStreakBannerToggle(checked) {
+  const lbl = document.getElementById('streakBannerVisibleLabel');
+  if (lbl) lbl.textContent = 'Saving…';
+  try {
+    await window.fbSaveStreakBannerVisible(checked);
+    if (lbl) lbl.textContent = checked ? 'Banner visible to all users' : 'Banner hidden from users';
+    const bar = document.getElementById('philliesStreakBar');
+    if (bar) bar.style.display = checked ? 'flex' : 'none';
+    if (checked) fetchAndShowPhilliesStreak();
+  } catch(e) {
+    if (lbl) lbl.textContent = 'Error saving — try again';
+  }
 }
 </script>
 
