@@ -3253,7 +3253,6 @@ function getTeamLogo(abbr) {
 // ── ESPN API Helpers ──
 function buildESPNScoreboardURL(weekValue, year) {
   year = year || new Date().getFullYear();
-  if (new Date().getMonth() < 8) year = year - 1;
   const wv = weekValue ? weekValue.toString().toLowerCase() : '';
   let seasontype = 2;
   let week = 1;
@@ -4459,7 +4458,7 @@ async function loadMyPicks() {
 // ── Scores ──
 async function initScores() {
   const now = new Date();
-  scoresYear = now.getMonth() < 8 ? now.getFullYear() - 1 : now.getFullYear();
+  scoresYear = now.getFullYear();
   try {
     const adminWeek = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
     if (adminWeek) {
