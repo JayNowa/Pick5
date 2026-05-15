@@ -4160,11 +4160,20 @@ async function fetchAndRenderSpreads(week) {
       const homeLogo = getTeamLogo(home);
 
       const card = document.createElement('div');
-      const awayStartedCheck = liveScoresMap && liveScoresMap[away] && liveScoresMap[away].started;
-      const homeStartedCheck = liveScoresMap && liveScoresMap[home] && liveScoresMap[home].started;
+      let gameIsInFuture = false;
+      if (date) {
+        try {
+          const dp = date.split('/');
+          const gd = new Date(parseInt(dp[2]) + 2000, parseInt(dp[0]) - 1, parseInt(dp[1]));
+          gameIsInFuture = gd > new Date();
+        } catch(e) {}
+      }
+      const liveMap = gameIsInFuture ? null : liveScoresMap;
+      const awayStartedCheck = liveMap && liveMap[away] && liveMap[away].started;
+      const homeStartedCheck = liveMap && liveMap[home] && liveMap[home].started;
       const gameStartedCheck = awayStartedCheck || homeStartedCheck;
-      const gameFinalCheck   = (liveScoresMap && liveScoresMap[away] && liveScoresMap[away].isFinal) ||
-                               (liveScoresMap && liveScoresMap[home] && liveScoresMap[home].isFinal);
+      const gameFinalCheck   = (liveMap && liveMap[away] && liveMap[away].isFinal) ||
+                               (liveMap && liveMap[home] && liveMap[home].isFinal);
 
       card.className = 'spread-card' + (gameFinalCheck ? ' game-final' : gameStartedCheck ? ' game-in-progress' : '');
       card.dataset.game = i;
@@ -4176,11 +4185,11 @@ async function fetchAndRenderSpreads(week) {
       awayBtn.className = 'team-pick-btn away-btn';
       awayBtn.dataset.abbr = away;
       awayBtn.dataset.game = i;
-      const awayStarted = liveScoresMap && liveScoresMap[away] && liveScoresMap[away].started;
-      const homeStarted = liveScoresMap && liveScoresMap[home] && liveScoresMap[home].started;
+      const awayStarted = liveMap && liveMap[away] && liveMap[away].started;
+      const homeStarted = liveMap && liveMap[home] && liveMap[home].started;
       const gameStarted = awayStarted || homeStarted;
-      const gameFinal   = (liveScoresMap && liveScoresMap[away] && liveScoresMap[away].isFinal) ||
-                          (liveScoresMap && liveScoresMap[home] && liveScoresMap[home].isFinal);
+      const gameFinal   = (liveMap && liveMap[away] && liveMap[away].isFinal) ||
+                          (liveMap && liveMap[home] && liveMap[home].isFinal);
 
       awayBtn.setAttribute('data-state', 'idle');
       awayBtn.dataset.spread = awaySpread || '';
@@ -4265,8 +4274,17 @@ async function fetchAndRenderSpreads(week) {
 
       // Lock tiebreaker if last game has started or is final
       const tbInput = document.getElementById('tiebreakerInput');
-      const tbStarted = liveScoresMap && lastAway && liveScoresMap[lastAway.toUpperCase()] && liveScoresMap[lastAway.toUpperCase()].started;
-      const tbFinal   = liveScoresMap && lastAway && liveScoresMap[lastAway.toUpperCase()] && liveScoresMap[lastAway.toUpperCase()].isFinal;
+      let lastGameInFuture = false;
+      if (lastDate) {
+        try {
+          const ldp = lastDate.split('/');
+          const lgd = new Date(parseInt(ldp[2]) + 2000, parseInt(ldp[0]) - 1, parseInt(ldp[1]));
+          lastGameInFuture = lgd > new Date();
+        } catch(e) {}
+      }
+      const tbLiveMap = lastGameInFuture ? null : liveScoresMap;
+      const tbStarted = tbLiveMap && lastAway && tbLiveMap[lastAway.toUpperCase()] && tbLiveMap[lastAway.toUpperCase()].started;
+      const tbFinal   = tbLiveMap && lastAway && tbLiveMap[lastAway.toUpperCase()] && tbLiveMap[lastAway.toUpperCase()].isFinal;
       if (tbStarted) {
         tbInput.disabled = true;
         tbInput.style.opacity = '0.45';
