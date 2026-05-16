@@ -29,6 +29,10 @@
     --nav-h: 60px;
   }
 
+  /* ── BRIGHT SECONDARY TEXT ── */
+  body.muted-bright { --muted: #c8cdd8; }
+  [data-theme="light"] body.muted-bright { --muted: #3a4158; }
+
   /* ── LIGHT THEME ── */
   [data-theme="light"] {
     --bg: #f0f2f5;
@@ -6349,11 +6353,22 @@ function setFontSize(size) {
   });
 }
 
+function setMutedStyle(style) {
+  document.body.classList.toggle('muted-bright', style === 'bright');
+  localStorage.setItem('pick5-muted', style);
+  const greyBtn   = document.getElementById('mutedGrey');
+  const brightBtn = document.getElementById('mutedBright');
+  if (greyBtn)   greyBtn.classList.toggle('active',   style === 'grey');
+  if (brightBtn) brightBtn.classList.toggle('active', style === 'bright');
+}
+
 function initSettings() {
   const theme = localStorage.getItem('pick5-theme') || 'dark';
   const size  = localStorage.getItem('pick5-fontsize') || 'normal';
+  const muted = localStorage.getItem('pick5-muted') || 'grey';
   setTheme(theme);
   setFontSize(size);
+  setMutedStyle(muted);
 }
 
 // Init on load
@@ -7540,6 +7555,13 @@ document.addEventListener('keydown', function(e) {
       <button class="font-btn" id="fontSmall"  onclick="setFontSize('small')">S</button>
       <button class="font-btn" id="fontNormal" onclick="setFontSize('normal')">M</button>
       <button class="font-btn" id="fontLarge"  onclick="setFontSize('large')">L</button>
+    </div>
+  </div>
+  <div class="settings-row">
+    <span class="settings-label">Secondary Text</span>
+    <div class="font-btns">
+      <button class="font-btn" id="mutedGrey"   onclick="setMutedStyle('grey')">Grey</button>
+      <button class="font-btn" id="mutedBright" onclick="setMutedStyle('bright')">White</button>
     </div>
   </div>
 </div>
