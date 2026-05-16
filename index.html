@@ -3048,32 +3048,43 @@
     }
   });
 
-  window.fbSaveNbaVisible = async function(visible) {
-    await setDoc(doc(db, "settings", "nbaVisible"), { value: visible, updatedAt: Date.now() });
+  // ── Consolidated UI config — single read, cached ──
+  let _uiConfigCache = null;
+
+  window.fbGetUIConfig = async function() {
+    if (_uiConfigCache !== null) return _uiConfigCache;
+    const snap = await getDoc(doc(db, "settings", "uiConfig"));
+    if (snap.exists()) {
+      _uiConfigCache = snap.data();
+    } else {
+      // First-time: migrate from legacy individual docs
+      const [nba, mlb, streak] = await Promise.all([
+        getDoc(doc(db, "settings", "nbaVisible")),
+        getDoc(doc(db, "settings", "mlbVisible")),
+        getDoc(doc(db, "settings", "streakBannerVisible"))
+      ]);
+      _uiConfigCache = {
+        nbaVisible:           nba.exists()    ? nba.data().value    : false,
+        mlbVisible:           mlb.exists()    ? mlb.data().value    : false,
+        streakBannerVisible:  streak.exists() ? streak.data().value : true
+      };
+      setDoc(doc(db, "settings", "uiConfig"), _uiConfigCache);
+    }
+    return _uiConfigCache;
   };
 
-  window.fbGetNbaVisible = async function() {
-    const snap = await getDoc(doc(db, "settings", "nbaVisible"));
-    return snap.exists() ? snap.data().value : false;
+  window.fbSaveUIConfig = async function(updates) {
+    await setDoc(doc(db, "settings", "uiConfig"), updates, { merge: true });
+    _uiConfigCache = Object.assign({}, _uiConfigCache || {}, updates);
   };
 
-  window.fbSaveMlbVisible = async function(visible) {
-    await setDoc(doc(db, "settings", "mlbVisible"), { value: visible, updatedAt: Date.now() });
-  };
+  window.fbSaveNbaVisible        = async function(v) { await window.fbSaveUIConfig({ nbaVisible: v }); };
+  window.fbSaveMlbVisible        = async function(v) { await window.fbSaveUIConfig({ mlbVisible: v }); };
+  window.fbSaveStreakBannerVisible = async function(v) { await window.fbSaveUIConfig({ streakBannerVisible: v }); };
 
-  window.fbGetMlbVisible = async function() {
-    const snap = await getDoc(doc(db, "settings", "mlbVisible"));
-    return snap.exists() ? snap.data().value : false;
-  };
-
-  window.fbSaveStreakBannerVisible = async function(visible) {
-    await setDoc(doc(db, "settings", "streakBannerVisible"), { value: visible, updatedAt: Date.now() });
-  };
-
-  window.fbGetStreakBannerVisible = async function() {
-    const snap = await getDoc(doc(db, "settings", "streakBannerVisible"));
-    return snap.exists() ? snap.data().value : true;
-  };
+  window.fbGetNbaVisible          = async function() { return !!((await window.fbGetUIConfig()).nbaVisible); };
+  window.fbGetMlbVisible          = async function() { return !!((await window.fbGetUIConfig()).mlbVisible); };
+  window.fbGetStreakBannerVisible  = async function() { const c = await window.fbGetUIConfig(); return c.streakBannerVisible !== false; };
 
   // ── Auth helpers ──
   window.fbGetApprovedUser = async function(email) {
@@ -3384,10 +3395,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Show Phillies streak banner if enabled
+  // Load all UI config in one read, then apply settings
   (async function() {
-    const visible = window.fbGetStreakBannerVisible ? await window.fbGetStreakBannerVisible() : true;
-    if (visible) fetchAndShowPhilliesStreak();
+    const cfg = window.fbGetUIConfig ? await window.fbGetUIConfig() : {};
+    if (cfg.streakBannerVisible !== false) fetchAndShowPhilliesStreak();
+    window._uiConfigReady = cfg;
   })();
 
   // Auto-login if a remembered session exists
@@ -3445,13 +3457,12 @@ function afterLogin(email, teamName) {
       const w = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
       currentActiveWeek = w ? String(w) : null;
     } catch(e) {}
-    // Show NBA/MLB score tabs if enabled or if admin
+    // Show NBA/MLB score tabs if enabled or if admin (uses cached config — no extra read)
     try {
-      const nbaVisible = window.fbGetNbaVisible ? await window.fbGetNbaVisible() : false;
-      const mlbVisible = window.fbGetMlbVisible ? await window.fbGetMlbVisible() : false;
+      const cfg = window.fbGetUIConfig ? await window.fbGetUIConfig() : {};
       const isAdmin = email && ADMIN_EMAILS.includes(email.toLowerCase());
-      if (nbaVisible || isAdmin) document.getElementById('nbaTab').style.display = '';
-      if (mlbVisible || isAdmin) document.getElementById('mlbTab').style.display = '';
+      if (cfg.nbaVisible || isAdmin) document.getElementById('nbaTab').style.display = '';
+      if (cfg.mlbVisible || isAdmin) document.getElementById('mlbTab').style.display = '';
     } catch(e) {}
     await updateWeekBadge();
     // Admin pending badge
@@ -5655,9 +5666,8 @@ async function loadAdminWeekOverride() {
 
 async function loadAdminScoresTabStatus() {
   try {
-    const nbaVisible = window.fbGetNbaVisible ? await window.fbGetNbaVisible() : false;
-    const mlbVisible = window.fbGetMlbVisible ? await window.fbGetMlbVisible() : false;
-    const visible = nbaVisible || mlbVisible;
+    const cfg = window.fbGetUIConfig ? await window.fbGetUIConfig() : {};
+    const visible = cfg.nbaVisible || cfg.mlbVisible;
     const cb  = document.getElementById('scoresTabsVisibleToggle');
     const lbl = document.getElementById('scoresTabsVisibleLabel');
     if (cb)  cb.checked = !!visible;
