@@ -4635,14 +4635,22 @@ function changeScoresWeek(dir) {
   fetchScores();
 }
 
+function showNflStandings() {
+  const cacheKey = 'nfl' + scoresYear;
+  if (standingsCache[cacheKey]) {
+    renderStandings('nfl', standingsCache[cacheKey], scoresYear);
+  } else {
+    fetchStandings('nfl', scoresYear);
+  }
+}
+
 function changeScoresYear(dir) {
   const now = new Date();
   const maxYear = now.getMonth() >= 8 ? now.getFullYear() + 1 : now.getFullYear();
   scoresYear = Math.min(maxYear, Math.max(2000, scoresYear + dir));
   updateScoresYearLabel();
   fetchScores();
-  // Refresh NFL standings for the new year (cache miss will trigger fetch)
-  if (!standingsCache['nfl' + scoresYear]) fetchStandings('nfl', scoresYear);
+  showNflStandings();
 }
 
 async function fetchScores() {
@@ -4828,8 +4836,11 @@ function switchScoresTab(tab) {
     fetchMlbScores();
     mlbScoresRefreshTimer = setInterval(fetchMlbScores, 15 * 60 * 1000);
   }
-  const standingsCacheKey = tab === 'nfl' ? tab + (scoresYear || '') : tab;
-  if (!standingsCache[standingsCacheKey]) fetchStandings(tab, tab === 'nfl' ? scoresYear : null);
+  if (tab === 'nfl') {
+    showNflStandings();
+  } else if (!standingsCache[tab]) {
+    fetchStandings(tab, null);
+  }
 }
 
 // ── NBA Scores ──
@@ -5607,7 +5618,7 @@ async function fetchStandings(sport, year) {
     const data = await res.json();
     standingsCache[cacheKey] = data;
     loadingEl.style.display = 'none';
-    renderStandings(sport, data);
+    renderStandings(sport, data, year);
   } catch(err) {
     loadingEl.style.display = 'none';
     errorEl.style.display   = 'block';
@@ -5621,15 +5632,21 @@ function getStatVal(stats, key) {
   return s != null ? s.value : null;
 }
 
-function renderStandings(sport, data) {
+function renderStandings(sport, data, year) {
   const loadingEl = document.getElementById(sport + 'StandingsLoading');
   const contentEl = document.getElementById(sport + 'StandingsContent');
   if (!contentEl) return;
   loadingEl.style.display = 'none';
   contentEl.innerHTML = '';
 
+  if (sport === 'nfl' && year) {
+    const yearEl = document.getElementById('nflStandingsYear');
+    if (yearEl) yearEl.textContent = '· ' + year;
+  }
+
   const cols = STANDINGS_COLS[sport];
   const conferences = data.children || [];
+  let teamCount = 0;
 
   conferences.forEach(function(conf) {
     const confDiv = document.createElement('div');
@@ -5644,6 +5661,7 @@ function renderStandings(sport, data) {
     divisions.forEach(function(div) {
       const entries = (div.standings && div.standings.entries) || [];
       if (!entries.length) return;
+      teamCount += entries.length;
 
       const divWrap = document.createElement('div');
       divWrap.className = 'standings-division';
@@ -5724,8 +5742,8 @@ function renderStandings(sport, data) {
     contentEl.appendChild(confDiv);
   });
 
-  if (!contentEl.innerHTML) {
-    contentEl.innerHTML = '<div class="scores-empty"><p>No standings data available.</p></div>';
+  if (teamCount === 0) {
+    contentEl.innerHTML = '<div class="scores-empty"><p>No standings available for this season yet.</p></div>';
   }
 }
 
@@ -7420,7 +7438,7 @@ document.addEventListener('keydown', function(e) {
       <div id="scoresLoading" class="picks-loading"><div class="loading-spinner"></div><p>Loading scores…</p></div>
       <div id="scoresError" class="picks-error" style="display:none;"></div>
       <div id="scoresGrid"></div>
-      <div class="standings-section-divider">Standings</div>
+      <div class="standings-section-divider">Standings <span id="nflStandingsYear" style="font-size:14px;color:var(--muted);font-family:inherit;font-weight:400;letter-spacing:0;"></span></div>
       <div id="nflStandingsLoading" class="picks-loading" style="display:none;"><div class="loading-spinner"></div><p>Loading standings…</p></div>
       <div id="nflStandingsError" class="picks-error" style="display:none;"></div>
       <div id="nflStandingsContent"></div>
