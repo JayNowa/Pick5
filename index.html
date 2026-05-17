@@ -471,7 +471,49 @@
   }
   .btn-delete-user:hover { background: rgba(255,80,80,0.3); }
   .btn-delete-user:disabled { opacity: 0.4; cursor: default; }
+  .btn-reset-pin {
+    padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer;
+    font-size: 13px; font-weight: 600;
+    background: rgba(200,169,74,0.15); color: var(--accent);
+    transition: background 0.15s; margin-right: 6px;
+  }
+  .btn-reset-pin:hover { background: rgba(200,169,74,0.3); }
+  .btn-reset-pin:disabled { opacity: 0.4; cursor: default; }
   .users-count { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+
+  /* ── CHANGE PIN OVERLAY ── */
+  #changePinOverlay {
+    position: fixed; inset: 0; z-index: 10000;
+    background: rgba(0,0,0,0.75);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .change-pin-modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px 28px;
+    width: 100%; max-width: 360px;
+    text-align: center;
+  }
+  .change-pin-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px; letter-spacing: 0.1em;
+    color: var(--accent); margin-bottom: 8px;
+  }
+  .change-pin-desc {
+    font-size: 14px; color: var(--muted); margin-bottom: 24px; line-height: 1.5;
+  }
+  .change-pin-input {
+    width: 100%; box-sizing: border-box;
+    background: var(--hover); border: 1px solid var(--border);
+    border-radius: 6px; padding: 12px 14px;
+    font-size: 18px; color: var(--text); text-align: center;
+    letter-spacing: 0.3em; margin-bottom: 12px; outline: none;
+  }
+  .change-pin-input:focus { border-color: var(--accent); }
+  .change-pin-input.error { border-color: var(--error); }
+  .change-pin-error { font-size: 13px; color: var(--error); margin-bottom: 12px; min-height: 18px; }
 
   /* ── LOGIN ── */
   header { text-align: center; margin-bottom: 48px; }
@@ -3160,6 +3202,14 @@
     await deleteDoc(doc(db, "approvedUsers", docId));
   };
 
+  window.fbResetUserPIN = async function(docId) {
+    await updateDoc(doc(db, "approvedUsers", docId), { pin: '1234', mustChangePIN: true });
+  };
+
+  window.fbUpdateUserPIN = async function(docId, newPin) {
+    await updateDoc(doc(db, "approvedUsers", docId), { pin: newPin, mustChangePIN: false });
+  };
+
   window.fbCheckTeamNameTaken = async function(teamName) {
     try {
       const normalised = teamName.trim().toLowerCase();
@@ -3371,6 +3421,10 @@ async function handleLogin() {
         localStorage.setItem('pick5-session-email', email);
         localStorage.setItem('pick5-session-team', user.teamName || '');
       }
+      if (user.mustChangePIN) {
+        showChangePinModal(user.id, email, user.teamName || '');
+        return;
+      }
       afterLogin(email, user.teamName || '');
     } else if (user) {
       showError('Incorrect PIN. Please try again.');
@@ -3421,7 +3475,11 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const user = await fbGetApprovedUser(savedEmail);
         if (user) {
-          afterLogin(savedEmail, user.teamName || savedTeam || '');
+          if (user.mustChangePIN) {
+            showChangePinModal(user.id, savedEmail, user.teamName || savedTeam || '');
+          } else {
+            afterLogin(savedEmail, user.teamName || savedTeam || '');
+          }
         } else {
           // No longer an approved user — clear session
           localStorage.removeItem('pick5-session-email');
@@ -5978,6 +6036,7 @@ async function loadUsersPage() {
         (user.phone ? '<div class="user-phone">' + user.phone + '</div>' : '') +
       '</div>' +
       '<span class="user-badge ' + (isAdmin ? 'admin' : 'member') + '">' + (isAdmin ? 'Admin' : 'Member') + '</span>' +
+      (!isSelf ? '<button class="btn-reset-pin" data-docid="' + user.id + '" data-name="' + escHtml(user.teamName || user.email) + '" onclick="handleResetPin(this)">Reset PIN</button>' : '') +
       (isSelf || isAdmin ? '' : '<button class="btn-delete-user" id="del-' + user.id + '" data-docid="' + user.id + '" data-email="' + user.email + '" onclick="handleDeleteUser(this)">Delete</button>');
 
     listEl.appendChild(row);
@@ -6000,6 +6059,56 @@ async function handleDeleteUser(btn) {
   } catch(e) {
     alert('Error deleting user: ' + e.message);
     if (btn) btn.disabled = false;
+  }
+}
+
+async function handleResetPin(btn) {
+  const docId = btn.dataset.docid;
+  const name  = btn.dataset.name;
+  if (!confirm('Reset PIN for ' + name + ' to 1234? They will be prompted to set a new PIN on next login.')) return;
+  btn.disabled = true;
+  try {
+    await window.fbResetUserPIN(docId);
+    showToast('PIN reset to 1234', 'success');
+  } catch(e) {
+    showToast('Failed to reset PIN', 'error');
+  }
+  btn.disabled = false;
+}
+
+let _cpDocId = null, _cpEmail = null, _cpTeam = null;
+
+function showChangePinModal(docId, email, team) {
+  _cpDocId = docId; _cpEmail = email; _cpTeam = team;
+  document.getElementById('newPinInput').value = '';
+  document.getElementById('confirmPinInput').value = '';
+  document.getElementById('changePinError').textContent = '';
+  document.getElementById('changePinOverlay').style.display = 'flex';
+  document.getElementById('newPinInput').focus();
+}
+
+async function handleChangePinSubmit() {
+  const newPin     = document.getElementById('newPinInput').value.trim();
+  const confirmPin = document.getElementById('confirmPinInput').value.trim();
+  const errEl      = document.getElementById('changePinError');
+  const newEl      = document.getElementById('newPinInput');
+  const confEl     = document.getElementById('confirmPinInput');
+
+  newEl.classList.remove('error'); confEl.classList.remove('error');
+  if (!/^\d{4}$/.test(newPin))   { errEl.textContent = 'PIN must be exactly 4 digits.'; newEl.classList.add('error'); return; }
+  if (newPin === '1234')         { errEl.textContent = 'Please choose a different PIN.'; newEl.classList.add('error'); return; }
+  if (newPin !== confirmPin)     { errEl.textContent = 'PINs do not match.'; confEl.classList.add('error'); return; }
+
+  errEl.textContent = '';
+  const submitBtn = document.querySelector('#changePinOverlay .btn-submit');
+  if (submitBtn) submitBtn.disabled = true;
+  try {
+    await window.fbUpdateUserPIN(_cpDocId, newPin);
+    document.getElementById('changePinOverlay').style.display = 'none';
+    afterLogin(_cpEmail, _cpTeam);
+  } catch(e) {
+    errEl.textContent = 'Failed to update PIN. Please try again.';
+    if (submitBtn) submitBtn.disabled = false;
   }
 }
 
@@ -7563,6 +7672,18 @@ document.addEventListener('keydown', function(e) {
       <button class="font-btn" id="mutedGrey"   onclick="setMutedStyle('grey')">Grey</button>
       <button class="font-btn" id="mutedBright" onclick="setMutedStyle('bright')">White</button>
     </div>
+  </div>
+</div>
+
+<!-- ═══ CHANGE PIN OVERLAY ═══ -->
+<div id="changePinOverlay" style="display:none;">
+  <div class="change-pin-modal">
+    <div class="change-pin-title">Set New PIN</div>
+    <p class="change-pin-desc">Your PIN has been reset by an admin. Please choose a new 4-digit PIN to continue.</p>
+    <input class="change-pin-input" type="password" inputmode="numeric" maxlength="4" id="newPinInput" placeholder="New PIN" autocomplete="new-password">
+    <input class="change-pin-input" type="password" inputmode="numeric" maxlength="4" id="confirmPinInput" placeholder="Confirm PIN" autocomplete="new-password">
+    <div class="change-pin-error" id="changePinError"></div>
+    <button class="btn-submit" style="width:100%;" onclick="handleChangePinSubmit()">Set PIN</button>
   </div>
 </div>
 
