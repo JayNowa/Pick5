@@ -4641,6 +4641,8 @@ function changeScoresYear(dir) {
   scoresYear = Math.min(maxYear, Math.max(2000, scoresYear + dir));
   updateScoresYearLabel();
   fetchScores();
+  // Refresh NFL standings for the new year (cache miss will trigger fetch)
+  if (!standingsCache['nfl' + scoresYear]) fetchStandings('nfl', scoresYear);
 }
 
 async function fetchScores() {
@@ -4826,7 +4828,8 @@ function switchScoresTab(tab) {
     fetchMlbScores();
     mlbScoresRefreshTimer = setInterval(fetchMlbScores, 15 * 60 * 1000);
   }
-  if (!standingsCache[tab]) fetchStandings(tab);
+  const standingsCacheKey = tab === 'nfl' ? tab + (scoresYear || '') : tab;
+  if (!standingsCache[standingsCacheKey]) fetchStandings(tab, tab === 'nfl' ? scoresYear : null);
 }
 
 // ── NBA Scores ──
@@ -5552,6 +5555,10 @@ const STANDINGS_URLS = {
   nba: STANDINGS_BASE + 'basketball/nba'    + STANDINGS_SUFFIX,
   mlb: STANDINGS_BASE + 'baseball/mlb'      + STANDINGS_SUFFIX
 };
+function standingsUrl(sport, year) {
+  const base = STANDINGS_URLS[sport];
+  return (sport === 'nfl' && year) ? base + '&season=' + year : base;
+}
 function fmtStreak(v) {
   const n = +v;
   if (isNaN(n) || n === 0) return '—';
@@ -5584,7 +5591,8 @@ const STANDINGS_COLS = {
 
 let standingsCache = {};
 
-async function fetchStandings(sport) {
+async function fetchStandings(sport, year) {
+  const cacheKey = sport === 'nfl' ? sport + (year || '') : sport;
   const loadingEl = document.getElementById(sport + 'StandingsLoading');
   const errorEl   = document.getElementById(sport + 'StandingsError');
   const contentEl = document.getElementById(sport + 'StandingsContent');
@@ -5594,10 +5602,10 @@ async function fetchStandings(sport) {
   contentEl.innerHTML     = '';
 
   try {
-    const res  = await fetch(STANDINGS_URLS[sport]);
+    const res  = await fetch(standingsUrl(sport, year));
     if (!res.ok) throw new Error('ESPN API error');
     const data = await res.json();
-    standingsCache[sport] = data;
+    standingsCache[cacheKey] = data;
     loadingEl.style.display = 'none';
     renderStandings(sport, data);
   } catch(err) {
