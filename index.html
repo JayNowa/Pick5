@@ -3228,7 +3228,7 @@
 <script>
 // ── Constants ──
 const ADMIN_EMAILS     = ["jenowakoski@gmail.com", "wcgriffiths14@gmail.com"];
-const PICKS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwSRseA76KhYoGki33yQ7O5MEGVOBdKYzYTAYSef88VBgoi2ymcWRvz3sZg5sqeIw/exec';
+const PICKS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyPEI6dlUGhZrbDOzX2aQ-cfZe3wflgDfxBogLbx15xbkETyPZxIdAOQM_wlCszHiQu/exec';
 const PICKS_DB_URL     = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS9-umRqGXfrl2flUZQ2pQaGaNT0FB8VsmjbFOs9Yjjh8PH2DaTGyAWEkEvWf5HUjHxgzyq7Z5XrvY2/pub?gid=0&single=true&output=csv';
 const SPREADS_CSV_URL  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTCZp0JY_6F3IQ_Uv7pRTTLRymDJ6NG8t9nT6KrFZ5pru7yZykoa5h2prW91r0x9kbej0aCZKHrSxH8/pub?gid=1821550063&single=true&output=csv';
 const RULES_CSV_URL    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSrOK6gU_IKZDjDFPVzPS4feK73hhXXbD1EOWkvcJ_LpUwhD_8K5iyb22Q4kuORdEfQeSCtvKM4GI2Z/pub?gid=0&single=true&output=csv';
@@ -5976,6 +5976,7 @@ async function loadUsersPage() {
         '<div class="user-name">' + (user.teamName || '—') + '</div>' +
         '<div class="user-email">' + user.email + '</div>' +
         (user.phone ? '<div class="user-phone">' + user.phone + '</div>' : '') +
+        (user.pin ? '<div class="user-phone">PIN: ' + user.pin + '</div>' : '') +
       '</div>' +
       '<span class="user-badge ' + (isAdmin ? 'admin' : 'member') + '">' + (isAdmin ? 'Admin' : 'Member') + '</span>' +
       (isSelf || isAdmin ? '' : '<button class="btn-delete-user" id="del-' + user.id + '" data-docid="' + user.id + '" data-email="' + user.email + '" onclick="handleDeleteUser(this)">Delete</button>');
