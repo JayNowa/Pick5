@@ -7710,7 +7710,7 @@ document.addEventListener('keydown', function(e) {
 
 <script>
 // ── Phillies Streak Banner (ESPN) ──
-async function fetchAndShowPhilliesStreak(fromAdmin) {
+async function fetchAndShowPhilliesStreak(fromAdmin, showBar = true) {
   const status  = fromAdmin ? document.getElementById('philliesStreakStatus') : null;
   const current = document.getElementById('philliesStreakCurrent');
   if (status) { status.textContent = 'Fetching from ESPN…'; status.className = 'admin-status'; }
@@ -7733,7 +7733,7 @@ async function fetchAndShowPhilliesStreak(fromAdmin) {
     if (!streakDisplay) throw new Error('streak not found');
     const wins  = streakDisplay.charAt(0).toUpperCase() === 'W';
     const count = parseInt(streakDisplay.slice(1), 10) || 1;
-    showPhilliesStreakBar(wins ? 'W' : 'L', count);
+    if (showBar) showPhilliesStreakBar(wins ? 'W' : 'L', count);
     if (current) current.textContent = streakDisplay;
     if (status) { status.textContent = 'Updated.'; status.className = 'admin-status success'; setTimeout(() => { status.textContent = ''; status.className = 'admin-status'; }, 3000); }
   } catch(e) {
@@ -7759,11 +7759,12 @@ function showPhilliesStreakBar(type, count) {
 }
 
 async function loadAdminPhilliesStreak() {
-  fetchAndShowPhilliesStreak(true);
-  const visible = window.fbGetStreakBannerVisible ? await window.fbGetStreakBannerVisible() : true;
+  const cfg = window.fbGetUIConfig ? await window.fbGetUIConfig() : {};
+  const visible = cfg.streakBannerVisible !== false;
+  await fetchAndShowPhilliesStreak(true, visible);
   const cb  = document.getElementById('streakBannerVisibleToggle');
   const lbl = document.getElementById('streakBannerVisibleLabel');
-  if (cb)  cb.checked = !!visible;
+  if (cb)  cb.checked = visible;
   if (lbl) lbl.textContent = visible ? 'Banner visible to all users' : 'Banner hidden from users';
 }
 
