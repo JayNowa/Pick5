@@ -7824,12 +7824,7 @@ function showPhilliesStreakBar(type, count) {
 async function loadAdminPhilliesStreak() {
   const cfg = window.fbGetUIConfig ? await window.fbGetUIConfig() : {};
   const visible = cfg.streakBannerVisible !== false;
-  await fetchAndShowPhilliesStreak(true);
-  // fetchAndShowPhilliesStreak always shows the bar — re-apply saved setting
-  if (!visible) {
-    const bar = document.getElementById('philliesStreakBar');
-    if (bar) { bar.style.display = 'none'; document.body.classList.remove('has-streak-bar'); }
-  }
+  await fetchAndShowPhilliesStreak(true, visible);
   const cb  = document.getElementById('streakBannerVisibleToggle');
   const lbl = document.getElementById('streakBannerVisibleLabel');
   if (cb)  cb.checked = visible;
