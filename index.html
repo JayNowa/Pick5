@@ -7753,6 +7753,10 @@ function showPhilliesStreakBar(type, count) {
   const streak = wins ? `W${count}` : `L${count}`;
   const seg    = `  ${emoji}  PHILLIES  ·  ${streak}  ·  ${count} ${noun}  ·  `;
   inner.textContent = seg.repeat(6);
+  // Restart animation so it always scrolls from the beginning
+  inner.style.animation = 'none';
+  void inner.offsetWidth;
+  inner.style.animation = 'phillies-scroll 28s linear infinite';
   bar.className = wins ? 'win-streak' : 'loss-streak';
   bar.style.display = 'flex';
   document.body.classList.add('has-streak-bar');
@@ -7774,9 +7778,12 @@ async function handleStreakBannerToggle(checked) {
   try {
     await window.fbSaveStreakBannerVisible(checked);
     if (lbl) lbl.textContent = checked ? 'Banner visible to all users' : 'Banner hidden from users';
-    const bar = document.getElementById('philliesStreakBar');
-    if (bar) bar.style.display = checked ? 'flex' : 'none';
-    if (checked) fetchAndShowPhilliesStreak();
+    if (checked) {
+      fetchAndShowPhilliesStreak(); // showPhilliesStreakBar handles display:flex once data is ready
+    } else {
+      const bar = document.getElementById('philliesStreakBar');
+      if (bar) { bar.style.display = 'none'; document.body.classList.remove('has-streak-bar'); }
+    }
   } catch(e) {
     if (lbl) lbl.textContent = 'Error saving — try again';
   }
