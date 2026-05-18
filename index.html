@@ -7219,7 +7219,16 @@ async function loadWeeklyPicks() {
       tr.appendChild(recordTd);
 
       const tbTd = document.createElement('td');
-      if (doc.tiebreaker !== undefined && doc.tiebreaker !== '') {
+      // Only reveal tiebreaker after the tiebreaker game has started
+      let tbGameStarted = false;
+      if (doc.tiebreakerGame && scoresMap) {
+        const tbAway = (doc.tiebreakerGame.split(' @ ')[0] || '').trim().toUpperCase();
+        const tbGd = scoresMap[tbAway];
+        tbGameStarted = tbGd ? !!tbGd.started : false;
+      } else if (!doc.tiebreakerGame) {
+        tbGameStarted = true; // older picks without saved game — show as-is
+      }
+      if (doc.tiebreaker !== undefined && doc.tiebreaker !== '' && tbGameStarted) {
         const actualTotal = scoresMap ? getActualTiebreaker(scoresMap) : null;
         if (actualTotal !== null) {
           const diff = Math.abs(parseInt(doc.tiebreaker) - actualTotal);
