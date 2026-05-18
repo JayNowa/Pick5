@@ -7255,6 +7255,8 @@ async function loadWeeklyPicks() {
         const pick = pair[0], spread = pair[1];
         if (pick && pick.trim()) {
           const abbr = pick.trim().toUpperCase();
+          const gameData = scoresMap && scoresMap[abbr];
+          if (!gameData || !gameData.started) return; // hide until game starts
           pickCounts[abbr] = (pickCounts[abbr] || 0) + 1;
           if (spread && !pickSpreads[abbr]) pickSpreads[abbr] = spread;
         }
