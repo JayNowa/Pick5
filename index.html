@@ -7265,7 +7265,7 @@ async function loadWeeklyPicks() {
 
     const sortedTeams = Object.keys(pickCounts).sort(function(a, b) { return a.localeCompare(b); });
 
-    if (sortedTeams.length > 0) {
+    {
       const distWrap = document.createElement('div');
       distWrap.className = 'wp-dist wp-dist-collapsible';
 
@@ -7275,25 +7275,35 @@ async function loadWeeklyPicks() {
       toggle.onclick = function() { distWrap.classList.toggle('open'); };
       distWrap.appendChild(toggle);
 
-      const grid = document.createElement('div');
-      grid.className = 'wp-dist-grid wp-dist-body';
+      const body = document.createElement('div');
+      body.className = 'wp-dist-body';
 
-      sortedTeams.forEach(function(abbr) {
-        const item = document.createElement('div');
-        const distResult = getPickResult(abbr, pickSpreads[abbr] || '', scoresMap);
-        item.className = 'wp-dist-item' + (distResult === 'win' ? ' win' : distResult === 'loss' ? ' loss' : '');
-        const logo = getTeamLogo(abbr);
-        if (logo) { const img = document.createElement('img'); img.src = logo; img.alt = abbr; item.appendChild(img); }
-        const name = document.createElement('span'); name.className = 'wp-dist-abbr'; name.textContent = abbr; item.appendChild(name);
-        const count = document.createElement('span'); count.className = 'wp-dist-count'; count.textContent = pickCounts[abbr]; item.appendChild(count);
-        grid.appendChild(item);
-      });
+      if (sortedTeams.length === 0) {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'font-size:14px;color:var(--muted);text-align:center;padding:16px 12px;';
+        empty.textContent = 'No picks from games that have started or finished yet.';
+        body.appendChild(empty);
+      } else {
+        const grid = document.createElement('div');
+        grid.className = 'wp-dist-grid';
+        sortedTeams.forEach(function(abbr) {
+          const item = document.createElement('div');
+          const distResult = getPickResult(abbr, pickSpreads[abbr] || '', scoresMap);
+          item.className = 'wp-dist-item' + (distResult === 'win' ? ' win' : distResult === 'loss' ? ' loss' : '');
+          const logo = getTeamLogo(abbr);
+          if (logo) { const img = document.createElement('img'); img.src = logo; img.alt = abbr; item.appendChild(img); }
+          const name = document.createElement('span'); name.className = 'wp-dist-abbr'; name.textContent = abbr; item.appendChild(name);
+          const count = document.createElement('span'); count.className = 'wp-dist-count'; count.textContent = pickCounts[abbr]; item.appendChild(count);
+          grid.appendChild(item);
+        });
+        body.appendChild(grid);
+        const note = document.createElement('div');
+        note.style.cssText = 'font-size:12px;color:var(--muted);text-align:center;padding:8px 12px 4px;';
+        note.textContent = '* Only showing teams whose game has started or finished';
+        body.appendChild(note);
+      }
 
-      const note = document.createElement('div');
-      note.style.cssText = 'font-size:12px;color:var(--muted);text-align:center;padding:8px 12px 4px;';
-      note.textContent = '* Only showing teams whose game has started or finished';
-      distWrap.appendChild(grid);
-      distWrap.appendChild(note);
+      distWrap.appendChild(body);
       tableEl.appendChild(distWrap);
     }
 
