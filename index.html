@@ -7289,7 +7289,11 @@ async function loadWeeklyPicks() {
         grid.appendChild(item);
       });
 
+      const note = document.createElement('div');
+      note.style.cssText = 'font-size:12px;color:var(--muted);text-align:center;padding:8px 12px 4px;';
+      note.textContent = '* Only showing teams whose game has started or finished';
       distWrap.appendChild(grid);
+      distWrap.appendChild(note);
       tableEl.appendChild(distWrap);
     }
 
