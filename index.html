@@ -7255,6 +7255,8 @@ async function loadWeeklyPicks() {
         const pick = pair[0], spread = pair[1];
         if (pick && pick.trim()) {
           const abbr = pick.trim().toUpperCase();
+          const gameData = scoresMap && scoresMap[abbr];
+          if (!gameData || !gameData.started) return; // hide until game starts
           pickCounts[abbr] = (pickCounts[abbr] || 0) + 1;
           if (spread && !pickSpreads[abbr]) pickSpreads[abbr] = spread;
         }
@@ -7287,7 +7289,11 @@ async function loadWeeklyPicks() {
         grid.appendChild(item);
       });
 
+      const note = document.createElement('div');
+      note.style.cssText = 'font-size:12px;color:var(--muted);text-align:center;padding:8px 12px 4px;';
+      note.textContent = '* Only showing teams whose game has started or finished';
       distWrap.appendChild(grid);
+      distWrap.appendChild(note);
       tableEl.appendChild(distWrap);
     }
 
