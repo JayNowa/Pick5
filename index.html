@@ -6701,6 +6701,19 @@ function getPickResult(pick, spreadStr, scoresMap) {
 }
 
 // ── Results Page ──
+// Returns true only when every game in the week's scoresMap is final
+function isWeekFullyFinal(weekScores) {
+  const games = Object.values(weekScores || {});
+  if (!games.length) return false;
+  const seen = new Set();
+  let allFinal = true;
+  games.forEach(function(g) {
+    const key = (g.homeAbbr || '') + '_' + (g.awayAbbr || '');
+    if (!seen.has(key)) { seen.add(key); if (!g.isFinal) allFinal = false; }
+  });
+  return allFinal;
+}
+
 // ── Leaderboard ──
 async function loadLeaderboard() {
   const loadingEl = document.getElementById('leaderboardLoading');
@@ -6753,9 +6766,13 @@ async function loadLeaderboard() {
         const picks   = [doc.pick1,   doc.pick2,   doc.pick3,   doc.pick4,   doc.pick5];
         const spreads = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5];
 
+        const weekFullyFinal = isWeekFullyFinal(weekScores);
         let weekPending = 0;
         picks.forEach(function(pick, pi) {
-          if (!pick || !pick.trim()) { totalLosses++; return; }
+          if (!pick || !pick.trim()) {
+            if (weekFullyFinal) totalLosses++; // only penalise once week is over
+            return;
+          }
           const result = getPickResult(pick, spreads[pi] || '', weekScores);
           if (result === 'win')       totalWins++;
           else if (result === 'loss') totalLosses++;
