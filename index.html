@@ -7202,6 +7202,7 @@ async function loadWeeklyPicks() {
       const picks   = [doc.pick1,   doc.pick2,   doc.pick3,   doc.pick4,   doc.pick5];
       const spreads = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5];
       let wins = 0, losses = 0, pending = 0;
+      const weekFinalWP = isWeekFullyFinal(scoresMap || {});
 
       picks.forEach(function(pick, pi) {
         const td = document.createElement('td');
@@ -7227,10 +7228,10 @@ async function loadWeeklyPicks() {
           td.appendChild(chip);
         } else {
           const chip = document.createElement('span');
-          chip.className = 'wp-pick loss';
+          chip.className = weekFinalWP ? 'wp-pick loss' : 'wp-pick hidden';
           chip.textContent = 'No Pick';
           td.appendChild(chip);
-          losses++;
+          if (weekFinalWP) losses++;
         }
         tr.appendChild(td);
       });
