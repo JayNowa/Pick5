@@ -3329,9 +3329,12 @@ function buildESPNScoreboardURL(weekValue, year) {
   const wv = weekValue ? weekValue.toString().toLowerCase() : '';
   let seasontype = 2;
   let week = 1;
-  if (wv.includes('pre')) {
+  if (wv === 'hof game' || wv === 'hof') {
     seasontype = 1;
-    week = parseInt(wv.replace(/[^0-9]/g, '')) || 1;
+    week = 1; // ESPN preseason week 1 = HOF game
+  } else if (wv.includes('pre')) {
+    seasontype = 1;
+    week = (parseInt(wv.replace(/[^0-9]/g, '')) || 1) + 1; // Pre Week N → ESPN week N+1
   } else {
     week = parseInt(weekValue) || 1;
   }
@@ -4565,10 +4568,12 @@ async function initScores() {
     const adminWeek = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
     if (adminWeek) {
       const aw = adminWeek.toString().toLowerCase();
-      if (aw.includes('pre')) {
-        // Pre Week — switch to preseason, extract number
+      if (aw === 'hof game' || aw === 'hof') {
         scoresSeasonType = 1;
-        scoresWeek = parseInt(aw.replace(/[^0-9]/g, '')) || 1;
+        scoresWeek = 1;
+      } else if (aw.includes('pre')) {
+        scoresSeasonType = 1;
+        scoresWeek = (parseInt(aw.replace(/[^0-9]/g, '')) || 1) + 1; // Pre Week N → ESPN week N+1
       } else {
         scoresSeasonType = 2;
         scoresWeek = parseInt(adminWeek) || 1;
@@ -4589,7 +4594,7 @@ async function initScores() {
 
 function updateScoresSeasonLabel() {
   const labels = { 1: 'Preseason', 2: 'Regular', 3: 'Playoffs' };
-  const maxWeeks = { 1: 4, 2: 18, 3: 5 };
+  const maxWeeks = { 1: 5, 2: 18, 3: 5 };
   document.getElementById('scoresSeasonLabel').textContent = labels[scoresSeasonType] || 'Regular';
   document.getElementById('seasonPrev').disabled = scoresSeasonType <= 1;
   document.getElementById('seasonNext').disabled = scoresSeasonType >= 3;
@@ -4607,9 +4612,11 @@ function changeSeasonType(dir) {
 
 function updateScoresWeekLabel() {
   const playoffLabels = { 1: 'Wild Card', 2: 'Divisional', 3: 'Conf. Champ', 5: 'Super Bowl' };
-  const maxWeek = scoresSeasonType === 1 ? 4 : scoresSeasonType === 3 ? 5 : 18;
+  const maxWeek = scoresSeasonType === 1 ? 5 : scoresSeasonType === 3 ? 5 : 18;
   if (scoresSeasonType === 3) {
     document.getElementById('scoresWeekLabel').textContent = playoffLabels[scoresWeek] || 'Week ' + scoresWeek;
+  } else if (scoresSeasonType === 1 && scoresWeek === 1) {
+    document.getElementById('scoresWeekLabel').textContent = 'HOF Game';
   } else {
     document.getElementById('scoresWeekLabel').textContent = 'Week ' + scoresWeek;
   }
@@ -7550,9 +7557,11 @@ document.addEventListener('keydown', function(e) {
           <label>Select Week to Display</label>
           <select id="adminSpreadsWeekSelect">
             <option value="">— None (hide graphic) —</option>
+            <option value="HOF Game">HOF Game</option>
             <option value="Pre Week 1">Pre Week 1</option>
             <option value="Pre Week 2">Pre Week 2</option>
             <option value="Pre Week 3">Pre Week 3</option>
+            <option value="Pre Week 4">Pre Week 4</option>
             <option value="1">Week 1</option>
             <option value="2">Week 2</option>
             <option value="3">Week 3</option>
