@@ -4594,7 +4594,7 @@ async function initScores() {
 
 function updateScoresSeasonLabel() {
   const labels = { 1: 'Preseason', 2: 'Regular', 3: 'Playoffs' };
-  const maxWeeks = { 1: 4, 2: 18, 3: 5 };
+  const maxWeeks = { 1: 5, 2: 18, 3: 5 };
   document.getElementById('scoresSeasonLabel').textContent = labels[scoresSeasonType] || 'Regular';
   document.getElementById('seasonPrev').disabled = scoresSeasonType <= 1;
   document.getElementById('seasonNext').disabled = scoresSeasonType >= 3;
@@ -4612,7 +4612,7 @@ function changeSeasonType(dir) {
 
 function updateScoresWeekLabel() {
   const playoffLabels = { 1: 'Wild Card', 2: 'Divisional', 3: 'Conf. Champ', 5: 'Super Bowl' };
-  const maxWeek = scoresSeasonType === 1 ? 4 : scoresSeasonType === 3 ? 5 : 18;
+  const maxWeek = scoresSeasonType === 1 ? 5 : scoresSeasonType === 3 ? 5 : 18;
   if (scoresSeasonType === 3) {
     document.getElementById('scoresWeekLabel').textContent = playoffLabels[scoresWeek] || 'Week ' + scoresWeek;
   } else if (scoresSeasonType === 1 && scoresWeek === 1) {
@@ -7580,6 +7580,7 @@ document.addEventListener('keydown', function(e) {
             <option value="Pre Week 1">Pre Week 1</option>
             <option value="Pre Week 2">Pre Week 2</option>
             <option value="Pre Week 3">Pre Week 3</option>
+            <option value="Pre Week 4">Pre Week 4</option>
             <option value="1">Week 1</option>
             <option value="2">Week 2</option>
             <option value="3">Week 3</option>
