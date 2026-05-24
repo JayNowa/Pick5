@@ -6978,9 +6978,10 @@ async function loadResultsPage() {
         const picks   = [doc.pick1,   doc.pick2,   doc.pick3,   doc.pick4,   doc.pick5];
         const spreads = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5];
 
+        const weekFinal = isWeekFullyFinal(weekScores);
         let w = 0, l = 0, p = 0;
         picks.forEach(function(pick, pi) {
-          if (!pick || !pick.trim()) { l++; return; }
+          if (!pick || !pick.trim()) { if (weekFinal) l++; return; }
           const result = getPickResult(pick, spreads[pi] || '', weekScores);
           if (result === 'win')       w++;
           else if (result === 'loss') l++;
