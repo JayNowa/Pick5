@@ -4075,7 +4075,7 @@ async function submitSpreadsPicks() {
   let weekLabel = 'Off Season';
   try {
     const w = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
-    weekLabel = w ? ((w.toString().toLowerCase().includes('week')) ? w : 'Week ' + w) : 'Off Season';
+    weekLabel = w ? ((isNaN(parseInt(w)) || w.toString().toLowerCase().includes('week')) ? w : 'Week ' + w) : 'Off Season';
   } catch(e) {}
 
   const navEl = document.getElementById('navEmail');
@@ -7104,7 +7104,7 @@ async function loadWeeklyPicks() {
 
   try {
     const week = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
-    const weekLabel = week ? ((week.toString().toLowerCase().includes('week')) ? week : 'Week ' + week) : null;
+    const weekLabel = week ? ((isNaN(parseInt(week)) || week.toString().toLowerCase().includes('week')) ? week : 'Week ' + week) : null;
 
     if (!weekLabel) {
       loadingEl.style.display = 'none';
