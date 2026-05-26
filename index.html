@@ -6828,9 +6828,8 @@ async function loadLeaderboard() {
           '<div class="lb-name">' + user.name + '</div>' +
           '<div class="lb-record">' +
             (allPending
-              ? '<span style="color:var(--muted);font-size:12px;letter-spacing:0.06em;">Results pending</span>'
-              : user.totalWins + 'W &ndash; ' + user.totalLosses + 'L') +
-            (pendingLabel ? ' ' + pendingLabel : '') +
+              ? (pendingLabel || '<span style="color:var(--muted);font-size:12px;letter-spacing:0.06em;">Results pending</span>')
+              : user.totalWins + 'W &ndash; ' + user.totalLosses + 'L' + (pendingLabel ? ' ' + pendingLabel : '')) +
           '</div>' +
         '</div>' +
         '<div class="lb-stats">' +
