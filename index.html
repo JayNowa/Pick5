@@ -173,10 +173,6 @@
 
   /* ── SETTINGS PANEL ── */
   #settingsBtn {
-    position: fixed;
-    bottom: 12px;
-    right: 16px;
-    z-index: 1000;
     font-family: 'Bebas Neue', sans-serif;
     font-size: 13px;
     letter-spacing: 0.12em;
@@ -196,7 +192,7 @@
 
   .settings-panel {
     position: fixed;
-    bottom: 56px;
+    top: calc(var(--nav-h) + 40px);
     right: 16px;
     z-index: 1000;
     background: var(--surface);
@@ -402,7 +398,7 @@
   }
 
   .page.with-nav {
-    padding-top: calc(var(--nav-h) + 40px);
+    padding-top: calc(var(--nav-h) + 40px + 36px);
     justify-content: flex-start;
   }
 
@@ -1278,17 +1274,33 @@
 
   /* ── VERSION BADGE ── */
   .version-badge {
-    position: fixed;
-    bottom: 12px;
-    right: 60px;
     font-family: 'Bebas Neue', sans-serif;
     font-size: 13px;
     letter-spacing: 0.12em;
     color: var(--muted);
     opacity: 0.5;
-    z-index: 999;
+    pointer-events: none;
+    margin-right: 8px;
+  }
+
+  /* ── UTILITY BAR (admin/users/settings/version — below nav) ── */
+  #utilityBar {
+    position: fixed;
+    top: var(--nav-h);
+    left: 0; right: 0;
+    z-index: 998;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 16px;
+    background: transparent;
+    transition: transform 0.22s ease;
     pointer-events: none;
   }
+  #utilityBar.hidden-bar { transform: translateY(-110%); }
+  #utilityBar > * { pointer-events: auto; }
+  .utility-left { display: flex; gap: 8px; align-items: center; }
+  .utility-right { display: flex; gap: 0; align-items: center; }
 
   /* ── TOAST ── */
   .toast {
@@ -2826,7 +2838,7 @@
     100% { transform: translateX(-50%); }
   }
   body.has-streak-bar #topNav { top: 52px; }
-  body.has-streak-bar .page.with-nav { padding-top: calc(52px + var(--nav-h) + 40px); }
+  body.has-streak-bar .page.with-nav { padding-top: calc(52px + var(--nav-h) + 40px + 36px); }
 
 </style>
 </head>
@@ -2859,9 +2871,15 @@
     <button class="btn-logout" onclick="logout()">Log Out</button>
   </div>
 </nav>
-<div id="adminCorner" style="display:none;position:fixed;bottom:12px;left:16px;z-index:999;">
-  <button class="admin-corner-btn" id="adminBtn" onclick="showPage('admin')">⚙ Admin</button>
-  <button class="admin-corner-btn" style="margin-top:6px;" onclick="showPage('users')">👥 Users</button>
+<div id="utilityBar">
+  <div class="utility-left">
+    <button class="admin-corner-btn" id="adminBtn" onclick="showPage('admin')">⚙ Admin</button>
+    <button class="admin-corner-btn" onclick="showPage('users')">👥 Users</button>
+  </div>
+  <div class="utility-right">
+    <div class="version-badge">v1.2.6</div>
+    <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
+  </div>
 </div>
 
 <!-- ═══ LOGIN PAGE ═══ -->
@@ -3449,6 +3467,13 @@ async function handleLogin() {
   }
 }
 
+window.addEventListener('scroll', function() {
+  const bar = document.getElementById('utilityBar');
+  if (bar && bar.style.display !== 'none') {
+    bar.classList.toggle('hidden-bar', window.scrollY > 8);
+  }
+}, { passive: true });
+
 document.addEventListener('DOMContentLoaded', () => {
   ['emailInput','pinInput'].forEach(id => {
     document.getElementById(id).addEventListener('keydown', e => {
@@ -3507,9 +3532,11 @@ function afterLogin(email, teamName) {
   navEl.dataset.teamname = teamName || '';
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('topNav').classList.add('visible');
-  if (email && ADMIN_EMAILS.includes(email.toLowerCase())) {
-    document.getElementById('adminCorner').style.display = 'block';
-  document.getElementById('settingsBtn').style.display = 'flex';
+  const utilBar = document.getElementById('utilityBar');
+  if (utilBar) {
+    utilBar.style.display = 'flex';
+    const adminLeft = utilBar.querySelector('.utility-left');
+    if (adminLeft) adminLeft.style.display = email && ADMIN_EMAILS.includes(email.toLowerCase()) ? 'flex' : 'none';
   }
   // Wait for Firebase to be ready, then load everything
   (async function waitForFirebase() {
@@ -3647,8 +3674,8 @@ async function showPage(page) {
 // ── Logout ──
 function logout() {
   document.getElementById('topNav').classList.remove('visible');
-  document.getElementById('adminCorner').style.display  = 'none';
-  document.getElementById('settingsBtn').style.display  = 'none';
+  const utilBarOut = document.getElementById('utilityBar');
+  if (utilBarOut) utilBarOut.style.display = 'none';
   document.getElementById('settingsPanel').classList.remove('open');
   document.getElementById('loginPage').style.display    = 'flex';
   document.getElementById('selectorPage').style.display    = 'none';
@@ -7731,7 +7758,6 @@ document.addEventListener('keydown', function(e) {
   </div>
 </div>
 
-<button id="settingsBtn" onclick="toggleSettingsPanel()" title="Settings">⚙</button>
 <div id="settingsPanel" class="settings-panel">
   <div class="settings-title">⚙ Settings</div>
   <div class="settings-row">
@@ -7770,7 +7796,6 @@ document.addEventListener('keydown', function(e) {
   </div>
 </div>
 
-<div class="version-badge">v1.2.6</div>
 <div class="toast" id="toast"></div>
 <div class="week-banner" id="weekBanner">
   <div class="week-banner-text">Picks are now open for<strong id="weekBannerLabel"></strong></div>
