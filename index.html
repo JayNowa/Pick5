@@ -6828,9 +6828,8 @@ async function loadLeaderboard() {
           '<div class="lb-name">' + user.name + '</div>' +
           '<div class="lb-record">' +
             (allPending
-              ? '<span style="color:var(--muted);font-size:12px;letter-spacing:0.06em;">Results pending</span>'
-              : user.totalWins + 'W &ndash; ' + user.totalLosses + 'L') +
-            (pendingLabel ? ' ' + pendingLabel : '') +
+              ? (pendingLabel || '<span style="color:var(--muted);font-size:12px;letter-spacing:0.06em;">Results pending</span>')
+              : user.totalWins + 'W &ndash; ' + user.totalLosses + 'L' + (pendingLabel ? ' ' + pendingLabel : '')) +
           '</div>' +
         '</div>' +
         '<div class="lb-stats">' +
@@ -7771,7 +7770,7 @@ document.addEventListener('keydown', function(e) {
   </div>
 </div>
 
-<div class="version-badge">v1.2.5</div>
+<div class="version-badge">v1.2.6</div>
 <div class="toast" id="toast"></div>
 <div class="week-banner" id="weekBanner">
   <div class="week-banner-text">Picks are now open for<strong id="weekBannerLabel"></strong></div>
