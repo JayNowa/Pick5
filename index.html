@@ -6758,7 +6758,7 @@ async function loadLeaderboard() {
     // Calculate totals per user
     const standings = Object.keys(userWeekMap).map(function(email) {
       let totalWins = 0, totalLosses = 0, totalTbDiff = 0, tbCount = 0;
-      let hasPending = false;
+      let pendingCount = 0;
 
       Object.keys(userWeekMap[email]).forEach(function(week) {
         const doc = userWeekMap[email][week];
@@ -6767,24 +6767,16 @@ async function loadLeaderboard() {
         const spreads = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5];
 
         const weekFullyFinal = isWeekFullyFinal(weekScores);
-        let weekPending = 0;
         picks.forEach(function(pick, pi) {
           if (!pick || !pick.trim()) {
-            if (weekFullyFinal) totalLosses++; // only penalise once week is over
+            if (weekFullyFinal) totalLosses++;
             return;
           }
           const result = getPickResult(pick, spreads[pi] || '', weekScores);
           if (result === 'win')       totalWins++;
           else if (result === 'loss') totalLosses++;
-          else                        weekPending++;
+          else                        pendingCount++;
         });
-
-        // Flag if this is the active week and not all games are final
-        if (currentActiveWeek) {
-          const activeLabel = (isNaN(parseInt(currentActiveWeek)) || currentActiveWeek.toString().toLowerCase().includes('week'))
-            ? currentActiveWeek : 'Week ' + currentActiveWeek;
-          if (week === activeLabel && weekPending > 0) hasPending = true;
-        }
 
         if (doc.tiebreaker !== undefined && doc.tiebreaker !== '') {
           const actual = getActualTiebreakerFromWeek(weekScores);
@@ -6802,7 +6794,7 @@ async function loadLeaderboard() {
         totalLosses,
         totalTbDiff,
         tbCount,
-        hasPending
+        pendingCount
       };
     });
 
@@ -6825,21 +6817,34 @@ async function loadLeaderboard() {
       const rankClass = idx < 5 ? rankClasses[idx] : (isLast ? 'loser' : 'other');
       const rankDisplay = idx < 5 ? medals[idx] : (isLast ? '💩' : (idx + 1));
 
+      const pendingLabel = user.pendingCount > 0
+        ? '<span style="color:var(--muted);font-size:11px;letter-spacing:0.06em;">' + user.pendingCount + ' game' + (user.pendingCount !== 1 ? 's' : '') + ' pending</span>'
+        : '';
+      const allPending = user.totalWins === 0 && user.totalLosses === 0;
+
       row.innerHTML =
         '<div class="lb-rank ' + rankClass + '">' + rankDisplay + '</div>' +
         '<div class="lb-info">' +
           '<div class="lb-name">' + user.name + '</div>' +
-          '<div class="lb-record">' + user.totalWins + 'W &ndash; ' + user.totalLosses + 'L' + (user.hasPending ? ' <span style="color:var(--muted);font-size:11px;letter-spacing:0.06em;">*pending</span>' : '') + '</div>' +
+          '<div class="lb-record">' +
+            (allPending
+              ? '<span style="color:var(--muted);font-size:12px;letter-spacing:0.06em;">Results pending</span>'
+              : user.totalWins + 'W &ndash; ' + user.totalLosses + 'L') +
+            (pendingLabel ? ' ' + pendingLabel : '') +
+          '</div>' +
         '</div>' +
         '<div class="lb-stats">' +
-          '<div class="lb-stat">' +
-            '<div class="lb-stat-val wins-val">' + user.totalWins + (user.hasPending ? '<span style="color:var(--muted);font-size:14px;">*</span>' : '') + '</div>' +
-            '<div class="lb-stat-label">Wins</div>' +
-          '</div>' +
-          '<div class="lb-stat">' +
-            '<div class="lb-stat-val losses-val">' + user.totalLosses + '</div>' +
-            '<div class="lb-stat-label">Losses</div>' +
-          '</div>' +
+          (allPending
+            ? '<div class="lb-stat"><div class="lb-stat-val" style="color:var(--muted);font-size:13px;">Pending</div></div>'
+            : '<div class="lb-stat">' +
+                '<div class="lb-stat-val wins-val">' + user.totalWins + '</div>' +
+                '<div class="lb-stat-label">Wins</div>' +
+              '</div>' +
+              '<div class="lb-stat">' +
+                '<div class="lb-stat-val losses-val">' + user.totalLosses + '</div>' +
+                '<div class="lb-stat-label">Losses</div>' +
+              '</div>'
+          ) +
           (user.tbCount > 0 ?
             '<div class="lb-stat">' +
               '<div class="lb-stat-val tb-val">' + user.totalTbDiff + '</div>' +
@@ -7766,7 +7771,7 @@ document.addEventListener('keydown', function(e) {
   </div>
 </div>
 
-<div class="version-badge">v1.2.4</div>
+<div class="version-badge">v1.2.5</div>
 <div class="toast" id="toast"></div>
 <div class="week-banner" id="weekBanner">
   <div class="week-banner-text">Picks are now open for<strong id="weekBannerLabel"></strong></div>
