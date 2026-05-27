@@ -192,7 +192,7 @@
 
   .settings-panel {
     position: fixed;
-    top: calc(var(--nav-h) + 40px);
+    bottom: 56px;
     right: 16px;
     z-index: 1000;
     background: var(--surface);
@@ -398,7 +398,7 @@
   }
 
   .page.with-nav {
-    padding-top: calc(var(--nav-h) + 40px + 36px);
+    padding-top: calc(var(--nav-h) + 40px);
     justify-content: flex-start;
   }
 
@@ -1285,19 +1285,16 @@
 
   /* ── UTILITY BAR (admin/users/settings/version — below nav) ── */
   #utilityBar {
-    position: fixed;
-    top: var(--nav-h);
-    left: 0; right: 0;
-    z-index: 998;
+    margin-top: var(--nav-h);
+    width: 100%;
     display: none;
     align-items: center;
     justify-content: space-between;
     padding: 6px 16px;
     background: transparent;
-    transition: transform 0.22s ease;
     pointer-events: none;
+    box-sizing: border-box;
   }
-  #utilityBar.hidden-bar { transform: translateY(-110%); }
   #utilityBar > * { pointer-events: auto; }
   .utility-left { display: flex; gap: 8px; align-items: center; }
   .utility-right { display: flex; gap: 0; align-items: center; }
@@ -2838,7 +2835,7 @@
     100% { transform: translateX(-50%); }
   }
   body.has-streak-bar #topNav { top: 52px; }
-  body.has-streak-bar .page.with-nav { padding-top: calc(52px + var(--nav-h) + 40px + 36px); }
+  body.has-streak-bar .page.with-nav { padding-top: calc(52px + var(--nav-h) + 40px); }
 
 </style>
 </head>
@@ -3466,13 +3463,6 @@ async function handleLogin() {
     staEl.textContent = '';
   }
 }
-
-window.addEventListener('scroll', function() {
-  const bar = document.getElementById('utilityBar');
-  if (bar && bar.style.display !== 'none') {
-    bar.classList.toggle('hidden-bar', window.scrollY > 8);
-  }
-}, { passive: true });
 
 document.addEventListener('DOMContentLoaded', () => {
   ['emailInput','pinInput'].forEach(id => {
