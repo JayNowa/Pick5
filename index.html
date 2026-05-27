@@ -190,16 +190,20 @@
   }
   #settingsBtn:hover { color: var(--accent); border-color: var(--accent); opacity: 1; }
 
+  .settings-btn-wrap {
+    position: relative;
+    display: inline-flex;
+  }
   .settings-panel {
-    position: fixed;
-    bottom: 56px;
-    right: 16px;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
     z-index: 1000;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 16px;
-    width: 220px;
+    padding: 20px;
+    width: 260px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.3);
     display: none;
   }
@@ -2872,7 +2876,34 @@
 <div id="utilityBar">
   <div class="utility-left">
     <div class="version-badge">v1.2.8</div>
-    <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
+    <div class="settings-btn-wrap">
+      <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
+      <div id="settingsPanel" class="settings-panel">
+        <div class="settings-title">⚙ Settings</div>
+        <div class="settings-row">
+          <span class="settings-label">Theme</span>
+          <div class="theme-toggle">
+            <button class="theme-toggle-btn" id="themeDark" onclick="setTheme('dark')" title="Dark">🌙</button>
+            <button class="theme-toggle-btn" id="themeLight" onclick="setTheme('light')" title="Light">☀️</button>
+          </div>
+        </div>
+        <div class="settings-row">
+          <span class="settings-label">Font Size</span>
+          <div class="font-btns">
+            <button class="font-btn" id="fontSmall"  onclick="setFontSize('small')">S</button>
+            <button class="font-btn" id="fontNormal" onclick="setFontSize('normal')">M</button>
+            <button class="font-btn" id="fontLarge"  onclick="setFontSize('large')">L</button>
+          </div>
+        </div>
+        <div class="settings-row">
+          <span class="settings-label">Secondary Text</span>
+          <div class="font-btns">
+            <button class="font-btn" id="mutedGrey"   onclick="setMutedStyle('grey')">Grey</button>
+            <button class="font-btn" id="mutedBright" onclick="setMutedStyle('bright')">White</button>
+          </div>
+        </div>
+      </div>
+    </div>
     <button class="admin-corner-btn" id="adminBtn" onclick="showPage('admin')">⚙ Admin</button>
     <button class="admin-corner-btn" onclick="showPage('users')">👥 Users</button>
   </div>
@@ -7748,32 +7779,6 @@ document.addEventListener('keydown', function(e) {
 
     <div id="ttFeedContainer">
       <div class="tt-loading">Loading messages…</div>
-    </div>
-  </div>
-</div>
-
-<div id="settingsPanel" class="settings-panel">
-  <div class="settings-title">⚙ Settings</div>
-  <div class="settings-row">
-    <span class="settings-label">Theme</span>
-    <div class="theme-toggle">
-      <button class="theme-toggle-btn" id="themeDark" onclick="setTheme('dark')" title="Dark">🌙</button>
-      <button class="theme-toggle-btn" id="themeLight" onclick="setTheme('light')" title="Light">☀️</button>
-    </div>
-  </div>
-  <div class="settings-row">
-    <span class="settings-label">Font Size</span>
-    <div class="font-btns">
-      <button class="font-btn" id="fontSmall"  onclick="setFontSize('small')">S</button>
-      <button class="font-btn" id="fontNormal" onclick="setFontSize('normal')">M</button>
-      <button class="font-btn" id="fontLarge"  onclick="setFontSize('large')">L</button>
-    </div>
-  </div>
-  <div class="settings-row">
-    <span class="settings-label">Secondary Text</span>
-    <div class="font-btns">
-      <button class="font-btn" id="mutedGrey"   onclick="setMutedStyle('grey')">Grey</button>
-      <button class="font-btn" id="mutedBright" onclick="setMutedStyle('bright')">White</button>
     </div>
   </div>
 </div>
