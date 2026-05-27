@@ -181,7 +181,7 @@
     color: #fff;
     border-radius: 4px;
     cursor: pointer;
-    display: none;
+    display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.18s;
@@ -398,7 +398,7 @@
   }
 
   .page.with-nav {
-    padding-top: calc(var(--nav-h) + 40px);
+    padding-top: 40px;
     justify-content: flex-start;
   }
 
@@ -1284,20 +1284,21 @@
   }
 
   /* ── UTILITY BAR (admin/users/settings/version — below nav) ── */
+  /* Body gains padding-top = nav height when logged in, so utilityBar sits naturally below the fixed nav */
+  body.logged-in { padding-top: var(--nav-h); }
+  body.logged-in.has-streak-bar { padding-top: calc(52px + var(--nav-h)); }
   #utilityBar {
-    margin-top: var(--nav-h);
     width: 100%;
     display: none;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     padding: 6px 16px;
     background: transparent;
     pointer-events: none;
     box-sizing: border-box;
   }
   #utilityBar > * { pointer-events: auto; }
-  .utility-left { display: flex; gap: 8px; align-items: center; }
-  .utility-right { display: flex; gap: 0; align-items: center; }
+  .utility-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
   /* ── TOAST ── */
   .toast {
@@ -2835,7 +2836,7 @@
     100% { transform: translateX(-50%); }
   }
   body.has-streak-bar #topNav { top: 52px; }
-  body.has-streak-bar .page.with-nav { padding-top: calc(52px + var(--nav-h) + 40px); }
+  body.has-streak-bar .page.with-nav { padding-top: 40px; }
 
 </style>
 </head>
@@ -2870,12 +2871,10 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
+    <div class="version-badge">v1.2.8</div>
+    <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
     <button class="admin-corner-btn" id="adminBtn" onclick="showPage('admin')">⚙ Admin</button>
     <button class="admin-corner-btn" onclick="showPage('users')">👥 Users</button>
-  </div>
-  <div class="utility-right">
-    <div class="version-badge">v1.2.7</div>
-    <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
   </div>
 </div>
 
@@ -3522,11 +3521,15 @@ function afterLogin(email, teamName) {
   navEl.dataset.teamname = teamName || '';
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('topNav').classList.add('visible');
+  document.body.classList.add('logged-in');
   const utilBar = document.getElementById('utilityBar');
   if (utilBar) {
     utilBar.style.display = 'flex';
-    const adminLeft = utilBar.querySelector('.utility-left');
-    if (adminLeft) adminLeft.style.display = email && ADMIN_EMAILS.includes(email.toLowerCase()) ? 'flex' : 'none';
+    const isAdmin = email && ADMIN_EMAILS.includes(email.toLowerCase());
+    const adminBtn = document.getElementById('adminBtn');
+    if (adminBtn) adminBtn.style.display = isAdmin ? '' : 'none';
+    const usersBtn = utilBar.querySelector('.admin-corner-btn:not(#adminBtn)');
+    if (usersBtn) usersBtn.style.display = isAdmin ? '' : 'none';
   }
   // Wait for Firebase to be ready, then load everything
   (async function waitForFirebase() {
@@ -3663,6 +3666,7 @@ async function showPage(page) {
 
 // ── Logout ──
 function logout() {
+  document.body.classList.remove('logged-in');
   document.getElementById('topNav').classList.remove('visible');
   const utilBarOut = document.getElementById('utilityBar');
   if (utilBarOut) utilBarOut.style.display = 'none';
