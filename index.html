@@ -2842,6 +2842,22 @@
   body.has-streak-bar #topNav { top: 52px; }
   body.has-streak-bar .page.with-nav { padding-top: 40px; }
 
+  /* ── FOOTBALL CONFETTI EASTER EGG ── */
+  .fb-confetti-piece {
+    position: fixed;
+    top: -40px;
+    pointer-events: none;
+    z-index: 99999;
+    user-select: none;
+    animation: fb-fall linear forwards;
+    will-change: transform, opacity;
+  }
+  @keyframes fb-fall {
+    0%   { transform: translateY(0) rotate(0deg);   opacity: 1; }
+    75%  { opacity: 1; }
+    100% { transform: translateY(110vh) rotate(540deg); opacity: 0; }
+  }
+
 </style>
 </head>
 <body>
@@ -2855,7 +2871,7 @@
 
 <!-- ═══ TOP NAV ═══ -->
 <nav id="topNav">
-  <div class="nav-logo">🏈 Pick 5</div>
+  <div class="nav-logo" id="navLogo" style="cursor:pointer;">🏈 Pick 5</div>
   <div class="nav-links">
     <button class="nav-link active" id="navSelector" onclick="showPage('selector')">Pick 5</button>
     <button class="nav-link" id="navMyPicks" onclick="showPage('myPicks')">My Picks</button>
@@ -2875,7 +2891,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.2.8</div>
+    <div class="version-badge">v1.2.10</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -7921,6 +7937,40 @@ async function handleStreakBannerToggle(checked) {
     // Re-check whenever the app comes back to the foreground
     document.addEventListener('visibilitychange', function() {
       if (document.visibilityState === 'visible') checkForUpdate();
+    });
+  })();
+</script>
+
+<script>
+  // ── EASTER EGG: click logo 5 times to rain footballs ──
+  (function() {
+    var clicks = 0, timer = null, active = false;
+    document.getElementById('navLogo').addEventListener('click', function() {
+      clicks++;
+      clearTimeout(timer);
+      timer = setTimeout(function() { clicks = 0; }, 1500);
+      if (clicks >= 5) {
+        clicks = 0;
+        if (active) return;
+        active = true;
+        var total = 55;
+        for (var i = 0; i < total; i++) {
+          (function(idx) {
+            setTimeout(function() {
+              var el = document.createElement('span');
+              el.className = 'fb-confetti-piece';
+              el.textContent = '🏈';
+              el.style.left = (Math.random() * 96) + 'vw';
+              el.style.fontSize = (14 + Math.random() * 20) + 'px';
+              var dur = (1.8 + Math.random() * 1.6).toFixed(2);
+              el.style.animationDuration = dur + 's';
+              document.body.appendChild(el);
+              setTimeout(function() { el.remove(); }, dur * 1000 + 100);
+            }, (idx / total) * 3400);
+          })(i);
+        }
+        setTimeout(function() { active = false; }, 5500);
+      }
     });
   })();
 </script>
