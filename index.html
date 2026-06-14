@@ -2891,7 +2891,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.2.11</div>
+    <div class="version-badge">v1.2.12</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -6876,15 +6876,16 @@ async function loadLeaderboard() {
 
     const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
     const rankClasses = ['first', 'second', 'third', 'fourth', 'fifth'];
+    const everyonePending = standings.every(function(u) { return u.totalWins === 0 && u.totalLosses === 0; });
 
     standings.forEach(function(user, idx) {
       const isLast = idx === standings.length - 1 && standings.length > 1;
       const row = document.createElement('div');
-      row.className = 'lb-row' + (idx < 5 ? ' ' + rankClasses[idx] : (isLast ? ' loser' : ''));
+      row.className = 'lb-row' + (everyonePending ? '' : (idx < 5 ? ' ' + rankClasses[idx] : (isLast ? ' loser' : '')));
       row.style.animationDelay = (idx * 0.06) + 's';
 
-      const rankClass = idx < 5 ? rankClasses[idx] : (isLast ? 'loser' : 'other');
-      const rankDisplay = idx < 5 ? medals[idx] : (isLast ? '💩' : (idx + 1));
+      const rankClass = everyonePending ? 'other' : (idx < 5 ? rankClasses[idx] : (isLast ? 'loser' : 'other'));
+      const rankDisplay = everyonePending ? '' : (idx < 5 ? medals[idx] : (isLast ? '💩' : (idx + 1)));
 
       const pendingLabel = user.pendingCount > 0
         ? '<span style="color:var(--muted);font-size:11px;letter-spacing:0.06em;">' + user.pendingCount + ' game' + (user.pendingCount !== 1 ? 's' : '') + ' pending</span>'
