@@ -2891,7 +2891,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.2.10</div>
+    <div class="version-badge">v1.2.11</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -4686,7 +4686,8 @@ function updateScoresWeekLabel() {
   } else if (scoresSeasonType === 1 && scoresWeek === 1) {
     document.getElementById('scoresWeekLabel').textContent = 'HOF Game';
   } else {
-    document.getElementById('scoresWeekLabel').textContent = 'Week ' + scoresWeek;
+    const displayWeek = scoresSeasonType === 1 ? scoresWeek - 1 : scoresWeek;
+    document.getElementById('scoresWeekLabel').textContent = 'Week ' + displayWeek;
   }
   document.getElementById('weekPrev').disabled = scoresWeek <= 1;
   document.getElementById('weekNext').disabled = scoresWeek >= maxWeek;
