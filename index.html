@@ -2897,7 +2897,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.2.13</div>
+    <div class="version-badge">v1.2.14</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -5350,7 +5350,6 @@ function closeGameModal() {
 }
 
 function renderGameDetail(data, sport) {
-  if (sport === 'baseball') console.log('[Pick5 MLB debug] summary data:', JSON.stringify(data).slice(0, 4000));
   const comp = (data.header && data.header.competitions && data.header.competitions[0]) || {};
   const competitors = comp.competitors || [];
   const status = comp.status || {};
@@ -5567,38 +5566,35 @@ function renderGameDetail(data, sport) {
     }
   }
 
-  // MLB probable starters (pre-game only)
+  // MLB probable starters (pre-game only) — always show section; TBD if ESPN hasn't announced yet
   if (sport === 'baseball' && isPre) {
-    const probables = comp.probables || [];
-    if (probables.length > 0) {
-      const awayP = probables.find(function(p) { return p.homeAway === 'away'; }) || probables[0];
-      const homeP = probables.find(function(p) { return p.homeAway === 'home'; }) || probables[1];
-      function pitcherStat(p, name) {
-        const stats = (p && p.statistics) || [];
-        const s = stats.find(function(x) { return (x.name || '').toLowerCase() === name.toLowerCase() || (x.abbreviation || '').toUpperCase() === name.toUpperCase(); });
-        return s ? s.displayValue : null;
-      }
-      function pitcherBlock(p, label) {
-        if (!p || !p.athlete) return '<div class="gd-pitcher"><div class="gd-pitcher-label">' + label + '</div><div class="gd-pitcher-name">TBD</div></div>';
-        const name = p.athlete.shortName || p.athlete.displayName || 'TBD';
-        const era  = pitcherStat(p, 'ERA') || pitcherStat(p, 'era');
-        const rec  = pitcherStat(p, 'record') || pitcherStat(p, 'pitchingRecord');
-        let meta = [];
-        if (rec) meta.push(rec);
-        if (era) meta.push('ERA ' + era);
-        return '<div class="gd-pitcher">' +
-          '<div class="gd-pitcher-label">' + escHtml(label) + '</div>' +
-          '<div class="gd-pitcher-name">' + escHtml(name) + '</div>' +
-          (meta.length ? '<div class="gd-pitcher-meta">' + escHtml(meta.join(' · ')) + '</div>' : '') +
-          '</div>';
-      }
-      html += '<div class="gd-section"><div class="gd-section-title">Probable Starters</div>';
-      html += '<div class="gd-pitchers">';
-      html += pitcherBlock(awayP, escHtml(awayTeam.abbreviation || 'Away'));
-      html += '<div class="gd-pitcher-vs">vs</div>';
-      html += pitcherBlock(homeP, escHtml(homeTeam.abbreviation || 'Home'));
-      html += '</div></div>';
+    const probables = comp.probables || data.probables || [];
+    const awayP = probables.find(function(p) { return p.homeAway === 'away'; }) || probables[0] || null;
+    const homeP = probables.find(function(p) { return p.homeAway === 'home'; }) || probables[1] || null;
+    function pitcherStat(p, name) {
+      const stats = (p && p.statistics) || [];
+      const s = stats.find(function(x) { return (x.name || '').toLowerCase() === name.toLowerCase() || (x.abbreviation || '').toUpperCase() === name.toUpperCase(); });
+      return s ? s.displayValue : null;
     }
+    function pitcherBlock(p, label) {
+      const name = (p && p.athlete && (p.athlete.shortName || p.athlete.displayName)) || 'TBD';
+      const era  = p ? (pitcherStat(p, 'ERA') || pitcherStat(p, 'era')) : null;
+      const rec  = p ? (pitcherStat(p, 'record') || pitcherStat(p, 'pitchingRecord')) : null;
+      let meta = [];
+      if (rec) meta.push(rec);
+      if (era) meta.push('ERA ' + era);
+      return '<div class="gd-pitcher">' +
+        '<div class="gd-pitcher-label">' + escHtml(label) + '</div>' +
+        '<div class="gd-pitcher-name">' + escHtml(name) + '</div>' +
+        (meta.length ? '<div class="gd-pitcher-meta">' + escHtml(meta.join(' · ')) + '</div>' : '') +
+        '</div>';
+    }
+    html += '<div class="gd-section"><div class="gd-section-title">Probable Starters</div>';
+    html += '<div class="gd-pitchers">';
+    html += pitcherBlock(awayP, awayTeam.abbreviation || 'Away');
+    html += '<div class="gd-pitcher-vs">vs</div>';
+    html += pitcherBlock(homeP, homeTeam.abbreviation || 'Home');
+    html += '</div></div>';
   }
 
   // MLB player stats (batting + pitching)
