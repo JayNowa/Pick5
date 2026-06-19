@@ -954,6 +954,12 @@
   .gd-game-status.live { color: #e74c3c; }
   .gd-body { padding: 20px 24px; }
   .gd-section { margin-bottom: 20px; }
+  .gd-pitchers { display: flex; align-items: center; justify-content: space-around; gap: 12px; }
+  .gd-pitcher { flex: 1; text-align: center; }
+  .gd-pitcher-label { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .gd-pitcher-name { font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 0.06em; }
+  .gd-pitcher-meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .gd-pitcher-vs { color: var(--muted); font-size: 13px; font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.1em; flex-shrink: 0; }
   .gd-section-title {
     font-size: 10px;
     letter-spacing: 0.14em;
@@ -2891,7 +2897,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.2.12</div>
+    <div class="version-badge">v1.2.13</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -5557,6 +5563,40 @@ function renderGameDetail(data, sport) {
         html += '<tr><td>' + escHtml(row[0]) + '</td><td>' + escHtml(String(row[1])) + '</td><td>' + escHtml(String(row[2])) + '</td></tr>';
       });
       html += '</tbody></table></div>';
+    }
+  }
+
+  // MLB probable starters (pre-game only)
+  if (sport === 'baseball' && isPre) {
+    const probables = comp.probables || [];
+    if (probables.length > 0) {
+      const awayP = probables.find(function(p) { return p.homeAway === 'away'; }) || probables[0];
+      const homeP = probables.find(function(p) { return p.homeAway === 'home'; }) || probables[1];
+      function pitcherStat(p, name) {
+        const stats = (p && p.statistics) || [];
+        const s = stats.find(function(x) { return (x.name || '').toLowerCase() === name.toLowerCase() || (x.abbreviation || '').toUpperCase() === name.toUpperCase(); });
+        return s ? s.displayValue : null;
+      }
+      function pitcherBlock(p, label) {
+        if (!p || !p.athlete) return '<div class="gd-pitcher"><div class="gd-pitcher-label">' + label + '</div><div class="gd-pitcher-name">TBD</div></div>';
+        const name = p.athlete.shortName || p.athlete.displayName || 'TBD';
+        const era  = pitcherStat(p, 'ERA') || pitcherStat(p, 'era');
+        const rec  = pitcherStat(p, 'record') || pitcherStat(p, 'pitchingRecord');
+        let meta = [];
+        if (rec) meta.push(rec);
+        if (era) meta.push('ERA ' + era);
+        return '<div class="gd-pitcher">' +
+          '<div class="gd-pitcher-label">' + escHtml(label) + '</div>' +
+          '<div class="gd-pitcher-name">' + escHtml(name) + '</div>' +
+          (meta.length ? '<div class="gd-pitcher-meta">' + escHtml(meta.join(' · ')) + '</div>' : '') +
+          '</div>';
+      }
+      html += '<div class="gd-section"><div class="gd-section-title">Probable Starters</div>';
+      html += '<div class="gd-pitchers">';
+      html += pitcherBlock(awayP, escHtml(awayTeam.abbreviation || 'Away'));
+      html += '<div class="gd-pitcher-vs">vs</div>';
+      html += pitcherBlock(homeP, escHtml(homeTeam.abbreviation || 'Home'));
+      html += '</div></div>';
     }
   }
 
