@@ -5350,6 +5350,7 @@ function closeGameModal() {
 }
 
 function renderGameDetail(data, sport) {
+  if (sport === 'baseball') console.log('[Pick5 MLB debug] summary data:', JSON.stringify(data).slice(0, 4000));
   const comp = (data.header && data.header.competitions && data.header.competitions[0]) || {};
   const competitors = comp.competitors || [];
   const status = comp.status || {};
