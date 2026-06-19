@@ -2897,7 +2897,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.2.14</div>
+    <div class="version-badge">v1.2.15</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -5568,7 +5568,24 @@ function renderGameDetail(data, sport) {
 
   // MLB probable starters (pre-game only) — always show section; TBD if ESPN hasn't announced yet
   if (sport === 'baseball' && isPre) {
-    const probables = comp.probables || data.probables || [];
+    // Search multiple known paths, then fall back to recursive search anywhere in the response
+    function findProbables(obj, depth) {
+      if (!obj || typeof obj !== 'object' || depth > 6) return null;
+      if (Array.isArray(obj)) {
+        for (var i = 0; i < obj.length; i++) { var r = findProbables(obj[i], depth + 1); if (r) return r; }
+        return null;
+      }
+      if (obj.probables && Array.isArray(obj.probables) && obj.probables.length > 0) return obj.probables;
+      if (obj.probable  && Array.isArray(obj.probable)  && obj.probable.length  > 0) return obj.probable;
+      var keys = Object.keys(obj);
+      for (var ki = 0; ki < keys.length; ki++) {
+        if (keys[ki] === 'probables' || keys[ki] === 'probable') continue;
+        var r2 = findProbables(obj[keys[ki]], depth + 1);
+        if (r2) return r2;
+      }
+      return null;
+    }
+    const probables = comp.probables || data.probables || findProbables(data, 0) || [];
     const awayP = probables.find(function(p) { return p.homeAway === 'away'; }) || probables[0] || null;
     const homeP = probables.find(function(p) { return p.homeAway === 'home'; }) || probables[1] || null;
     function pitcherStat(p, name) {
