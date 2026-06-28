@@ -2858,6 +2858,35 @@
     100% { transform: translateY(110vh) rotate(540deg); opacity: 0; }
   }
 
+  /* ── TEST MODE ── */
+  #testModeBanner {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 600;
+    background: linear-gradient(90deg, #c94000, #e05c00);
+    color: #fff; text-align: center; padding: 7px 16px;
+    font-family: 'Bebas Neue', sans-serif; font-size: 14px; letter-spacing: 0.14em;
+    pointer-events: none; display: none;
+  }
+  .test-game-row {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end;
+    padding: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+    border-radius: 8px; margin-bottom: 10px;
+  }
+  .test-game-col { display: flex; flex-direction: column; gap: 4px; }
+  .test-game-label { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .test-game-input {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 10px; color: var(--text); font-size: 14px;
+    font-family: 'Barlow Condensed', sans-serif; box-sizing: border-box;
+  }
+  .test-game-input:focus { outline: none; border-color: var(--accent); }
+  .test-game-input.abbr { width: 70px; text-transform: uppercase; }
+  .test-game-input.score-input { width: 55px; }
+  .test-game-input.clock-input { width: 90px; }
+  .test-game-input.period-input { width: 55px; }
+  .test-game-remove { background: transparent; border: 1px solid rgba(255,80,80,0.4); color: rgba(255,100,100,0.8); border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 13px; align-self: flex-end; }
+  .test-game-remove:hover { border-color: #f55; color: #f55; }
+  .test-vs { font-family: 'Bebas Neue', sans-serif; font-size: 18px; color: var(--muted); align-self: flex-end; padding-bottom: 6px; }
+
 </style>
 </head>
 <body>
@@ -2891,7 +2920,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.2.12</div>
+    <div class="version-badge">v1.3.0</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -3188,6 +3217,17 @@
   window.fbSaveNbaVisible        = async function(v) { await window.fbSaveUIConfig({ nbaVisible: v }); };
   window.fbSaveMlbVisible        = async function(v) { await window.fbSaveUIConfig({ mlbVisible: v }); };
   window.fbSaveStreakBannerVisible = async function(v) { await window.fbSaveUIConfig({ streakBannerVisible: v }); };
+  window.fbSaveTestMode          = async function(v) { await window.fbSaveUIConfig({ testMode: v }); };
+
+  window.fbSaveTestScores = async function(weekKey, games) {
+    await setDoc(doc(db, "settings", "testScores_" + weekKey.replace(/[^a-zA-Z0-9]/g, '_')), {
+      weekKey: weekKey, games: games, savedAt: Date.now()
+    });
+  };
+  window.fbGetTestScores = async function(weekKey) {
+    const snap = await getDoc(doc(db, "settings", "testScores_" + weekKey.replace(/[^a-zA-Z0-9]/g, '_')));
+    return snap.exists() ? snap.data() : null;
+  };
 
   window.fbGetNbaVisible          = async function() { return !!((await window.fbGetUIConfig()).nbaVisible); };
   window.fbGetMlbVisible          = async function() { return !!((await window.fbGetUIConfig()).mlbVisible); };
@@ -3356,6 +3396,19 @@ let scoresRefreshTimer = null;
 const SCORES_CACHE_MS = 2 * 60 * 1000;
 const scoresCache = {}; // key -> { data, ts }
 
+// ── Test Mode ──
+let _testModeEnabled = false;
+
+const NFL_TEAM_NAMES = {
+  ARI:'Cardinals', ATL:'Falcons', BAL:'Ravens', BUF:'Bills', CAR:'Panthers',
+  CHI:'Bears', CIN:'Bengals', CLE:'Browns', DAL:'Cowboys', DEN:'Broncos',
+  DET:'Lions', GB:'Packers', HOU:'Texans', IND:'Colts', JAX:'Jaguars',
+  KC:'Chiefs', LAC:'Chargers', LAR:'Rams', LV:'Raiders', MIA:'Dolphins',
+  MIN:'Vikings', NE:'Patriots', NO:'Saints', NYG:'Giants', NYJ:'Jets',
+  PHI:'Eagles', PIT:'Steelers', SEA:'Seahawks', SF:'49ers', TB:'Buccaneers',
+  TEN:'Titans', WAS:'Commanders'
+};
+
 let currentActiveWeek = null;
 
 // ── Picks state ──
@@ -3429,8 +3482,36 @@ function buildESPNScoresMap(events) {
   return map;
 }
 
+// Convert test game list to the same map format as buildESPNScoresMap
+function buildTestScoresMap(games) {
+  const map = {};
+  (games || []).forEach(function(g) {
+    const isFinal = g.status === 'post';
+    const isLive  = g.status === 'in';
+    const started = isFinal || isLive;
+    const gameData = {
+      started, isFinal, isLive,
+      homeScore: parseFloat(g.homeScore || 0),
+      awayScore: parseFloat(g.awayScore || 0),
+      homeAbbr: (g.homeAbbr || '').toUpperCase(),
+      awayAbbr: (g.awayAbbr || '').toUpperCase(),
+      period: parseInt(g.period || 0),
+      clock: g.clock || ''
+    };
+    if (gameData.homeAbbr) map[gameData.homeAbbr] = gameData;
+    if (gameData.awayAbbr) map[gameData.awayAbbr] = gameData;
+  });
+  return map;
+}
+
 // Fetch ESPN scores map for a given admin week value
 async function fetchESPNScoresMap(weekValue) {
+  if (_testModeEnabled) {
+    try {
+      const testData = window.fbGetTestScores ? await window.fbGetTestScores(String(weekValue)) : null;
+      return (testData && testData.games) ? buildTestScoresMap(testData.games) : {};
+    } catch(e) { return {}; }
+  }
   try {
     const url = buildESPNScoreboardURL(weekValue);
     const res = await fetch(url);
@@ -3595,6 +3676,8 @@ function afterLogin(email, teamName) {
       const isAdmin = email && ADMIN_EMAILS.includes(email.toLowerCase());
       if (cfg.nbaVisible || isAdmin) document.getElementById('nbaTab').style.display = '';
       if (cfg.mlbVisible || isAdmin) document.getElementById('mlbTab').style.display = '';
+      _testModeEnabled = !!cfg.testMode;
+      if (_testModeEnabled) showTestModeBanner();
     } catch(e) {}
     await updateWeekBadge();
     // Admin pending badge
@@ -3620,6 +3703,7 @@ async function showPage(page) {
   document.getElementById('teamDataPage').style.display     = 'none';
   document.getElementById('rulesRecordsPage').style.display = 'none';
   document.getElementById('trashTalkPage').style.display    = 'none';
+  document.getElementById('testScoresPage').style.display   = 'none';
 
   document.getElementById('navSelector').classList.remove('active');
   document.getElementById('navMyPicks').classList.remove('active');
@@ -3671,11 +3755,17 @@ async function showPage(page) {
     p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
     document.getElementById('navScores').classList.add('active');
     initScores();
+  } else if (page === 'testScores') {
+    const p = document.getElementById('testScoresPage');
+    p.style.display = 'flex';
+    p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
+    loadTestScoresPage();
   } else if (page === 'admin') {
     loadPendingRequests();
     loadMissingPicks();
     loadAdminScoresTabStatus();
     loadAdminPhilliesStreak();
+    loadAdminTestMode();
     const p = document.getElementById('adminPage');
     p.style.display = 'flex';
     p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
@@ -3730,7 +3820,10 @@ function logout() {
   document.getElementById('teamDataPage').style.display    = 'none';
   document.getElementById('rulesRecordsPage').style.display = 'none';
   document.getElementById('trashTalkPage').style.display   = 'none';
+  document.getElementById('testScoresPage').style.display  = 'none';
   document.getElementById('navNbaScores').style.display    = 'none';
+  _testModeEnabled = false;
+  hideTestModeBanner();
   document.getElementById('nbaTab').style.display = 'none';
   document.getElementById('mlbTab').style.display = 'none';
   stopWeekPolling();
@@ -4729,7 +4822,115 @@ function changeScoresYear(dir) {
   showNflStandings();
 }
 
+// Convert (scoresSeasonType, scoresWeek) back to the admin weekKey string
+function scoresPageToWeekKey() {
+  if (scoresSeasonType === 1) {
+    if (scoresWeek === 1) return 'HOF Game';
+    return 'Pre Week ' + (scoresWeek - 1);
+  }
+  if (scoresSeasonType === 2) return String(scoresWeek);
+  return null; // playoffs not supported in test mode
+}
+
+// Render NFL scoreboard from test data instead of ESPN
+async function fetchScoresFromTestData() {
+  const loadingEl = document.getElementById('scoresLoading');
+  const errorEl   = document.getElementById('scoresError');
+  const gridEl    = document.getElementById('scoresGrid');
+  loadingEl.style.display = 'block';
+  errorEl.style.display   = 'none';
+  gridEl.innerHTML        = '';
+  document.getElementById('scoresRefreshInfo').textContent = '⚠ TEST MODE — not real scores';
+  try {
+    const weekKey = scoresPageToWeekKey();
+    if (!weekKey) {
+      loadingEl.style.display = 'none';
+      gridEl.innerHTML = '<div class="scores-empty"><div class="icon">🧪</div><p>Test mode does not support playoff weeks.</p></div>';
+      return;
+    }
+    const testData = window.fbGetTestScores ? await window.fbGetTestScores(weekKey) : null;
+    const games = (testData && testData.games) || [];
+    loadingEl.style.display = 'none';
+    if (games.length === 0) {
+      gridEl.innerHTML = '<div class="scores-empty"><div class="icon">🧪</div><p>No test games saved for ' + escHtml(weekKey) + '.<br>Go to Admin → Test Scores to add games.</p></div>';
+      return;
+    }
+    const grid = document.createElement('div');
+    grid.className = 'scores-grid';
+    games.forEach(function(g, ei) {
+      const awayAbbr = (g.awayAbbr || '').toUpperCase();
+      const homeAbbr = (g.homeAbbr || '').toUpperCase();
+      const awayName = NFL_TEAM_NAMES[awayAbbr] || awayAbbr;
+      const homeName = NFL_TEAM_NAMES[homeAbbr] || homeAbbr;
+      const isFinal = g.status === 'post';
+      const isLive  = g.status === 'in';
+      const isPre   = g.status === 'pre';
+      const awayScore = parseFloat(g.awayScore || 0);
+      const homeScore = parseFloat(g.homeScore || 0);
+      const awayWins = isFinal && awayScore > homeScore;
+      const homeWins = isFinal && homeScore > awayScore;
+      const awayLogo = 'https://a.espncdn.com/i/teamlogos/nfl/500/' + awayAbbr.toLowerCase() + '.png';
+      const homeLogo = 'https://a.espncdn.com/i/teamlogos/nfl/500/' + homeAbbr.toLowerCase() + '.png';
+
+      const card = document.createElement('div');
+      card.className = 'score-card' + (isLive ? ' live' : '');
+      card.style.animationDelay = (ei * 0.04) + 's';
+
+      const cardHeader = document.createElement('div');
+      cardHeader.className = 'score-card-header';
+      const statusEl = document.createElement('span');
+      statusEl.className = 'game-status ' + (isLive ? 'live' : isFinal ? 'final' : 'scheduled');
+      statusEl.textContent = isFinal ? 'Final' : isLive ? ('Q' + (g.period || 1) + ' ' + (g.clock || '')) : 'Scheduled';
+      const testBadge = document.createElement('span');
+      testBadge.className = 'game-network';
+      testBadge.style.color = '#e05c00';
+      testBadge.textContent = 'TEST';
+      cardHeader.appendChild(statusEl); cardHeader.appendChild(testBadge);
+
+      const cardBody = document.createElement('div');
+      cardBody.className = 'score-card-body';
+      const matchup = document.createElement('div');
+      matchup.className = 'score-matchup';
+
+      function makeTeamRow(abbr, name, logo, score, wins) {
+        const row = document.createElement('div');
+        row.className = 'score-team';
+        const logoEl = document.createElement('img');
+        logoEl.className = 'score-team-logo'; logoEl.src = logo; logoEl.alt = name;
+        logoEl.onerror = function() { this.src = 'https://a.espncdn.com/i/teamlogos/leagues/500/nfl.png'; this.onerror = null; };
+        const info = document.createElement('div');
+        const nameEl = document.createElement('div');
+        nameEl.className = 'score-team-name' + (wins ? ' winner' : '');
+        nameEl.textContent = name;
+        const abbrEl = document.createElement('div');
+        abbrEl.className = 'score-team-record';
+        abbrEl.textContent = abbr;
+        info.appendChild(nameEl); info.appendChild(abbrEl);
+        const pts = document.createElement('div');
+        pts.className = 'score-points' + (wins ? ' winner' : '') + (isPre ? ' tbd' : '');
+        pts.textContent = isPre ? '—' : score;
+        row.appendChild(logoEl); row.appendChild(info); row.appendChild(pts);
+        return row;
+      }
+
+      matchup.appendChild(makeTeamRow(awayAbbr, awayName, awayLogo, awayScore, awayWins));
+      matchup.appendChild((function(){ const d=document.createElement('div'); d.className='score-divider'; return d; })());
+      matchup.appendChild(makeTeamRow(homeAbbr, homeName, homeLogo, homeScore, homeWins));
+      cardBody.appendChild(matchup);
+      card.appendChild(cardHeader); card.appendChild(cardBody);
+      grid.appendChild(card);
+    });
+    gridEl.appendChild(grid);
+  } catch(err) {
+    loadingEl.style.display = 'none';
+    errorEl.style.display = 'block';
+    errorEl.textContent = 'Error loading test scores.';
+    console.error(err);
+  }
+}
+
 async function fetchScores() {
+  if (_testModeEnabled) { await fetchScoresFromTestData(); showNflStandings(); return; }
   const loadingEl = document.getElementById('scoresLoading');
   const errorEl   = document.getElementById('scoresError');
   const gridEl    = document.getElementById('scoresGrid');
@@ -5826,6 +6027,165 @@ function renderStandings(sport, data, year) {
 // ── Admin ──
 async function loadAdminWeekOverride() {
   loadAdminSpreadsWeek();
+}
+
+// ── Test Mode banner ──
+function showTestModeBanner() {
+  let b = document.getElementById('testModeBanner');
+  if (b) b.style.display = 'block';
+}
+function hideTestModeBanner() {
+  const b = document.getElementById('testModeBanner');
+  if (b) b.style.display = 'none';
+}
+
+// ── Admin: Test Mode toggle ──
+async function loadAdminTestMode() {
+  try {
+    const cfg = window.fbGetUIConfig ? await window.fbGetUIConfig() : {};
+    const enabled = !!cfg.testMode;
+    const toggle = document.getElementById('testModeToggle');
+    const label  = document.getElementById('testModeLabel');
+    if (toggle) toggle.checked = enabled;
+    if (label) label.textContent = enabled ? '🟠 Test Mode ON — site is using test scores' : 'Test Mode OFF — site is using live ESPN data';
+  } catch(e) {}
+}
+
+async function handleTestModeToggle(checked) {
+  try {
+    if (window.fbSaveTestMode) await window.fbSaveTestMode(checked);
+    _testModeEnabled = checked;
+    const label = document.getElementById('testModeLabel');
+    if (label) label.textContent = checked ? '🟠 Test Mode ON — site is using test scores' : 'Test Mode OFF — site is using live ESPN data';
+    if (checked) showTestModeBanner(); else hideTestModeBanner();
+  } catch(e) {
+    alert('Error saving test mode: ' + e.message);
+  }
+}
+
+// ── Test Scores Page ──
+let _testGames = [];
+let _testScoresWeek = null;
+
+const TEST_WEEK_OPTIONS = [
+  { value: 'HOF Game', label: 'HOF Game' },
+  { value: 'Pre Week 1', label: 'Pre Week 1' },
+  { value: 'Pre Week 2', label: 'Pre Week 2' },
+  { value: 'Pre Week 3', label: 'Pre Week 3' },
+  ...Array.from({length:18}, function(_,i){ return { value:String(i+1), label:'Week '+(i+1) }; })
+];
+
+function loadTestScoresPage() {
+  // Build week select
+  const sel = document.getElementById('testScoresWeekSelect');
+  if (sel && sel.options.length === 0) {
+    TEST_WEEK_OPTIONS.forEach(function(opt) {
+      const o = document.createElement('option');
+      o.value = opt.value; o.textContent = opt.label;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', function() { _testGames = []; renderTestGamesList(); });
+  }
+  _testGames = [];
+  renderTestGamesList();
+}
+
+function renderTestGamesList() {
+  const container = document.getElementById('testGamesList');
+  if (!container) return;
+  container.innerHTML = '';
+  if (_testGames.length === 0) {
+    container.innerHTML = '<div style="color:var(--muted);font-size:14px;margin-bottom:12px;">No games added yet. Click "Load Saved" to load existing games or "＋ Add Game" to create one.</div>';
+  }
+  _testGames.forEach(function(g, idx) {
+    const row = document.createElement('div');
+    row.className = 'test-game-row';
+    row.innerHTML =
+      '<div class="test-game-col"><div class="test-game-label">Away</div>' +
+        '<input class="test-game-input abbr" list="nfl-abbrs" value="' + escHtml(g.awayAbbr||'') + '" placeholder="e.g. PHI" oninput="updateTestGame(' + idx + ',\'awayAbbr\',this.value.toUpperCase())"></div>' +
+      '<div class="test-game-col"><div class="test-game-label">Away Score</div>' +
+        '<input type="number" min="0" class="test-game-input score-input" value="' + (g.awayScore||0) + '" oninput="updateTestGame(' + idx + ',\'awayScore\',+this.value)"></div>' +
+      '<div class="test-vs">@</div>' +
+      '<div class="test-game-col"><div class="test-game-label">Home</div>' +
+        '<input class="test-game-input abbr" list="nfl-abbrs" value="' + escHtml(g.homeAbbr||'') + '" placeholder="e.g. DAL" oninput="updateTestGame(' + idx + ',\'homeAbbr\',this.value.toUpperCase())"></div>' +
+      '<div class="test-game-col"><div class="test-game-label">Home Score</div>' +
+        '<input type="number" min="0" class="test-game-input score-input" value="' + (g.homeScore||0) + '" oninput="updateTestGame(' + idx + ',\'homeScore\',+this.value)"></div>' +
+      '<div class="test-game-col"><div class="test-game-label">Status</div>' +
+        '<select class="test-game-input" onchange="updateTestGame(' + idx + ',\'status\',this.value);renderTestGamesList()">' +
+          '<option value="pre"' + (g.status==='pre'?' selected':'') + '>Not Started</option>' +
+          '<option value="in"'  + (g.status==='in' ?' selected':'') + '>In Progress</option>' +
+          '<option value="post"'+ (g.status==='post'?' selected':'') + '>Final</option>' +
+        '</select></div>' +
+      (g.status === 'in' ?
+        '<div class="test-game-col"><div class="test-game-label">Qtr</div>' +
+          '<input type="number" min="1" max="4" class="test-game-input period-input" value="' + (g.period||1) + '" oninput="updateTestGame(' + idx + ',\'period\',+this.value)"></div>' +
+        '<div class="test-game-col"><div class="test-game-label">Clock</div>' +
+          '<input class="test-game-input clock-input" value="' + escHtml(g.clock||'') + '" placeholder="e.g. 2:34" oninput="updateTestGame(' + idx + ',\'clock\',this.value)"></div>'
+        : '') +
+      '<button class="test-game-remove" onclick="removeTestGame(' + idx + ')">✕ Remove</button>';
+    container.appendChild(row);
+  });
+}
+
+function updateTestGame(idx, field, value) {
+  if (_testGames[idx]) _testGames[idx][field] = value;
+}
+
+function addTestGame() {
+  _testGames.push({ awayAbbr:'', homeAbbr:'', awayScore:0, homeScore:0, status:'pre', period:1, clock:'' });
+  renderTestGamesList();
+}
+
+function removeTestGame(idx) {
+  _testGames.splice(idx, 1);
+  renderTestGamesList();
+}
+
+async function loadSavedTestGames() {
+  const weekKey = document.getElementById('testScoresWeekSelect').value;
+  if (!weekKey) return;
+  const status = document.getElementById('testScoresSaveStatus');
+  if (status) { status.textContent = 'Loading…'; status.style.color = 'var(--muted)'; }
+  try {
+    const data = window.fbGetTestScores ? await window.fbGetTestScores(weekKey) : null;
+    _testGames = (data && data.games) ? JSON.parse(JSON.stringify(data.games)) : [];
+    renderTestGamesList();
+    if (status) { status.textContent = _testGames.length + ' game(s) loaded for ' + weekKey; status.style.color = 'var(--accent)'; }
+  } catch(e) {
+    if (status) { status.textContent = 'Error loading: ' + e.message; status.style.color = '#f55'; }
+  }
+}
+
+async function saveTestGames() {
+  const weekKey = document.getElementById('testScoresWeekSelect').value;
+  if (!weekKey) { alert('Please select a week first.'); return; }
+  const status = document.getElementById('testScoresSaveStatus');
+  if (status) { status.textContent = 'Saving…'; status.style.color = 'var(--muted)'; }
+  try {
+    // Validate: every game must have both team abbreviations
+    for (let i = 0; i < _testGames.length; i++) {
+      const g = _testGames[i];
+      if (!g.awayAbbr || !g.homeAbbr) {
+        if (status) { status.textContent = 'Game ' + (i+1) + ' is missing a team abbreviation.'; status.style.color = '#f55'; }
+        return;
+      }
+    }
+    const games = _testGames.map(function(g) {
+      return {
+        awayAbbr: g.awayAbbr.toUpperCase(),
+        homeAbbr: g.homeAbbr.toUpperCase(),
+        awayScore: parseFloat(g.awayScore) || 0,
+        homeScore: parseFloat(g.homeScore) || 0,
+        status: g.status || 'pre',
+        period: parseInt(g.period) || 0,
+        clock: g.clock || ''
+      };
+    });
+    if (window.fbSaveTestScores) await window.fbSaveTestScores(weekKey, games);
+    if (status) { status.textContent = '✓ Saved ' + games.length + ' game(s) for ' + weekKey; status.style.color = 'var(--accent)'; }
+  } catch(e) {
+    if (status) { status.textContent = 'Error saving: ' + e.message; status.style.color = '#f55'; }
+  }
 }
 
 async function loadAdminScoresTabStatus() {
@@ -7697,6 +8057,21 @@ document.addEventListener('keydown', function(e) {
       </div>
     </div>
 
+    <!-- Test Mode -->
+    <div class="admin-card" style="border-color: rgba(200,80,0,0.4);">
+      <div class="admin-card-title">🧪 Test Mode</div>
+      <p class="admin-card-desc">When ON, the entire site uses your manually entered test scores instead of ESPN. Use this to test picks, results, and leaderboard logic before the season starts. <strong style="color:#e05c00;">Turn OFF to restore live ESPN data for all users.</strong></p>
+      <div style="display:flex;align-items:center;gap:14px;margin-top:12px;">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;">
+          <input type="checkbox" id="testModeToggle" onchange="handleTestModeToggle(this.checked)" style="width:18px;height:18px;accent-color:#e05c00;cursor:pointer;" />
+          <span style="font-size:14px;color:var(--text);font-weight:600;" id="testModeLabel">Loading…</span>
+        </label>
+      </div>
+      <div style="margin-top:14px;">
+        <button class="btn-submit" onclick="showPage('testScores')" style="background:linear-gradient(135deg,#c94000,#e05c00);">Open Test Scores Editor →</button>
+      </div>
+    </div>
+
     <!-- Phillies Streak Banner -->
     <div class="admin-card">
       <div class="admin-card-title">⚾ Phillies Streak Banner</div>
@@ -7710,6 +8085,41 @@ document.addEventListener('keydown', function(e) {
         <button class="btn-submit" style="min-width:120px;" onclick="fetchAndShowPhilliesStreak(true)">Refresh Now</button>
       </div>
       <div class="admin-status" id="philliesStreakStatus" style="margin-top:10px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TEST SCORES PAGE (admin only) ═══ -->
+<div class="page with-nav" id="testScoresPage" style="display:none;">
+  <div class="container">
+    <div class="page-header">
+      <div class="page-title">🧪 Test Scores</div>
+      <div class="page-subtitle">Admin-only score override for testing</div>
+      <div class="page-divider"></div>
+    </div>
+
+    <div class="admin-card">
+      <div class="admin-card-title">Select Week</div>
+      <p class="admin-card-desc">Pick the week you want to set test scores for, then load any saved games or add new ones below.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-top:8px;">
+        <div class="field" style="margin-bottom:0;flex:1;min-width:160px;">
+          <label>Week</label>
+          <select id="testScoresWeekSelect" class="test-game-input" style="width:100%;"></select>
+        </div>
+        <button class="btn-submit" style="min-width:120px;" onclick="loadSavedTestGames()">Load Saved</button>
+      </div>
+    </div>
+
+    <div class="admin-card">
+      <div class="admin-card-title">Games</div>
+      <p class="admin-card-desc">Enter each game's team abbreviations (e.g. PHI, DAL), scores, and status. Abbreviations must match what's in your picks sheet exactly.</p>
+      <div id="testGamesList" style="margin-top:12px;"></div>
+      <button class="btn-submit" onclick="addTestGame()" style="background:transparent;border:1px solid var(--border);color:var(--text);margin-top:4px;">＋ Add Game</button>
+      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn-submit" onclick="saveTestGames()" style="flex:1;min-width:140px;">Save All Games</button>
+        <button class="btn-submit" onclick="showPage('admin')" style="flex:1;min-width:120px;background:transparent;border:1px solid var(--border);color:var(--text);">← Back to Admin</button>
+      </div>
+      <div class="admin-status" id="testScoresSaveStatus" style="margin-top:10px;"></div>
     </div>
   </div>
 </div>
@@ -7813,7 +8223,19 @@ document.addEventListener('keydown', function(e) {
   </div>
 </div>
 
+<div id="testModeBanner">⚠ TEST MODE ACTIVE — SCORES ARE NOT REAL ⚠</div>
 <div class="toast" id="toast"></div>
+
+<datalist id="nfl-abbrs">
+  <option value="ARI"><option value="ATL"><option value="BAL"><option value="BUF">
+  <option value="CAR"><option value="CHI"><option value="CIN"><option value="CLE">
+  <option value="DAL"><option value="DEN"><option value="DET"><option value="GB">
+  <option value="HOU"><option value="IND"><option value="JAX"><option value="KC">
+  <option value="LAC"><option value="LAR"><option value="LV"><option value="MIA">
+  <option value="MIN"><option value="NE"><option value="NO"><option value="NYG">
+  <option value="NYJ"><option value="PHI"><option value="PIT"><option value="SEA">
+  <option value="SF"><option value="TB"><option value="TEN"><option value="WAS">
+</datalist>
 <div class="week-banner" id="weekBanner">
   <div class="week-banner-text">Picks are now open for<strong id="weekBannerLabel"></strong></div>
   <div class="week-banner-actions">
