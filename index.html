@@ -2920,7 +2920,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.3.0</div>
+    <div class="version-badge">v1.3.1</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -6188,6 +6188,76 @@ async function saveTestGames() {
   }
 }
 
+async function importFromESPN() {
+  const weekKey = document.getElementById('testScoresWeekSelect').value;
+  if (!weekKey) { alert('Please select a week first.'); return; }
+  const status = document.getElementById('testScoresSaveStatus');
+  if (status) { status.textContent = 'Fetching from ESPN…'; status.style.color = 'var(--muted)'; }
+  try {
+    const url = buildESPNScoreboardURL(weekKey, 2026);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('ESPN returned ' + res.status);
+    const data = await res.json();
+    const events = (data && data.events) || [];
+    if (!events.length) {
+      if (status) { status.textContent = 'No games found for ' + weekKey + ' (ESPN may not have schedule yet).'; status.style.color = 'var(--muted)'; }
+      return;
+    }
+    _testGames = events.map(function(event) {
+      const comp = event.competitions[0];
+      const home = comp.competitors.find(function(c) { return c.homeAway === 'home'; });
+      const away = comp.competitors.find(function(c) { return c.homeAway === 'away'; });
+      return {
+        awayAbbr: away && away.team ? away.team.abbreviation.toUpperCase() : '',
+        homeAbbr: home && home.team ? home.team.abbreviation.toUpperCase() : '',
+        awayScore: 0, homeScore: 0, status: 'pre', period: 0, clock: ''
+      };
+    });
+    renderTestGamesList();
+    if (status) { status.textContent = '✓ Imported ' + _testGames.length + ' game(s) from ESPN for ' + weekKey + ' — click "Save All Games" to keep them.'; status.style.color = 'var(--accent)'; }
+  } catch(e) {
+    if (status) { status.textContent = 'ESPN fetch failed: ' + e.message; status.style.color = '#f55'; }
+  }
+}
+
+async function importAllWeeksFromESPN() {
+  const status = document.getElementById('testScoresSaveStatus');
+  const btn = document.getElementById('importAllWeeksBtn');
+  if (btn) btn.disabled = true;
+  let saved = 0, errors = 0;
+  for (let i = 0; i < TEST_WEEK_OPTIONS.length; i++) {
+    const weekKey = TEST_WEEK_OPTIONS[i].value;
+    if (status) { status.textContent = 'Importing ' + weekKey + '… (' + (i+1) + '/' + TEST_WEEK_OPTIONS.length + ')'; status.style.color = 'var(--muted)'; }
+    try {
+      const url = buildESPNScoreboardURL(weekKey, 2026);
+      const res = await fetch(url);
+      if (!res.ok) { errors++; continue; }
+      const data = await res.json();
+      const events = (data && data.events) || [];
+      if (!events.length) continue;
+      const games = events.map(function(event) {
+        const comp = event.competitions[0];
+        const home = comp.competitors.find(function(c) { return c.homeAway === 'home'; });
+        const away = comp.competitors.find(function(c) { return c.homeAway === 'away'; });
+        return {
+          awayAbbr: away && away.team ? away.team.abbreviation.toUpperCase() : '',
+          homeAbbr: home && home.team ? home.team.abbreviation.toUpperCase() : '',
+          awayScore: 0, homeScore: 0, status: 'pre', period: 0, clock: ''
+        };
+      });
+      if (window.fbSaveTestScores) await window.fbSaveTestScores(weekKey, games);
+      saved++;
+    } catch(e) { errors++; }
+  }
+  if (btn) btn.disabled = false;
+  // Reload the currently selected week
+  await loadSavedTestGames();
+  if (status) {
+    status.textContent = '✓ Imported ' + saved + ' week(s) from ESPN' + (errors ? ' (' + errors + ' failed/empty)' : '') + '. All games set to pre-game status.';
+    status.style.color = 'var(--accent)';
+  }
+}
+
 async function loadAdminScoresTabStatus() {
   try {
     const cfg = window.fbGetUIConfig ? await window.fbGetUIConfig() : {};
@@ -8107,6 +8177,10 @@ document.addEventListener('keydown', function(e) {
           <select id="testScoresWeekSelect" class="test-game-input" style="width:100%;"></select>
         </div>
         <button class="btn-submit" style="min-width:120px;" onclick="loadSavedTestGames()">Load Saved</button>
+        <button class="btn-submit" style="min-width:160px;background:rgba(0,140,255,0.15);border:1px solid rgba(0,140,255,0.4);" onclick="importFromESPN()">📥 Import from ESPN</button>
+      </div>
+      <div style="margin-top:10px;">
+        <button id="importAllWeeksBtn" class="btn-submit" style="width:100%;background:rgba(0,140,255,0.08);border:1px solid rgba(0,140,255,0.3);color:var(--text);font-size:13px;" onclick="importAllWeeksFromESPN()">📥 Import ALL 22 Weeks from ESPN (saves directly to Firebase)</button>
       </div>
     </div>
 
