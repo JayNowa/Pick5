@@ -1182,6 +1182,25 @@
     border-bottom: 1px solid var(--border);
   }
   .picks-submission:last-child { border-bottom: none; }
+  .picks-submission.superseded {
+    opacity: 0.55;
+    text-decoration: line-through;
+    text-decoration-color: rgba(255,255,255,0.35);
+  }
+  .superseded-badge {
+    display: inline-block;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 7px;
+    margin-left: 8px;
+    vertical-align: middle;
+    text-decoration: none;
+  }
 
   .submission-meta {
     font-size: 12px;
@@ -2920,7 +2939,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.3.2</div>
+    <div class="version-badge">v1.3.3</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -4644,14 +4663,16 @@ async function loadMyPicks() {
       header.appendChild(countEl);
       group.appendChild(header);
 
-      submissions.forEach(doc => {
+      submissions.forEach((doc, subIdx) => {
         const allPicks = [doc.pick1, doc.pick2, doc.pick3, doc.pick4, doc.pick5];
         const picks = allPicks.filter(p => p && p.trim());
         const sub = document.createElement('div');
-        sub.className = 'picks-submission';
+        const isSuperseded = subIdx > 0;
+        sub.className = 'picks-submission' + (isSuperseded ? ' superseded' : '');
         const meta = document.createElement('div');
         meta.className = 'submission-meta';
-        meta.textContent = [doc.date, doc.time].filter(Boolean).join(' · ');
+        meta.innerHTML = [doc.date, doc.time].filter(Boolean).join(' · ') +
+          (isSuperseded ? ' <span class="superseded-badge">Not Counted</span>' : '');
         sub.appendChild(meta);
         const chipsEl = document.createElement('div');
         chipsEl.className = 'submission-picks';
