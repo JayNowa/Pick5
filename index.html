@@ -2920,7 +2920,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.3.1</div>
+    <div class="version-badge">v1.3.2</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -3508,7 +3508,11 @@ function buildTestScoresMap(games) {
 async function fetchESPNScoresMap(weekValue) {
   if (_testModeEnabled) {
     try {
-      const testData = window.fbGetTestScores ? await window.fbGetTestScores(String(weekValue)) : null;
+      // Picks store weeks as "Week 5" but test score keys are "5" — normalize before lookup
+      const raw = String(weekValue).trim();
+      const weekMatch = raw.match(/^Week\s+(\d+)$/i);
+      const testKey = weekMatch ? weekMatch[1] : raw;
+      const testData = window.fbGetTestScores ? await window.fbGetTestScores(testKey) : null;
       return (testData && testData.games) ? buildTestScoresMap(testData.games) : {};
     } catch(e) { return {}; }
   }
