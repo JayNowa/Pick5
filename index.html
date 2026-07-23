@@ -2906,6 +2906,102 @@
   .test-game-remove:hover { border-color: #f55; color: #f55; }
   .test-vs { font-family: 'Bebas Neue', sans-serif; font-size: 18px; color: var(--muted); align-self: flex-end; padding-bottom: 6px; }
 
+  /* ── HOW TO JOIN TUTORIAL PAGE ── */
+  #tutorialPage {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    background: var(--bg);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    /* tutorial-scoped tokens */
+    --gold: var(--accent);
+    --gold-dim: rgba(200,169,74,0.18);
+    --gold-glow: rgba(200,169,74,0.35);
+    --t-text: var(--text);
+    --t-muted: var(--muted);
+    --t-border: var(--border);
+    --connector: rgba(200,169,74,0.25);
+    --page-surface: var(--surface);
+    --app-bg: #0a0c10;
+    --app-surface: #13171f;
+    --app-border: #2a3040;
+    --app-accent: #c8a94a;
+    --app-accent2: #e8c96a;
+    --app-text: #f0f2f5;
+    --app-muted: #6b7588;
+  }
+  [data-theme="light"] #tutorialPage {
+    --gold: var(--accent);
+    --gold-dim: rgba(184,146,42,0.12);
+    --gold-glow: rgba(184,146,42,0.28);
+    --connector: rgba(184,146,42,0.3);
+  }
+  #tutorialPage .tut-page-header { text-align: center; padding: 72px 24px 56px; }
+  #tutorialPage .tut-page-header .shield { font-size: 52px; display: block; margin-bottom: 20px; filter: drop-shadow(0 0 24px rgba(200,169,74,0.5)); }
+  #tutorialPage .tut-page-header h1 { font-family: 'Bebas Neue', Impact, 'Arial Narrow', Arial, sans-serif; font-size: clamp(32px, 6vw, 52px); letter-spacing: 0.18em; text-transform: uppercase; background: linear-gradient(135deg, var(--gold) 0%, #e8c96a 60%, var(--gold) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1; margin-bottom: 14px; }
+  #tutorialPage .tut-page-header .eyebrow { font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--t-muted); margin-bottom: 10px; }
+  #tutorialPage .tut-page-header .lead { font-size: 17px; color: var(--t-muted); max-width: 480px; margin: 0 auto; line-height: 1.6; }
+  #tutorialPage .header-rule { width: 64px; height: 2px; background: linear-gradient(90deg, transparent, var(--gold), transparent); margin: 22px auto 0; }
+  #tutorialPage .tut-back-btn { display: flex; align-items: center; gap: 8px; background: none; border: none; color: var(--t-muted); font-size: 13px; letter-spacing: 0.1em; cursor: pointer; padding: 16px 24px 0; text-transform: uppercase; }
+  #tutorialPage .tut-back-btn:hover { color: var(--gold); }
+  #tutorialPage .steps-wrap { max-width: 780px; margin: 0 auto; padding: 0 24px 96px; position: relative; }
+  #tutorialPage .steps-wrap::before { content: ''; position: absolute; left: 52px; top: 0; bottom: 60px; width: 1px; background: linear-gradient(to bottom, var(--gold), var(--connector) 80%, transparent); pointer-events: none; }
+  #tutorialPage .step { display: flex; gap: 28px; margin-bottom: 60px; align-items: flex-start; }
+  #tutorialPage .step-num { flex-shrink: 0; width: 56px; height: 56px; border-radius: 50%; border: 2px solid var(--gold); background: var(--gold-dim); display: flex; align-items: center; justify-content: center; font-family: 'Bebas Neue', Impact, sans-serif; font-size: 22px; color: var(--gold); position: relative; z-index: 1; box-shadow: 0 0 0 4px var(--bg), 0 0 20px var(--gold-glow); margin-top: 4px; }
+  #tutorialPage .step-body { flex: 1; min-width: 0; }
+  #tutorialPage .step-title { font-family: 'Bebas Neue', Impact, 'Arial Narrow', Arial, sans-serif; font-size: 22px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--t-text); margin-bottom: 8px; }
+  #tutorialPage .step-desc { font-size: 15px; color: var(--t-muted); margin-bottom: 20px; max-width: 520px; line-height: 1.7; }
+  #tutorialPage .step-desc strong { color: var(--t-text); font-weight: 600; }
+  #tutorialPage .mockup { background: var(--app-bg); border: 1px solid var(--app-border); border-radius: 10px; overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04); }
+  #tutorialPage .mockup-bar { background: #0e1118; border-bottom: 1px solid var(--app-border); padding: 10px 14px; display: flex; align-items: center; gap: 6px; }
+  #tutorialPage .mockup-bar .mdot { width: 9px; height: 9px; border-radius: 50%; }
+  #tutorialPage .mockup-bar .mdot:nth-child(1) { background: #ff5f57; }
+  #tutorialPage .mockup-bar .mdot:nth-child(2) { background: #febc2e; }
+  #tutorialPage .mockup-bar .mdot:nth-child(3) { background: #28c840; }
+  #tutorialPage .mockup-bar .murl { margin-left: 10px; font-size: 11px; color: #4a5168; letter-spacing: 0.04em; font-family: 'SF Mono', 'Fira Mono', monospace; }
+  #tutorialPage .mockup-body { padding: 28px 24px; display: flex; flex-direction: column; align-items: center; }
+  #tutorialPage .app-hdr { text-align: center; margin-bottom: 28px; }
+  #tutorialPage .app-hdr .app-shield { font-size: 36px; display: block; margin-bottom: 8px; filter: drop-shadow(0 0 14px rgba(200,169,74,0.4)); }
+  #tutorialPage .app-hdr .app-title { font-family: 'Bebas Neue', Impact, 'Arial Narrow', Arial, sans-serif; font-size: 32px; letter-spacing: 0.16em; text-transform: uppercase; background: linear-gradient(135deg, var(--app-accent) 0%, var(--app-accent2) 60%, var(--app-accent) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1; margin-bottom: 6px; }
+  #tutorialPage .app-hdr .app-subtitle { font-size: 12px; letter-spacing: 0.22em; color: var(--app-muted); text-transform: uppercase; margin-bottom: 12px; }
+  #tutorialPage .app-hdr .app-divider { width: 64px; height: 2px; background: linear-gradient(90deg, transparent, var(--app-accent), transparent); margin: 0 auto; }
+  #tutorialPage .acard { background: var(--app-surface); border: 1px solid var(--app-border); border-radius: 8px; padding: 28px 32px; width: 100%; max-width: 380px; }
+  #tutorialPage .acard h2 { font-family: 'Bebas Neue', Impact, 'Arial Narrow', Arial, sans-serif; font-size: 22px; letter-spacing: 0.12em; color: var(--app-accent); margin-bottom: 4px; }
+  #tutorialPage .acard > p { font-size: 13px; color: var(--app-muted); letter-spacing: 0.04em; margin-bottom: 20px; }
+  #tutorialPage .afield { margin-bottom: 14px; }
+  #tutorialPage .afield label { display: block; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--app-muted); margin-bottom: 6px; }
+  #tutorialPage .ainput { background: rgba(255,255,255,0.06); border: 1px solid var(--app-border); border-radius: 6px; padding: 10px 12px; font-size: 14px; color: var(--app-text); width: 100%; }
+  #tutorialPage .ainput.filled { border-color: rgba(200,169,74,0.35); background: rgba(200,169,74,0.06); }
+  #tutorialPage .ahint { font-size: 11px; color: var(--app-muted); margin-top: 5px; letter-spacing: 0.04em; }
+  #tutorialPage .abtn { width: 100%; background: linear-gradient(135deg, var(--app-accent) 0%, #a07830 100%); color: #0a0c10; font-family: 'Bebas Neue', Impact, sans-serif; font-size: 16px; letter-spacing: 0.12em; border: none; border-radius: 6px; padding: 13px; cursor: default; margin-top: 6px; box-shadow: 0 4px 20px rgba(200,169,74,0.25); text-transform: uppercase; }
+  #tutorialPage .aremember { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 12px; color: var(--app-muted); }
+  #tutorialPage .aremember input { accent-color: var(--app-accent); width: 12px; height: 12px; }
+  #tutorialPage .areqlink { text-align: center; margin-top: 14px; font-size: 12px; color: var(--app-muted); letter-spacing: 0.05em; }
+  #tutorialPage .areqlink a { color: var(--app-accent); text-decoration: underline; text-underline-offset: 3px; }
+  #tutorialPage .highlight-box { display: inline-block; border: 2px solid var(--app-accent); border-radius: 4px; padding: 2px 6px; box-shadow: 0 0 10px rgba(200,169,74,0.4); }
+  #tutorialPage .highlight-arrow { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 6px; font-size: 11px; color: var(--app-accent); letter-spacing: 0.08em; text-transform: uppercase; padding-right: 4px; }
+  #tutorialPage .asuccess { background: rgba(200,169,74,0.08); border: 1px solid rgba(200,169,74,0.3); border-radius: 6px; padding: 14px 16px; text-align: center; margin-bottom: 16px; }
+  #tutorialPage .asuccess .check { font-size: 28px; display: block; margin-bottom: 6px; }
+  #tutorialPage .asuccess .smsg { font-size: 13px; color: var(--app-accent); letter-spacing: 0.04em; }
+  #tutorialPage .asuccess .semail { font-size: 12px; color: var(--app-muted); margin-top: 4px; }
+  #tutorialPage .tut-tip { background: var(--page-surface); border: 1px solid var(--t-border); border-left: 3px solid var(--gold); border-radius: 0 6px 6px 0; padding: 14px 18px; font-size: 14px; color: var(--t-muted); margin-bottom: 20px; line-height: 1.6; }
+  #tutorialPage .tut-tip strong { color: var(--t-text); }
+  #tutorialPage .done-banner { text-align: center; padding: 48px 24px; margin-top: 20px; }
+  #tutorialPage .done-banner .big-emoji { font-size: 48px; margin-bottom: 16px; display: block; }
+  #tutorialPage .done-banner h2 { font-family: 'Bebas Neue', Impact, 'Arial Narrow', Arial, sans-serif; font-size: 28px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; }
+  #tutorialPage .done-banner p { font-size: 15px; color: var(--t-muted); max-width: 400px; margin: 0 auto; line-height: 1.6; }
+  @media (max-width: 560px) {
+    #tutorialPage .steps-wrap { padding: 0 16px 72px; }
+    #tutorialPage .steps-wrap::before { left: 36px; }
+    #tutorialPage .step-num { width: 44px; height: 44px; font-size: 18px; }
+    #tutorialPage .step { gap: 16px; }
+    #tutorialPage .acard { padding: 20px; }
+    #tutorialPage .mockup-body { padding: 20px 14px; }
+    #tutorialPage .tut-page-header { padding: 48px 16px 40px; }
+  }
+
 </style>
 </head>
 <body>
@@ -2939,7 +3035,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.3.3</div>
+    <div class="version-badge">v1.3.4</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -2973,6 +3069,143 @@
   </div>
 </div>
 
+<!-- ═══ HOW TO JOIN TUTORIAL PAGE ═══ -->
+<div id="tutorialPage">
+  <button class="tut-back-btn" onclick="hideTutorial()">← Back to Sign In</button>
+  <div class="tut-page-header">
+    <span class="shield">🏈</span>
+    <div class="eyebrow">Pick 5 League</div>
+    <h1>How to Join</h1>
+    <p class="lead">Pick 5 is invite-based. Follow these steps to request access and start making your picks.</p>
+    <div class="header-rule"></div>
+  </div>
+  <div class="steps-wrap">
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Open the site</div>
+        <div class="step-desc">Navigate to <strong>pick5game.win</strong>. You'll land on the sign-in screen — don't have a login yet? That's fine, keep reading.</div>
+        <div class="mockup">
+          <div class="mockup-bar"><div class="mdot"></div><div class="mdot"></div><div class="mdot"></div><div class="murl">pick5game.win</div></div>
+          <div class="mockup-body">
+            <div class="app-hdr"><span class="app-shield">🏈</span><div class="app-title">Pick 5</div><div class="app-subtitle">Authorized Access Only</div><div class="app-divider"></div></div>
+            <div class="acard">
+              <h2>Sign In</h2><p>Enter your approved email &amp; PIN to continue</p>
+              <div class="afield"><label>Email Address</label><div class="ainput" style="color:var(--app-muted);font-size:13px;">you@example.com</div></div>
+              <div class="afield"><label>PIN</label><div class="ainput" style="color:var(--app-muted);font-size:13px;">••••</div><div class="ahint">Enter the PIN assigned to your email</div></div>
+              <div class="abtn">Enter</div>
+              <div class="aremember"><input type="checkbox" checked disabled /> Remember me</div>
+              <div class="areqlink">Don't have access? <a>Request Access</a></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Click "Request Access"</div>
+        <div class="step-desc">At the bottom of the sign-in card, tap <strong>Request Access</strong>. This opens a short form — you won't need an existing account.</div>
+        <div class="mockup">
+          <div class="mockup-bar"><div class="mdot"></div><div class="mdot"></div><div class="mdot"></div><div class="murl">pick5game.win</div></div>
+          <div class="mockup-body">
+            <div class="acard">
+              <h2>Sign In</h2><p>Enter your approved email &amp; PIN to continue</p>
+              <div class="afield"><label>Email Address</label><div class="ainput" style="color:var(--app-muted);font-size:13px;">you@example.com</div></div>
+              <div class="afield"><label>PIN</label><div class="ainput" style="color:var(--app-muted);font-size:13px;">••••</div><div class="ahint">Enter the PIN assigned to your email</div></div>
+              <div class="abtn">Enter</div>
+              <div class="aremember"><input type="checkbox" checked disabled /> Remember me</div>
+              <div class="areqlink" style="margin-top:14px;padding:6px 0;">Don't have access?&nbsp;<span class="highlight-box"><a>Request Access</a></span></div>
+              <div class="highlight-arrow">← tap here</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Fill out the form</div>
+        <div class="step-desc">Enter your <strong>email address</strong>, choose a <strong>PIN</strong> you'll use to log in, pick a <strong>team name</strong>, and add your <strong>phone number</strong>. Then hit Submit Request.</div>
+        <div class="tut-tip"><strong>Choose your PIN carefully</strong> — you'll need it every time you sign in. There's no password reset, so pick something you'll remember.</div>
+        <div class="mockup">
+          <div class="mockup-bar"><div class="mdot"></div><div class="mdot"></div><div class="mdot"></div><div class="murl">pick5game.win</div></div>
+          <div class="mockup-body">
+            <div class="acard">
+              <h2>Request Access</h2><p>Fill out the form below and an admin will review your request.</p>
+              <div class="afield"><label>Email Address</label><div class="ainput filled">john@example.com</div></div>
+              <div class="afield"><label>Choose a PIN</label><div class="ainput filled">••••</div><div class="ahint">You'll use this PIN to log in once approved</div></div>
+              <div class="afield"><label>Team Name</label><div class="ainput filled">The Armchair QBs</div></div>
+              <div class="afield"><label>Phone Number</label><div class="ainput filled">555-867-5309</div></div>
+              <div class="abtn">Submit Request</div>
+              <div class="areqlink" style="margin-top:12px;"><a>← Back to Sign In</a></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Request submitted</div>
+        <div class="step-desc">After hitting Submit, you'll see a confirmation message. Your request is now in the admin's queue — <strong>no action needed on your end</strong>.</div>
+        <div class="mockup">
+          <div class="mockup-bar"><div class="mdot"></div><div class="mdot"></div><div class="mdot"></div><div class="murl">pick5game.win</div></div>
+          <div class="mockup-body">
+            <div class="acard">
+              <h2>Request Access</h2><p>Fill out the form below and an admin will review your request.</p>
+              <div class="asuccess"><span class="check">✓</span><div class="smsg">Request submitted! You'll be notified when approved.</div><div class="semail">john@example.com</div></div>
+              <div class="areqlink" style="margin-top:4px;"><a>← Back to Sign In</a></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <div class="step-title">Wait for approval</div>
+        <div class="step-desc">The league admin will see your request and approve it. Once approved, you're good to go — reach out directly if you haven't heard back after a day or two.</div>
+        <div class="tut-tip"><strong>Heads up:</strong> your account isn't active until the admin approves it. Trying to sign in before then won't work.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">6</div>
+      <div class="step-body">
+        <div class="step-title">Sign in and start picking</div>
+        <div class="step-desc">Once approved, go back to the site and enter the <strong>same email</strong> and <strong>PIN</strong> you used in your request. Check <strong>Remember me</strong> so you stay logged in on this device.</div>
+        <div class="mockup">
+          <div class="mockup-bar"><div class="mdot"></div><div class="mdot"></div><div class="mdot"></div><div class="murl">pick5game.win</div></div>
+          <div class="mockup-body">
+            <div class="app-hdr"><span class="app-shield">🏈</span><div class="app-title">Pick 5</div><div class="app-subtitle">Authorized Access Only</div><div class="app-divider"></div></div>
+            <div class="acard">
+              <h2>Sign In</h2><p>Enter your approved email &amp; PIN to continue</p>
+              <div class="afield"><label>Email Address</label><div class="ainput filled">john@example.com</div></div>
+              <div class="afield"><label>PIN</label><div class="ainput filled">••••</div><div class="ahint">Enter the PIN assigned to your email</div></div>
+              <div class="abtn">Enter</div>
+              <div class="aremember"><input type="checkbox" checked disabled /> Remember me</div>
+              <div class="areqlink">Don't have access? <a>Request Access</a></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="done-banner">
+      <span class="big-emoji">🏆</span>
+      <h2>You're In</h2>
+      <p>Head to My Picks and make your five picks before the week's deadline. Good luck.</p>
+    </div>
+
+  </div>
+</div>
+
 <!-- ═══ LOGIN PAGE ═══ -->
 <div class="page" id="loginPage">
   <div class="container">
@@ -3002,6 +3235,9 @@
       </div>
       <div class="request-access-link">
         Don't have access? <span onclick="openRequestAccess()">Request Access</span>
+      </div>
+      <div class="request-access-link" style="margin-top:8px;">
+        <span onclick="showTutorial()">How to Join →</span>
       </div>
     </div>
   </div>
@@ -6453,6 +6689,16 @@ function openRequestAccess() {
 
 function closeRequestAccess() {
   document.getElementById('requestAccessOverlay').style.display = 'none';
+}
+
+function showTutorial() {
+  document.getElementById('requestAccessOverlay').style.display = 'none';
+  const t = document.getElementById('tutorialPage');
+  t.style.display = 'block';
+  t.scrollTop = 0;
+}
+function hideTutorial() {
+  document.getElementById('tutorialPage').style.display = 'none';
 }
 
 async function submitAccessRequest() {
