@@ -3035,7 +3035,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.3.4</div>
+    <div class="version-badge">v1.3.5</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -6696,10 +6696,14 @@ function showTutorial() {
   const t = document.getElementById('tutorialPage');
   t.style.display = 'block';
   t.scrollTop = 0;
+  history.replaceState(null, '', '#how-to-join');
 }
 function hideTutorial() {
   document.getElementById('tutorialPage').style.display = 'none';
+  history.replaceState(null, '', window.location.pathname);
 }
+// Auto-open tutorial if URL contains #how-to-join
+if (window.location.hash === '#how-to-join') { showTutorial(); }
 
 async function submitAccessRequest() {
   const email    = document.getElementById('requestEmail').value.trim().toLowerCase();
