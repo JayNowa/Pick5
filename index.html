@@ -4172,7 +4172,12 @@ function clearTtReply() {
 async function loadTrashTalk() {
   const container = document.getElementById('ttFeedContainer');
   container.innerHTML = '<div class="tt-loading">Loading messages…</div>';
-  const posts = await window.fbGetTrashTalk();
+  const [posts, users] = await Promise.all([
+    window.fbGetTrashTalk(),
+    window.fbGetAllApprovedUsers ? window.fbGetAllApprovedUsers() : Promise.resolve([])
+  ]);
+  const teamNameMap = {};
+  users.forEach(function(u) { if (u.email && u.teamName) teamNameMap[u.email.toLowerCase()] = u.teamName; });
   const currentEmail = (document.getElementById('navEmail').dataset.email || '').toLowerCase();
   const isAdmin = ADMIN_EMAILS.includes(currentEmail);
 
@@ -4184,23 +4189,25 @@ async function loadTrashTalk() {
   const feed = document.createElement('div');
   feed.className = 'tt-feed';
   posts.forEach(function(post) {
-    feed.appendChild(buildTtCard(post, currentEmail, isAdmin));
+    feed.appendChild(buildTtCard(post, currentEmail, isAdmin, teamNameMap));
   });
   container.innerHTML = '';
   container.appendChild(feed);
 }
 
-function buildTtCard(post, currentEmail, isAdmin) {
+function buildTtCard(post, currentEmail, isAdmin, teamNameMap) {
   const card = document.createElement('div');
   card.className = 'tt-card';
   card.dataset.postId = post.id;
+
+  const resolvedName = (teamNameMap && teamNameMap[post.fromEmail]) || post.fromTeamName || post.fromEmail;
 
   // Header
   const header = document.createElement('div');
   header.className = 'tt-card-header';
   const author = document.createElement('span');
   author.className = 'tt-author';
-  author.textContent = post.fromTeamName || post.fromEmail;
+  author.textContent = resolvedName;
   const meta = document.createElement('div');
   meta.className = 'tt-meta';
   const time = document.createElement('span');
@@ -4271,7 +4278,7 @@ function buildTtCard(post, currentEmail, isAdmin) {
   replyBtn.className = 'tt-reply-btn';
   replyBtn.textContent = '↩ Reply';
   replyBtn.onclick = function() {
-    setTtReply(post.id, post.fromTeamName || post.fromEmail, post.message);
+    setTtReply(post.id, resolvedName, post.message);
   };
   footer.appendChild(replyBtn);
   card.appendChild(footer);
