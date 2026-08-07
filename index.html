@@ -7590,14 +7590,32 @@ async function loadLeaderboard() {
     const rankClasses = ['first', 'second', 'third', 'fourth', 'fifth'];
     const everyonePending = standings.every(function(u) { return u.totalWins === 0 && u.totalLosses === 0; });
 
+    // Assign standard competition ranks (1224 style) so tied entries share the same placement
+    const ranks = [];
+    for (let ri = 0; ri < standings.length; ri++) {
+      if (ri === 0) {
+        ranks[ri] = 1;
+      } else {
+        const pr = standings[ri - 1];
+        const cr = standings[ri];
+        const tied = cr.totalWins === pr.totalWins &&
+          (!(cr.tbCount > 0 && pr.tbCount > 0) || cr.totalTbDiff === pr.totalTbDiff);
+        ranks[ri] = tied ? ranks[ri - 1] : ri + 1;
+      }
+    }
+    const lastRank = ranks[ranks.length - 1];
+    const lastRankCount = ranks.filter(function(r) { return r === lastRank; }).length;
+
     standings.forEach(function(user, idx) {
-      const isLast = idx === standings.length - 1 && standings.length > 1;
+      const rank = ranks[idx];
+      const isSingleLast = standings.length > 1 && rank === lastRank && lastRankCount === 1;
       const row = document.createElement('div');
-      row.className = 'lb-row' + (everyonePending ? '' : (idx < 5 ? ' ' + rankClasses[idx] : (isLast ? ' loser' : '')));
+      const rowRankClass = everyonePending ? '' : (isSingleLast ? ' loser' : (rank <= 5 ? ' ' + rankClasses[rank - 1] : ''));
+      row.className = 'lb-row' + rowRankClass;
       row.style.animationDelay = (idx * 0.06) + 's';
 
-      const rankClass = everyonePending ? 'other' : (idx < 5 ? rankClasses[idx] : (isLast ? 'loser' : 'other'));
-      const rankDisplay = everyonePending ? '' : (idx < 5 ? medals[idx] : (isLast ? '💩' : (idx + 1)));
+      const rankClass = everyonePending ? 'other' : (isSingleLast ? 'loser' : (rank <= 5 ? rankClasses[rank - 1] : 'other'));
+      const rankDisplay = everyonePending ? '' : (isSingleLast ? '💩' : (rank <= 5 ? medals[rank - 1] : rank));
 
       const pendingLabel = user.pendingCount > 0
         ? '<span style="color:var(--muted);font-size:11px;letter-spacing:0.06em;">' + user.pendingCount + ' game' + (user.pendingCount !== 1 ? 's' : '') + ' pending</span>'
