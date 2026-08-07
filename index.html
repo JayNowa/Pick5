@@ -3035,7 +3035,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.3.5</div>
+    <div class="version-badge">v1.3.6</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -4172,7 +4172,12 @@ function clearTtReply() {
 async function loadTrashTalk() {
   const container = document.getElementById('ttFeedContainer');
   container.innerHTML = '<div class="tt-loading">Loading messages…</div>';
-  const posts = await window.fbGetTrashTalk();
+  const [posts, users] = await Promise.all([
+    window.fbGetTrashTalk(),
+    window.fbGetAllApprovedUsers ? window.fbGetAllApprovedUsers() : Promise.resolve([])
+  ]);
+  const teamNameMap = {};
+  users.forEach(function(u) { if (u.email && u.teamName) teamNameMap[u.email.toLowerCase()] = u.teamName; });
   const currentEmail = (document.getElementById('navEmail').dataset.email || '').toLowerCase();
   const isAdmin = ADMIN_EMAILS.includes(currentEmail);
 
@@ -4184,23 +4189,25 @@ async function loadTrashTalk() {
   const feed = document.createElement('div');
   feed.className = 'tt-feed';
   posts.forEach(function(post) {
-    feed.appendChild(buildTtCard(post, currentEmail, isAdmin));
+    feed.appendChild(buildTtCard(post, currentEmail, isAdmin, teamNameMap));
   });
   container.innerHTML = '';
   container.appendChild(feed);
 }
 
-function buildTtCard(post, currentEmail, isAdmin) {
+function buildTtCard(post, currentEmail, isAdmin, teamNameMap) {
   const card = document.createElement('div');
   card.className = 'tt-card';
   card.dataset.postId = post.id;
+
+  const resolvedName = (teamNameMap && teamNameMap[post.fromEmail]) || post.fromTeamName || post.fromEmail;
 
   // Header
   const header = document.createElement('div');
   header.className = 'tt-card-header';
   const author = document.createElement('span');
   author.className = 'tt-author';
-  author.textContent = post.fromTeamName || post.fromEmail;
+  author.textContent = resolvedName;
   const meta = document.createElement('div');
   meta.className = 'tt-meta';
   const time = document.createElement('span');
@@ -4271,7 +4278,7 @@ function buildTtCard(post, currentEmail, isAdmin) {
   replyBtn.className = 'tt-reply-btn';
   replyBtn.textContent = '↩ Reply';
   replyBtn.onclick = function() {
-    setTtReply(post.id, post.fromTeamName || post.fromEmail, post.message);
+    setTtReply(post.id, resolvedName, post.message);
   };
   footer.appendChild(replyBtn);
   card.appendChild(footer);
@@ -7583,14 +7590,32 @@ async function loadLeaderboard() {
     const rankClasses = ['first', 'second', 'third', 'fourth', 'fifth'];
     const everyonePending = standings.every(function(u) { return u.totalWins === 0 && u.totalLosses === 0; });
 
+    // Assign standard competition ranks (1224 style) so tied entries share the same placement
+    const ranks = [];
+    for (let ri = 0; ri < standings.length; ri++) {
+      if (ri === 0) {
+        ranks[ri] = 1;
+      } else {
+        const pr = standings[ri - 1];
+        const cr = standings[ri];
+        const tied = cr.totalWins === pr.totalWins &&
+          (!(cr.tbCount > 0 && pr.tbCount > 0) || cr.totalTbDiff === pr.totalTbDiff);
+        ranks[ri] = tied ? ranks[ri - 1] : ri + 1;
+      }
+    }
+    const lastRank = ranks[ranks.length - 1];
+    const lastRankCount = ranks.filter(function(r) { return r === lastRank; }).length;
+
     standings.forEach(function(user, idx) {
-      const isLast = idx === standings.length - 1 && standings.length > 1;
+      const rank = ranks[idx];
+      const isSingleLast = standings.length > 1 && rank === lastRank && lastRankCount === 1;
       const row = document.createElement('div');
-      row.className = 'lb-row' + (everyonePending ? '' : (idx < 5 ? ' ' + rankClasses[idx] : (isLast ? ' loser' : '')));
+      const rowRankClass = everyonePending ? '' : (isSingleLast ? ' loser' : (rank <= 5 ? ' ' + rankClasses[rank - 1] : ''));
+      row.className = 'lb-row' + rowRankClass;
       row.style.animationDelay = (idx * 0.06) + 's';
 
-      const rankClass = everyonePending ? 'other' : (idx < 5 ? rankClasses[idx] : (isLast ? 'loser' : 'other'));
-      const rankDisplay = everyonePending ? '' : (idx < 5 ? medals[idx] : (isLast ? '💩' : (idx + 1)));
+      const rankClass = everyonePending ? 'other' : (isSingleLast ? 'loser' : (rank <= 5 ? rankClasses[rank - 1] : 'other'));
+      const rankDisplay = everyonePending ? '' : (isSingleLast ? '💩' : (rank <= 5 ? medals[rank - 1] : rank));
 
       const pendingLabel = user.pendingCount > 0
         ? '<span style="color:var(--muted);font-size:11px;letter-spacing:0.06em;">' + user.pendingCount + ' game' + (user.pendingCount !== 1 ? 's' : '') + ' pending</span>'
