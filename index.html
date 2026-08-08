@@ -3035,7 +3035,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.3.6</div>
+    <div class="version-badge">v1.3.7</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -7495,6 +7495,149 @@ function isWeekFullyFinal(weekScores) {
   return allFinal;
 }
 
+// ── Weekly Recap Email ──
+async function sendWeeklyRecap() {
+  const selEl    = document.getElementById('recapWeekSelect');
+  const statusEl = document.getElementById('recapStatus');
+  const btnEl    = document.getElementById('sendRecapBtn');
+
+  const val = selEl.value;
+  if (!val) {
+    statusEl.textContent = 'Please select a week first.';
+    statusEl.className = 'admin-status error';
+    return;
+  }
+
+  const weekLabel = (isNaN(parseInt(val)) || val.toString().toLowerCase().includes('week'))
+    ? val : 'Week ' + val;
+
+  btnEl.disabled = true;
+  statusEl.textContent = 'Gathering data…';
+  statusEl.className = 'admin-status';
+
+  try {
+    const allPicks = await fetchAllPicks();
+    if (!allPicks || allPicks.length === 0) throw new Error('No picks found.');
+
+    const uniqueWeeks = [...new Set(allPicks.map(function(d) { return d.week; }).filter(Boolean))];
+    const scoresByWeek = {};
+    await Promise.all(uniqueWeeks.map(async function(wk) {
+      scoresByWeek[wk] = await fetchESPNScoresMap(wk);
+    }));
+
+    const userWeekMap = {};
+    const userNames   = {};
+    allPicks.forEach(function(doc) {
+      const email = doc.email || 'unknown';
+      const week  = doc.week  || '';
+      if (!week) return;
+      userNames[email] = doc.teamName || email;
+      if (!userWeekMap[email]) userWeekMap[email] = {};
+      if (!userWeekMap[email][week] || (doc.timestamp || 0) > (userWeekMap[email][week].timestamp || 0)) {
+        userWeekMap[email][week] = doc;
+      }
+    });
+
+    const weekScores  = scoresByWeek[weekLabel] || {};
+    const weekResults = [];
+
+    Object.keys(userWeekMap).forEach(function(email) {
+      const doc = userWeekMap[email][weekLabel];
+      if (!doc) return;
+      const picks   = [doc.pick1,   doc.pick2,   doc.pick3,   doc.pick4,   doc.pick5];
+      const spreads = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5];
+      let wins = 0, losses = 0, pending = 0;
+      const pickDetails = [];
+      picks.forEach(function(pick, pi) {
+        if (!pick || !pick.trim()) return;
+        const result = getPickResult(pick, spreads[pi] || '', weekScores);
+        if (result === 'win') wins++;
+        else if (result === 'loss') losses++;
+        else pending++;
+        pickDetails.push({ team: pick, spread: spreads[pi] || '', result: result });
+      });
+      const tbScore  = (doc.tiebreaker !== undefined && doc.tiebreaker !== '') ? parseInt(doc.tiebreaker) : null;
+      const tbGame   = doc.tiebreakerGame || '';
+      const actualTb = getActualTiebreakerFromWeek(weekScores);
+      const tbDiff   = (tbScore !== null && actualTb !== null) ? Math.abs(tbScore - actualTb) : null;
+      weekResults.push({ email: email, teamName: userNames[email] || email, wins: wins, losses: losses, pending: pending, picks: pickDetails, tbScore: tbScore, tbGame: tbGame, tbDiff: tbDiff, actualTb: actualTb });
+    });
+
+    if (weekResults.length === 0) throw new Error('No picks found for ' + weekLabel + '.');
+
+    weekResults.sort(function(a, b) {
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      if (a.tbDiff !== null && b.tbDiff !== null) return a.tbDiff - b.tbDiff;
+      return 0;
+    });
+
+    const perfectScores = weekResults.filter(function(r) { return r.wins === 5 && r.losses === 0 && r.pending === 0; }).map(function(r) { return r.teamName; });
+    const shutouts      = weekResults.filter(function(r) { return r.losses === 5 && r.wins === 0 && r.pending === 0; }).map(function(r) { return r.teamName; });
+
+    const standings = Object.keys(userWeekMap).map(function(email) {
+      let totalWins = 0, totalLosses = 0, totalTbDiff = 0, tbCount = 0;
+      Object.keys(userWeekMap[email]).forEach(function(week) {
+        const doc = userWeekMap[email][week];
+        const ws  = scoresByWeek[week] || {};
+        const weekFinal = isWeekFullyFinal(ws);
+        [doc.pick1, doc.pick2, doc.pick3, doc.pick4, doc.pick5].forEach(function(pick, pi) {
+          const sp = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5][pi];
+          if (!pick || !pick.trim()) { if (weekFinal) totalLosses++; return; }
+          const r = getPickResult(pick, sp || '', ws);
+          if (r === 'win') totalWins++; else if (r === 'loss') totalLosses++;
+        });
+        if (doc.tiebreaker !== undefined && doc.tiebreaker !== '') {
+          const actual = getActualTiebreakerFromWeek(ws);
+          if (actual !== null) { totalTbDiff += Math.abs(parseInt(doc.tiebreaker) - actual); tbCount++; }
+        }
+      });
+      return { teamName: userNames[email] || email, totalWins: totalWins, totalLosses: totalLosses, totalTbDiff: totalTbDiff, tbCount: tbCount };
+    });
+
+    standings.sort(function(a, b) {
+      if (b.totalWins !== a.totalWins) return b.totalWins - a.totalWins;
+      if (a.tbCount > 0 && b.tbCount > 0) return a.totalTbDiff - b.totalTbDiff;
+      return 0;
+    });
+
+    const sRanks = [];
+    standings.forEach(function(s, i) {
+      if (i === 0) { sRanks[i] = 1; return; }
+      const pr = standings[i - 1];
+      const tied = s.totalWins === pr.totalWins &&
+        (!(s.tbCount > 0 && pr.tbCount > 0) || s.totalTbDiff === pr.totalTbDiff);
+      sRanks[i] = tied ? sRanks[i - 1] : i + 1;
+    });
+
+    const leaderboard = standings.map(function(s, i) {
+      return { rank: sRanks[i], teamName: s.teamName, totalWins: s.totalWins, totalLosses: s.totalLosses, totalTbDiff: s.tbCount > 0 ? s.totalTbDiff : null };
+    });
+
+    const allUsers   = await window.fbGetAllApprovedUsers();
+    const recipients = allUsers.map(function(u) { return u.email; }).filter(Boolean);
+    if (recipients.length === 0) throw new Error('No approved users found.');
+
+    statusEl.textContent = 'Sending to ' + recipients.length + ' players…';
+
+    await fetch(PICKS_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'weeklyRecap', week: weekLabel, recipients: recipients, weekResults: weekResults, leaderboard: leaderboard, perfectScores: perfectScores, shutouts: shutouts })
+    });
+
+    statusEl.textContent = '✅ Recap sent to ' + recipients.length + ' players!';
+    statusEl.className = 'admin-status success';
+
+  } catch(err) {
+    statusEl.textContent = '❌ ' + err.message;
+    statusEl.className = 'admin-status error';
+    console.error(err);
+  } finally {
+    btnEl.disabled = false;
+  }
+}
+
 // ── Leaderboard ──
 async function loadLeaderboard() {
   const loadingEl = document.getElementById('leaderboardLoading');
@@ -8456,6 +8599,47 @@ document.addEventListener('keydown', function(e) {
       </div>
       <div class="admin-status" id="philliesStreakStatus" style="margin-top:10px;"></div>
     </div>
+
+    <!-- Weekly Recap Email -->
+    <div class="admin-card">
+      <div class="admin-card-title">📧 Weekly Recap Email</div>
+      <p class="admin-card-desc">Send a recap email to all players after the week's games are final. Includes each team's score and picks, any perfect (5-0) or shutout (0-5) performances, and the current season standings.</p>
+      <div class="admin-controls">
+        <div class="field" style="margin-bottom:0;flex:1;">
+          <label>Select Week</label>
+          <select id="recapWeekSelect">
+            <option value="">— Select a week —</option>
+            <option value="HOF Game">HOF Game</option>
+            <option value="Pre Week 1">Pre Week 1</option>
+            <option value="Pre Week 2">Pre Week 2</option>
+            <option value="Pre Week 3">Pre Week 3</option>
+            <option value="1">Week 1</option>
+            <option value="2">Week 2</option>
+            <option value="3">Week 3</option>
+            <option value="4">Week 4</option>
+            <option value="5">Week 5</option>
+            <option value="6">Week 6</option>
+            <option value="7">Week 7</option>
+            <option value="8">Week 8</option>
+            <option value="9">Week 9</option>
+            <option value="10">Week 10</option>
+            <option value="11">Week 11</option>
+            <option value="12">Week 12</option>
+            <option value="13">Week 13</option>
+            <option value="14">Week 14</option>
+            <option value="15">Week 15</option>
+            <option value="16">Week 16</option>
+            <option value="17">Week 17</option>
+            <option value="18">Week 18</option>
+          </select>
+        </div>
+        <div style="margin-top:20px;">
+          <button class="btn-submit" id="sendRecapBtn" onclick="sendWeeklyRecap()" style="min-width:180px;">📧 Send Recap Email</button>
+        </div>
+        <div class="admin-status" id="recapStatus"></div>
+      </div>
+    </div>
+
   </div>
 </div>
 
