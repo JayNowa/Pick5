@@ -3035,7 +3035,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.3.7</div>
+    <div class="version-badge">v1.3.8</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -7496,10 +7496,10 @@ function isWeekFullyFinal(weekScores) {
 }
 
 // ── Weekly Recap Email ──
-async function sendWeeklyRecap() {
+async function sendWeeklyRecap(testOnly) {
   const selEl    = document.getElementById('recapWeekSelect');
   const statusEl = document.getElementById('recapStatus');
-  const btnEl    = document.getElementById('sendRecapBtn');
+  const btnEl    = document.getElementById(testOnly ? 'testRecapBtn' : 'sendRecapBtn');
 
   const val = selEl.value;
   if (!val) {
@@ -7613,11 +7613,12 @@ async function sendWeeklyRecap() {
       return { rank: sRanks[i], teamName: s.teamName, totalWins: s.totalWins, totalLosses: s.totalLosses, totalTbDiff: s.tbCount > 0 ? s.totalTbDiff : null };
     });
 
-    const allUsers   = await window.fbGetAllApprovedUsers();
-    const recipients = allUsers.map(function(u) { return u.email; }).filter(Boolean);
+    const recipients = testOnly
+      ? ADMIN_EMAILS.slice()
+      : (await window.fbGetAllApprovedUsers()).map(function(u) { return u.email; }).filter(Boolean);
     if (recipients.length === 0) throw new Error('No approved users found.');
 
-    statusEl.textContent = 'Sending to ' + recipients.length + ' players…';
+    statusEl.textContent = (testOnly ? 'Test sending to admins' : 'Sending to ' + recipients.length + ' players') + '…';
 
     await fetch(PICKS_SCRIPT_URL, {
       method: 'POST',
@@ -7626,7 +7627,7 @@ async function sendWeeklyRecap() {
       body: JSON.stringify({ type: 'weeklyRecap', week: weekLabel, recipients: recipients, weekResults: weekResults, leaderboard: leaderboard, perfectScores: perfectScores, shutouts: shutouts })
     });
 
-    statusEl.textContent = '✅ Recap sent to ' + recipients.length + ' players!';
+    statusEl.textContent = testOnly ? '✅ Test recap sent to admins!' : '✅ Recap sent to ' + recipients.length + ' players!';
     statusEl.className = 'admin-status success';
 
   } catch(err) {
@@ -8633,8 +8634,9 @@ document.addEventListener('keydown', function(e) {
             <option value="18">Week 18</option>
           </select>
         </div>
-        <div style="margin-top:20px;">
-          <button class="btn-submit" id="sendRecapBtn" onclick="sendWeeklyRecap()" style="min-width:180px;">📧 Send Recap Email</button>
+        <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn-submit" id="sendRecapBtn" onclick="sendWeeklyRecap(false)" style="flex:1;min-width:160px;">📧 Send Recap Email</button>
+          <button class="btn-submit" id="testRecapBtn" onclick="sendWeeklyRecap(true)" style="flex:1;min-width:140px;background:linear-gradient(135deg,#4a6fa8,#2e4d7a);">🧪 Test Send</button>
         </div>
         <div class="admin-status" id="recapStatus"></div>
       </div>
