@@ -3035,7 +3035,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.3.8</div>
+    <div class="version-badge">v1.3.9</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -4609,8 +4609,7 @@ async function fetchAndRenderSpreads(week) {
     const userEmail    = (navEl.dataset.email || navEl.textContent).toLowerCase();
     const weekLabel    = (isNaN(parseInt(week)) || week.toString().toLowerCase().includes('week')) ? week : 'Week ' + week;
 
-    const [spreadsRes, existingPicks, liveScoresMap] = await Promise.all([
-      fetch(SPREADS_CSV_URL + '&cachebust=' + Date.now()),
+    const [existingPicks, liveScoresMap] = await Promise.all([
       (async () => {
         try {
           if (!window.fbGetMyPicks) return [];
@@ -6560,52 +6559,56 @@ async function adminFetchAndSaveSpreads() {
 
   if (!val) { status.textContent = 'Please select a week first.'; status.className = 'admin-status error'; return; }
 
-  status.textContent = 'Fetching spreads from Google Sheets…';
+  const weekLabel = (isNaN(parseInt(val)) || val.toString().toLowerCase().includes('week')) ? val : 'Week ' + val;
+  status.textContent = 'Fetching spreads from ESPN…';
   status.className = 'admin-status';
 
   try {
-    const res = await fetch(SPREADS_CSV_URL + '&cachebust=' + Date.now());
-    if (!res.ok) throw new Error('Spreads sheet unreachable');
-    const text = await res.text();
-    const rows = parseCSV(text);
-    const dataRows = rows[0][0].toLowerCase().includes('week') ? rows.slice(1) : rows;
+    const url = buildESPNScoreboardURL(val);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('ESPN returned ' + res.status);
+    const data = await res.json();
+    const events = data.events || [];
 
-    // Filter to selected week
-    const weekLabel = (isNaN(parseInt(val)) || val.toString().toLowerCase().includes('week')) ? val : 'Week ' + val;
-    const weekRows = dataRows.filter(r => r[0] && r[0].trim().toLowerCase() === weekLabel.toLowerCase());
-
-    if (weekRows.length === 0) {
-      status.textContent = 'No games found for ' + weekLabel + ' in the spreads sheet.';
+    if (events.length === 0) {
+      status.textContent = 'No games found on ESPN for ' + weekLabel + '. The schedule may not be posted yet.';
       status.className = 'admin-status error';
       return;
     }
 
-    // Convert rows to game objects
-    // Columns: Week(0), Date(1), Time(2), Away(3), Home(4), Odds(5)
-    const games = weekRows.map(function(row) {
-      const date = (row[1] || '').trim();
-      const time = (row[2] || '').trim();
-      const away = (row[3] || '').trim();
-      const home = (row[4] || '').trim();
-      const odds = (row[5] || '').trim() || 'EVEN';
+    let missingLines = 0;
+    const games = events.map(function(event) {
+      const comp    = event.competitions[0];
+      const home    = comp.competitors.find(function(c) { return c.homeAway === 'home'; });
+      const away    = comp.competitors.find(function(c) { return c.homeAway === 'away'; });
+      const homeAbbr = home && home.team ? home.team.abbreviation.toUpperCase() : '';
+      const awayAbbr = away && away.team ? away.team.abbreviation.toUpperCase() : '';
 
-      // Convert date to day of week
-      let dow = '';
-      try {
-        const parts = date.split('/');
-        const d = new Date(parseInt(parts[2]) + 2000, parseInt(parts[0]) - 1, parseInt(parts[1]));
-        dow = d.toLocaleDateString('en-US', { weekday: 'long' });
-      } catch(e) {}
+      const oddsArr = comp.odds || [];
+      let odds = '';
+      if (oddsArr.length > 0 && oddsArr[0].details) {
+        odds = oddsArr[0].details.trim();
+      } else {
+        missingLines++;
+      }
 
-      return { away, home, odds, date, time, dow };
-    }).filter(g => g.away && g.home);
+      const gameDate = new Date(comp.date || event.date);
+      const date = gameDate.toLocaleDateString('en-US', { timeZone: 'America/New_York', month: '2-digit', day: '2-digit', year: '2-digit' });
+      const time = gameDate.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit', hour12: true }) + ' ET';
+      const dow  = gameDate.toLocaleDateString('en-US', { timeZone: 'America/New_York', weekday: 'long' });
+
+      return { away: awayAbbr, home: homeAbbr, odds: odds, date: date, time: time, dow: dow };
+    }).filter(function(g) { return g.away && g.home; });
 
     const weekKey = val.toString().replace(/[^a-zA-Z0-9]/g, '_');
     await window.fbSaveSpreadData(weekKey, games);
 
-    status.textContent = 'Saved ' + games.length + ' games for ' + weekLabel + '!';
-    status.className = 'admin-status success';
-    setTimeout(() => { status.textContent = ''; status.className = 'admin-status'; }, 4000);
+    const note = missingLines > 0
+      ? ' — ⚠️ ' + missingLines + ' game' + (missingLines !== 1 ? 's' : '') + ' missing lines, re-fetch when posted'
+      : '';
+    status.textContent = 'Saved ' + games.length + ' games for ' + weekLabel + note + '!';
+    status.className = missingLines > 0 ? 'admin-status' : 'admin-status success';
+    if (missingLines === 0) setTimeout(function() { status.textContent = ''; status.className = 'admin-status'; }, 4000);
 
   } catch(err) {
     status.textContent = 'Failed: ' + err.message;
@@ -8513,7 +8516,7 @@ document.addEventListener('keydown', function(e) {
     <!-- Spreads Week Picker -->
     <div class="admin-card">
       <div class="admin-card-title">📊 Home Page Spreads</div>
-      <p class="admin-card-desc">Choose a week, then click <strong>Fetch & Save Spreads</strong> to pull lines from your Google Sheets and lock them into Firebase. Once saved, spreads won't change even if the sheet is updated. Then click <strong>Show This Week</strong> to display them.</p>
+      <p class="admin-card-desc">Choose a week, then click <strong>Fetch & Save Spreads</strong> to pull lines directly from ESPN and lock them into Firebase. Once saved, spreads won't change. If lines aren't posted yet for some games, re-fetch later — it overwrites cleanly. Then click <strong>Show This Week</strong> to display them.</p>
 
       <div class="admin-current-week">
         Currently showing: <strong id="adminCurrentSpreadsWeek">Loading…</strong>
