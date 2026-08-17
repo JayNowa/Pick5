@@ -3035,7 +3035,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.3.9</div>
+    <div class="version-badge">v1.4.0</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -8132,9 +8132,30 @@ async function loadWeeklyPicks() {
       }
     });
 
-    // Sort alphabetically by team name
+    // Keep all users; sort alphabetically as base order for tiebreaking
     const users = Object.values(byUser).sort(function(a, b) {
       return (a.teamName || a.email || '').localeCompare(b.teamName || b.email || '');
+    });
+
+    // Pre-compute weekly record per user so we can sort and split sections
+    const weekFinalWP = isWeekFullyFinal(scoresMap || {});
+    const userRecords = {};
+    users.forEach(function(doc) {
+      const email   = doc.email || 'unknown';
+      const picks   = [doc.pick1,   doc.pick2,   doc.pick3,   doc.pick4,   doc.pick5];
+      const spreads = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5];
+      let wins = 0, losses = 0, pending = 0;
+      picks.forEach(function(pick, pi) {
+        if (pick && pick.trim()) {
+          const gameData = scoresMap && scoresMap[pick.trim().toUpperCase()];
+          if (!gameData || !gameData.started) { pending++; }
+          else {
+            const r = getPickResult(pick, spreads[pi] || '', scoresMap);
+            if (r === 'win') wins++; else if (r === 'loss') losses++; else pending++;
+          }
+        } else if (weekFinalWP) { losses++; }
+      });
+      userRecords[email] = { wins, losses, pending };
     });
 
     // Logged-in user's pick doc
@@ -8305,15 +8326,40 @@ async function loadWeeklyPicks() {
       tableEl.appendChild(mySection);
     }
 
-    // ── Everyone's Picks ──
+    // ── Everyone's Picks (0 losses) + Eliminated (1+ losses) ──
+    function byRecord(a, b) {
+      const ra = userRecords[a.email || 'unknown'] || {};
+      const rb = userRecords[b.email || 'unknown'] || {};
+      if (rb.wins !== ra.wins) return rb.wins - ra.wins;
+      return (a.teamName || a.email || '').localeCompare(b.teamName || b.email || '');
+    }
+
+    const alive     = users.filter(function(d) { return !(userRecords[d.email || 'unknown'] || {}).losses; }).sort(byRecord);
+    const eliminated = users.filter(function(d) { return  (userRecords[d.email || 'unknown'] || {}).losses > 0; }).sort(byRecord);
+
     const allSection = document.createElement('div');
     allSection.className = 'wp-section';
     const allLabel = document.createElement('div');
     allLabel.className = 'wp-section-label';
     allLabel.textContent = "Everyone's Picks";
     allSection.appendChild(allLabel);
-    allSection.appendChild(buildPickTable(users));
+    allSection.appendChild(alive.length > 0 ? buildPickTable(alive) : (function() {
+      const e = document.createElement('div'); e.className = 'wp-empty';
+      e.textContent = 'Everyone has been eliminated this week.'; return e;
+    })());
     tableEl.appendChild(allSection);
+
+    if (eliminated.length > 0) {
+      const elimSection = document.createElement('div');
+      elimSection.className = 'wp-section';
+      const elimLabel = document.createElement('div');
+      elimLabel.className = 'wp-section-label';
+      elimLabel.style.color = 'var(--error)';
+      elimLabel.textContent = 'Eliminated (' + eliminated.length + ')';
+      elimSection.appendChild(elimLabel);
+      elimSection.appendChild(buildPickTable(eliminated));
+      tableEl.appendChild(elimSection);
+    }
 
   } catch(err) {
     loadingEl.style.display = 'none';
