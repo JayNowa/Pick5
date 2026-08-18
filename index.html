@@ -3035,7 +3035,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.4.1</div>
+    <div class="version-badge">v1.4.2</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -6938,6 +6938,60 @@ function updateUsersCount() {
   }
 }
 
+// ── Admin: Send Picks Reminder ──
+async function sendPicksReminder() {
+  const statusEl = document.getElementById('reminderStatus');
+  const btnEl    = document.getElementById('sendReminderBtn');
+
+  btnEl.disabled = true;
+  statusEl.textContent = 'Checking missing picks…';
+  statusEl.className = 'admin-status';
+
+  try {
+    const activeWeek = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
+    if (!activeWeek) throw new Error('No active week set.');
+    const weekLabel = (isNaN(parseInt(activeWeek)) || activeWeek.toString().toLowerCase().includes('week'))
+      ? activeWeek : 'Week ' + activeWeek;
+
+    const [allUsers, weekPicks] = await Promise.all([
+      window.fbGetAllApprovedUsers ? window.fbGetAllApprovedUsers() : [],
+      window.fbGetWeeklyPicks ? window.fbGetWeeklyPicks(weekLabel) : []
+    ]);
+
+    const pickedEmails = new Set(weekPicks.map(function(d) { return (d.email || '').toLowerCase(); }));
+    const missing = allUsers.filter(function(u) { return !pickedEmails.has((u.email || '').toLowerCase()); });
+
+    if (missing.length === 0) {
+      statusEl.textContent = '✓ Everyone has submitted — no reminders needed!';
+      statusEl.className = 'admin-status success';
+      btnEl.disabled = false;
+      return;
+    }
+
+    statusEl.textContent = 'Sending to ' + missing.length + ' player' + (missing.length !== 1 ? 's' : '') + '…';
+
+    const allPlayers = allUsers.map(function(u) { return { email: u.email, teamName: u.teamName || u.email }; });
+    const recipients = missing.map(function(u) { return { email: u.email, teamName: u.teamName || u.email }; });
+
+    await fetch(PICKS_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'picksReminder', week: weekLabel, recipients: recipients, allPlayers: allPlayers })
+    });
+
+    statusEl.textContent = '✅ Reminder sent to ' + missing.length + ' player' + (missing.length !== 1 ? 's' : '') + '!';
+    statusEl.className = 'admin-status success';
+
+  } catch(err) {
+    statusEl.textContent = '❌ ' + err.message;
+    statusEl.className = 'admin-status error';
+    console.error(err);
+  } finally {
+    btnEl.disabled = false;
+  }
+}
+
 // ── Admin: Pending Requests ──
 // ── Admin: Missing Picks ──
 async function loadMissingPicks() {
@@ -8573,6 +8627,10 @@ document.addEventListener('keydown', function(e) {
       <p class="admin-card-desc">Users who have not submitted picks for the current active week.</p>
       <div id="missingPicksLoading" style="color:var(--muted);font-size:14px;margin-bottom:8px;">Loading…</div>
       <div id="missingPicksList"></div>
+      <div style="margin-top:16px;">
+        <button class="btn-submit" id="sendReminderBtn" onclick="sendPicksReminder()" style="min-width:180px;">🔔 Send Reminder Email</button>
+      </div>
+      <div class="admin-status" id="reminderStatus"></div>
     </div>
 
     <!-- Spreads Week Picker -->
