@@ -8170,6 +8170,7 @@ async function loadWeeklyPicks() {
       }
     });
 
+
     // Logged-in user's pick doc
     const loggedInEmail = (document.getElementById('navEmail').dataset.email || '').toLowerCase();
     const myDoc = byUser[Object.keys(byUser).find(function(e) { return e.toLowerCase() === loggedInEmail; })];
