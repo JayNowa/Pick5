@@ -3035,7 +3035,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.4.0</div>
+    <div class="version-badge">v1.4.1</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -8158,6 +8158,19 @@ async function loadWeeklyPicks() {
       userRecords[email] = { wins, losses, pending };
     });
 
+    // Pre-compute tiebreaker diff per user for sorting (matches leaderboard sort)
+    const actualTbTotal = scoresMap ? getActualTiebreaker(scoresMap) : null;
+    const userTbDiff = {};
+    users.forEach(function(doc) {
+      const email = doc.email || 'unknown';
+      if (actualTbTotal !== null && doc.tiebreaker !== undefined && doc.tiebreaker !== '') {
+        userTbDiff[email] = Math.abs(parseInt(doc.tiebreaker) - actualTbTotal);
+      } else {
+        userTbDiff[email] = null;
+      }
+    });
+
+
     // Logged-in user's pick doc
     const loggedInEmail = (document.getElementById('navEmail').dataset.email || '').toLowerCase();
     const myDoc = byUser[Object.keys(byUser).find(function(e) { return e.toLowerCase() === loggedInEmail; })];
@@ -8331,6 +8344,9 @@ async function loadWeeklyPicks() {
       const ra = userRecords[a.email || 'unknown'] || {};
       const rb = userRecords[b.email || 'unknown'] || {};
       if (rb.wins !== ra.wins) return rb.wins - ra.wins;
+      const ta = userTbDiff[a.email || 'unknown'];
+      const tb = userTbDiff[b.email || 'unknown'];
+      if (ta !== null && tb !== null) return ta - tb;
       return (a.teamName || a.email || '').localeCompare(b.teamName || b.email || '');
     }
 
