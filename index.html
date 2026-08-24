@@ -3035,7 +3035,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.4.3</div>
+    <div class="version-badge">v1.4.4</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -7638,16 +7638,23 @@ async function sendWeeklyRecap(testOnly) {
         const doc = (userWeekMap[email] || {})[week];
         const ws  = scoresByWeek[week] || {};
         const weekFinal = isWeekFullyFinal(ws);
-        if (!doc) { if (weekFinal) totalLosses += 5; return; }
+        if (!doc) {
+          if (weekFinal) totalLosses += 5;
+          const actual = getActualTiebreakerFromWeek(ws);
+          if (actual !== null) { totalTbDiff += actual; tbCount++; }
+          return;
+        }
         [doc.pick1, doc.pick2, doc.pick3, doc.pick4, doc.pick5].forEach(function(pick, pi) {
           const sp = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5][pi];
           if (!pick || !pick.trim()) { if (weekFinal) totalLosses++; return; }
           const r = getPickResult(pick, sp || '', ws);
           if (r === 'win') totalWins++; else if (r === 'loss') totalLosses++;
         });
-        if (doc.tiebreaker !== undefined && doc.tiebreaker !== '') {
-          const actual = getActualTiebreakerFromWeek(ws);
-          if (actual !== null) { totalTbDiff += Math.abs(parseInt(doc.tiebreaker) - actual); tbCount++; }
+        const recapActual = getActualTiebreakerFromWeek(ws);
+        if (recapActual !== null) {
+          const tbScore = (doc.tiebreaker !== undefined && doc.tiebreaker !== '') ? parseInt(doc.tiebreaker) : 0;
+          totalTbDiff += Math.abs(tbScore - recapActual);
+          tbCount++;
         }
       });
       return { teamName: userNames[email] || email, totalWins: totalWins, totalLosses: totalLosses, totalTbDiff: totalTbDiff, tbCount: tbCount };
@@ -7752,6 +7759,8 @@ async function loadLeaderboard() {
 
         if (!doc) {
           if (weekFullyFinal) totalLosses += 5;
+          const actual = getActualTiebreakerFromWeek(weekScores);
+          if (actual !== null) { totalTbDiff += actual; tbCount++; }
           return;
         }
 
@@ -7769,12 +7778,11 @@ async function loadLeaderboard() {
           else                        pendingCount++;
         });
 
-        if (doc.tiebreaker !== undefined && doc.tiebreaker !== '') {
-          const actual = getActualTiebreakerFromWeek(weekScores);
-          if (actual !== null) {
-            totalTbDiff += Math.abs(parseInt(doc.tiebreaker) - actual);
-            tbCount++;
-          }
+        const lbActual = getActualTiebreakerFromWeek(weekScores);
+        if (lbActual !== null) {
+          const tbScore = (doc.tiebreaker !== undefined && doc.tiebreaker !== '') ? parseInt(doc.tiebreaker) : 0;
+          totalTbDiff += Math.abs(tbScore - lbActual);
+          tbCount++;
         }
       });
 
