@@ -3035,7 +3035,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.4.2</div>
+    <div class="version-badge">v1.4.3</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -7631,12 +7631,14 @@ async function sendWeeklyRecap(testOnly) {
     const perfectScores = weekResults.filter(function(r) { return r.wins === 5 && r.losses === 0 && r.pending === 0; }).map(function(r) { return r.teamName; });
     const shutouts      = weekResults.filter(function(r) { return r.losses === 5 && r.wins === 0 && r.pending === 0; }).map(function(r) { return r.teamName; });
 
+    const recapAllWeeks = new Set(Object.values(userWeekMap).flatMap(function(wm) { return Object.keys(wm); }));
     const standings = Object.keys(userWeekMap).map(function(email) {
       let totalWins = 0, totalLosses = 0, totalTbDiff = 0, tbCount = 0;
-      Object.keys(userWeekMap[email]).forEach(function(week) {
-        const doc = userWeekMap[email][week];
+      recapAllWeeks.forEach(function(week) {
+        const doc = (userWeekMap[email] || {})[week];
         const ws  = scoresByWeek[week] || {};
         const weekFinal = isWeekFullyFinal(ws);
+        if (!doc) { if (weekFinal) totalLosses += 5; return; }
         [doc.pick1, doc.pick2, doc.pick3, doc.pick4, doc.pick5].forEach(function(pick, pi) {
           const sp = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5][pi];
           if (!pick || !pick.trim()) { if (weekFinal) totalLosses++; return; }
@@ -7738,17 +7740,24 @@ async function loadLeaderboard() {
     });
 
     // Calculate totals per user
+    const lbAllWeeks = new Set(Object.values(userWeekMap).flatMap(function(wm) { return Object.keys(wm); }));
     const standings = Object.keys(userWeekMap).map(function(email) {
       let totalWins = 0, totalLosses = 0, totalTbDiff = 0, tbCount = 0;
       let pendingCount = 0;
 
-      Object.keys(userWeekMap[email]).forEach(function(week) {
-        const doc = userWeekMap[email][week];
+      lbAllWeeks.forEach(function(week) {
+        const doc = (userWeekMap[email] || {})[week];
         const weekScores = scoresByWeek[week] || {};
+        const weekFullyFinal = isWeekFullyFinal(weekScores);
+
+        if (!doc) {
+          if (weekFullyFinal) totalLosses += 5;
+          return;
+        }
+
         const picks   = [doc.pick1,   doc.pick2,   doc.pick3,   doc.pick4,   doc.pick5];
         const spreads = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5];
 
-        const weekFullyFinal = isWeekFullyFinal(weekScores);
         picks.forEach(function(pick, pi) {
           if (!pick || !pick.trim()) {
             if (weekFullyFinal) totalLosses++;
