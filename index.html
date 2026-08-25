@@ -1226,8 +1226,26 @@
     color: var(--text);
     letter-spacing: 0.04em;
     display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+  }
+  .pick-chip-main {
+    display: flex;
     align-items: center;
     gap: 8px;
+  }
+  .pick-chip-score {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--subtext);
+    letter-spacing: 0.02em;
+  }
+  .pick-chip-score-status {
+    color: #c8a94a;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
   }
   .pick-chip.win  { border-color: #4caf7d; background: rgba(76,175,125,0.12); }
   .pick-chip.loss { border-color: #e05555; background: rgba(224,85,85,0.12); }
@@ -3035,7 +3053,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.4.4</div>
+    <div class="version-badge">v1.4.5</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -4923,23 +4941,36 @@ async function loadMyPicks() {
         picks.forEach((pick, pi) => {
           const chip = document.createElement('div');
           chip.className = 'pick-chip';
+          const mainRow = document.createElement('div');
+          mainRow.className = 'pick-chip-main';
           const numEl = document.createElement('span');
           numEl.className = 'pick-num';
           numEl.textContent = pi + 1;
-          chip.appendChild(numEl);
+          mainRow.appendChild(numEl);
           const logo = getTeamLogo(pick);
           if (logo) {
             const img = document.createElement('img');
             img.src = logo; img.alt = pick;
             img.style.cssText = 'width:22px;height:22px;object-fit:contain;vertical-align:middle;';
-            chip.appendChild(img);
+            mainRow.appendChild(img);
           }
           const spread = spreadFields[pi] || '';
           const result = getPickResult(pick, spread, scoresMap);
           if (result === 'win') { chip.classList.add('win'); wins++; }
           else if (result === 'loss') { chip.classList.add('loss'); losses++; }
           else { pending++; }
-          chip.appendChild(document.createTextNode(pick + (spread ? ' ' + spread : '')));
+          mainRow.appendChild(document.createTextNode(pick + (spread ? ' ' + spread : '')));
+          chip.appendChild(mainRow);
+          const game = scoresMap[pick.trim().toUpperCase()];
+          if (game && game.started) {
+            const scoreEl = document.createElement('div');
+            scoreEl.className = 'pick-chip-score';
+            const status = game.isFinal ? 'Final' : 'Live';
+            scoreEl.innerHTML = game.awayAbbr + ' <strong>' + game.awayScore + '</strong> – ' +
+              game.homeAbbr + ' <strong>' + game.homeScore + '</strong>' +
+              ' <span class="pick-chip-score-status">· ' + status + '</span>';
+            chip.appendChild(scoreEl);
+          }
           chipsEl.appendChild(chip);
         });
         sub.appendChild(chipsEl);
