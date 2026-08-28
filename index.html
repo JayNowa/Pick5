@@ -3053,7 +3053,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.5.9</div>
+    <div class="version-badge">v1.6.0</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -7284,15 +7284,30 @@ function renderTeamCards(teams) {
         seasonsHTML += '<div class="team-data-row"><span class="team-data-label">' + y + '</span><span class="team-data-value">' + rec.value + (rank && rank.value ? ' <span style="color:var(--muted);font-weight:400;font-size:11px;">(#' + rank.value + rankEmojiFull(rank.value, totalTeams) + ')</span>' : '') + '</span></div>';
       }
     }
+    const overallLabels = ['Total Wins','Total Losses','Best finish','Worst finish','Win%','5-0','0-5','Career Earnings'];
     let overallHTML = '<div class="team-data-section-head" style="margin-top:12px;">Overall</div>';
-    ['Total Wins','Total Losses','Best finish','Worst finish','Win%','5-0','0-5','Career Earnings'].forEach(function(lbl) {
+    overallLabels.forEach(function(lbl) {
       const stat = team.stats.find(s => s.label === lbl);
       if (stat && stat.value) {
         const isHighlight = ['Total Wins','Win%','Best finish','Career Earnings'].includes(lbl);
         overallHTML += '<div class="team-data-row"><span class="team-data-label">' + lbl + '</span><span class="team-data-value' + (isHighlight ? ' highlight' : '') + '">' + stat.value + (lbl === 'Best finish' || lbl === 'Worst finish' ? rankEmojiFull(stat.value, totalTeams) : '') + '</span></div>';
       }
     });
-    card.innerHTML = headerHTML + (hasSeasons ? seasonsHTML : '') + overallHTML;
+
+    // Any stats not already shown in the sections above
+    const knownLabels = new Set(['Team Inception','Name changes'].concat(overallLabels));
+    const extraStats = (team.stats || []).filter(function(s) {
+      return s.value && !knownLabels.has(s.label) && !/^\d{4}$/.test(s.label) && !/^\d{4} Rankings$/.test(s.label);
+    });
+    let extraHTML = '';
+    if (extraStats.length > 0) {
+      extraHTML = '<div class="team-data-section-head" style="margin-top:12px;">Details</div>';
+      extraStats.forEach(function(s) {
+        extraHTML += '<div class="team-data-row"><span class="team-data-label">' + s.label + '</span><span class="team-data-value">' + s.value + '</span></div>';
+      });
+    }
+
+    card.innerHTML = headerHTML + (hasSeasons ? seasonsHTML : '') + overallHTML + extraHTML;
     return card;
   }
 
