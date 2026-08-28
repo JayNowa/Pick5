@@ -3053,7 +3053,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.4.5</div>
+    <div class="version-badge">v1.4.6</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -3491,6 +3491,16 @@
   window.fbSaveMlbVisible        = async function(v) { await window.fbSaveUIConfig({ mlbVisible: v }); };
   window.fbSaveStreakBannerVisible = async function(v) { await window.fbSaveUIConfig({ streakBannerVisible: v }); };
   window.fbSaveTestMode          = async function(v) { await window.fbSaveUIConfig({ testMode: v }); };
+  window.fbSaveTeamDataSource    = async function(v) { await window.fbSaveUIConfig({ teamDataSource: v }); };
+
+  // Team data stored in Firebase
+  window.fbGetTeamData = async function() {
+    const snap = await getDoc(doc(db, "settings", "teamData"));
+    return snap.exists() ? (snap.data().teams || []) : [];
+  };
+  window.fbSaveTeamData = async function(teams) {
+    await setDoc(doc(db, "settings", "teamData"), { teams: teams });
+  };
 
   window.fbSaveTestScores = async function(weekKey, games) {
     await setDoc(doc(db, "settings", "testScores_" + weekKey.replace(/[^a-zA-Z0-9]/g, '_')), {
@@ -4043,6 +4053,7 @@ async function showPage(page) {
     loadAdminScoresTabStatus();
     loadAdminPhilliesStreak();
     loadAdminTestMode();
+    loadAdminTeamEditor();
     const p = document.getElementById('adminPage');
     p.style.display = 'flex';
     p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
@@ -7178,6 +7189,41 @@ async function loadTeamData() {
   const contentEl = document.getElementById('teamDataContent');
   if (!contentEl) return;
 
+  // Show source toggle for admins
+  const navEl2 = document.getElementById('navEmail');
+  const currentEmail = (navEl2 ? (navEl2.dataset.email || navEl2.textContent) : '').toLowerCase();
+  const isAdminUser = ADMIN_EMAILS.includes(currentEmail);
+  const toggleEl = document.getElementById('teamDataSourceToggle');
+  if (toggleEl && isAdminUser) toggleEl.style.display = 'flex';
+
+  // Determine source
+  let source = 'sheets';
+  try {
+    if (window.fbGetUIConfig) {
+      const cfg = await window.fbGetUIConfig();
+      source = cfg.teamDataSource || 'sheets';
+    }
+  } catch(e) {}
+  updateTeamDataSourceButtons(source);
+
+  if (source === 'firebase') {
+    contentEl.innerHTML = '<div class="team-data-loading">Loading team data…</div>';
+    try {
+      const teams = await window.fbGetTeamData();
+      if (!teams || teams.length === 0) {
+        contentEl.innerHTML = '<div class="team-data-loading">No team data in Firebase yet. Import from Google Sheets in the admin panel.</div>';
+        return;
+      }
+      teamDataCache = teams;
+      renderTeamCards(teams);
+    } catch(e) {
+      contentEl.innerHTML = '<div class="team-data-loading">Failed to load team data from Firebase.</div>';
+      console.error('Team data Firebase error:', e);
+    }
+    return;
+  }
+
+  // Default: Google Sheets
   if (teamDataCache) {
     renderTeamCards(teamDataCache);
     return;
@@ -7192,21 +7238,15 @@ async function loadTeamData() {
     const rows = parseCSV(text);
     if (!rows || rows.length < 2) throw new Error('No data');
 
-    // Row 0: headers — col 0 is stat label, col 1+ are team names
     const headers = rows[0];
-    const statLabels = [];
-    // rows 1+ have stat label in col 0, values in col 1+
     const teams = [];
-
     const numTeams = headers.length - 1;
     for (let t = 0; t < numTeams; t++) {
       teams.push({ name: headers[t + 1], stats: [] });
     }
-
     for (let r = 1; r < rows.length; r++) {
       const label = (rows[r][0] || '').trim();
       if (!label) continue;
-      statLabels.push(label);
       for (let t = 0; t < numTeams; t++) {
         teams[t].stats.push({ label: label, value: (rows[r][t + 1] || '').trim() });
       }
@@ -7217,6 +7257,30 @@ async function loadTeamData() {
   } catch(e) {
     contentEl.innerHTML = '<div class="team-data-loading">Failed to load team data. Please try again.</div>';
     console.error('Team data error:', e);
+  }
+}
+
+function updateTeamDataSourceButtons(source) {
+  const sheetsBtn = document.getElementById('tdSourceSheets');
+  const fbBtn = document.getElementById('tdSourceFirebase');
+  if (!sheetsBtn || !fbBtn) return;
+  const activeStyle = 'background:var(--accent);color:#000;font-weight:700;';
+  const inactiveStyle = 'background:transparent;color:var(--subtext);font-weight:400;';
+  sheetsBtn.style.cssText = sheetsBtn.style.cssText + (source === 'sheets' ? activeStyle : inactiveStyle);
+  fbBtn.style.cssText = fbBtn.style.cssText + (source === 'firebase' ? activeStyle : inactiveStyle);
+}
+
+async function setTeamDataSource(source) {
+  const statusEl = document.getElementById('teamDataSourceStatus');
+  if (statusEl) statusEl.textContent = 'Saving…';
+  try {
+    await window.fbSaveTeamDataSource(source);
+    teamDataCache = null;
+    updateTeamDataSourceButtons(source);
+    if (statusEl) statusEl.textContent = '';
+    loadTeamData();
+  } catch(e) {
+    if (statusEl) statusEl.textContent = 'Failed to save.';
   }
 }
 
@@ -7734,6 +7798,158 @@ async function sendWeeklyRecap(testOnly) {
   } finally {
     btnEl.disabled = false;
   }
+}
+
+// ── Admin Team Data Editor ──
+let _adminTeamEditorData = null;
+
+async function loadAdminTeamEditor() {
+  const listEl = document.getElementById('adminTeamEditorList');
+  if (!listEl) return;
+  listEl.innerHTML = '<div style="color:var(--subtext);font-size:14px;">Loading…</div>';
+  try {
+    _adminTeamEditorData = await window.fbGetTeamData();
+    renderAdminTeamEditorList();
+  } catch(e) {
+    listEl.innerHTML = '<div style="color:#e05555;">Failed to load team data.</div>';
+  }
+}
+
+function renderAdminTeamEditorList() {
+  const listEl = document.getElementById('adminTeamEditorList');
+  if (!listEl || !_adminTeamEditorData) return;
+  if (_adminTeamEditorData.length === 0) {
+    listEl.innerHTML = '<div style="color:var(--subtext);font-size:14px;">No teams yet. Import from Google Sheets to get started.</div>';
+    return;
+  }
+  listEl.innerHTML = '';
+  _adminTeamEditorData.forEach(function(team, ti) {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'border:1px solid var(--border);border-radius:8px;margin-bottom:10px;overflow:hidden;';
+    wrap.id = 'adminTeamRow-' + ti;
+
+    const header = document.createElement('div');
+    header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;background:var(--hover);';
+    header.onclick = function() { toggleAdminTeam(ti); };
+    header.innerHTML = '<span style="font-weight:700;color:var(--text);">' + (team.name || 'Unnamed Team') + '</span>' +
+      '<span style="font-size:12px;color:var(--subtext);">' + (team.stats ? team.stats.length : 0) + ' stats ▾</span>';
+    wrap.appendChild(header);
+
+    const body = document.createElement('div');
+    body.id = 'adminTeamBody-' + ti;
+    body.style.cssText = 'display:none;padding:14px;';
+
+    // Team name field
+    body.innerHTML = '<div style="margin-bottom:12px;">' +
+      '<label style="font-size:12px;color:var(--subtext);display:block;margin-bottom:4px;">Team Name</label>' +
+      '<input id="adminTeamName-' + ti + '" value="' + escapeHtml(team.name || '') + '" ' +
+        'style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-size:14px;box-sizing:border-box;" />' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--subtext);margin-bottom:8px;letter-spacing:0.06em;text-transform:uppercase;">Stats</div>' +
+      '<div id="adminTeamStats-' + ti + '"></div>' +
+      '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
+        '<button onclick="addAdminTeamStat(' + ti + ')" style="font-size:13px;padding:6px 12px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;">＋ Add Row</button>' +
+        '<button onclick="saveAdminTeam(' + ti + ')" style="font-size:13px;padding:6px 16px;background:var(--accent);border:none;border-radius:6px;color:#000;font-weight:700;cursor:pointer;">Save</button>' +
+        '<span id="adminTeamSaveStatus-' + ti + '" style="font-size:12px;color:var(--subtext);align-self:center;"></span>' +
+      '</div>';
+    wrap.appendChild(body);
+    listEl.appendChild(wrap);
+    renderAdminTeamStats(ti);
+  });
+}
+
+function renderAdminTeamStats(ti) {
+  const statsEl = document.getElementById('adminTeamStats-' + ti);
+  if (!statsEl || !_adminTeamEditorData[ti]) return;
+  const stats = _adminTeamEditorData[ti].stats || [];
+  statsEl.innerHTML = '';
+  stats.forEach(function(stat, si) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;align-items:center;';
+    row.innerHTML =
+      '<input value="' + escapeHtml(stat.label || '') + '" placeholder="Label" ' +
+        'oninput="_adminTeamEditorData[' + ti + '].stats[' + si + '].label=this.value" ' +
+        'style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-size:13px;" />' +
+      '<input value="' + escapeHtml(stat.value || '') + '" placeholder="Value" ' +
+        'oninput="_adminTeamEditorData[' + ti + '].stats[' + si + '].value=this.value" ' +
+        'style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-size:13px;" />' +
+      '<button onclick="removeAdminTeamStat(' + ti + ',' + si + ')" ' +
+        'style="padding:4px 8px;background:transparent;border:1px solid rgba(224,85,85,0.4);border-radius:6px;color:#e05555;cursor:pointer;font-size:13px;">✕</button>';
+    statsEl.appendChild(row);
+  });
+}
+
+function toggleAdminTeam(ti) {
+  const body = document.getElementById('adminTeamBody-' + ti);
+  if (!body) return;
+  body.style.display = body.style.display === 'none' ? 'block' : 'none';
+}
+
+function addAdminTeamStat(ti) {
+  if (!_adminTeamEditorData[ti]) return;
+  _adminTeamEditorData[ti].stats = _adminTeamEditorData[ti].stats || [];
+  _adminTeamEditorData[ti].stats.push({ label: '', value: '' });
+  renderAdminTeamStats(ti);
+}
+
+function removeAdminTeamStat(ti, si) {
+  if (!_adminTeamEditorData[ti]) return;
+  _adminTeamEditorData[ti].stats.splice(si, 1);
+  renderAdminTeamStats(ti);
+}
+
+async function saveAdminTeam(ti) {
+  const statusEl = document.getElementById('adminTeamSaveStatus-' + ti);
+  const nameEl = document.getElementById('adminTeamName-' + ti);
+  if (nameEl) _adminTeamEditorData[ti].name = nameEl.value.trim();
+  if (statusEl) statusEl.textContent = 'Saving…';
+  try {
+    await window.fbSaveTeamData(_adminTeamEditorData);
+    teamDataCache = null;
+    if (statusEl) { statusEl.textContent = 'Saved!'; setTimeout(function() { statusEl.textContent = ''; }, 2000); }
+  } catch(e) {
+    if (statusEl) statusEl.textContent = 'Error saving.';
+  }
+}
+
+async function importTeamDataFromSheets() {
+  const btn = document.getElementById('importTeamDataBtn');
+  const statusEl = document.getElementById('importTeamDataStatus');
+  if (btn) btn.disabled = true;
+  if (statusEl) { statusEl.textContent = 'Fetching from Google Sheets…'; statusEl.className = 'admin-status'; }
+  try {
+    const res = await fetch(TEAM_DATA_CSV_URL + '&cachebust=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    const rows = parseCSV(text);
+    if (!rows || rows.length < 2) throw new Error('No data in sheet');
+    const headers = rows[0];
+    const numTeams = headers.length - 1;
+    const teams = [];
+    for (let t = 0; t < numTeams; t++) {
+      teams.push({ name: headers[t + 1], stats: [] });
+    }
+    for (let r = 1; r < rows.length; r++) {
+      const label = (rows[r][0] || '').trim();
+      if (!label) continue;
+      for (let t = 0; t < numTeams; t++) {
+        teams[t].stats.push({ label: label, value: (rows[r][t + 1] || '').trim() });
+      }
+    }
+    await window.fbSaveTeamData(teams);
+    _adminTeamEditorData = teams;
+    teamDataCache = null;
+    renderAdminTeamEditorList();
+    if (statusEl) { statusEl.textContent = '✓ Imported ' + teams.length + ' teams.'; statusEl.className = 'admin-status success'; }
+  } catch(e) {
+    if (statusEl) { statusEl.textContent = 'Import failed: ' + e.message; statusEl.className = 'admin-status error'; }
+    console.error('Import error:', e);
+  }
+  if (btn) btn.disabled = false;
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ── Leaderboard ──
@@ -8813,6 +9029,16 @@ document.addEventListener('keydown', function(e) {
       </div>
     </div>
 
+    <div class="admin-card" style="margin-top:20px;">
+      <div class="admin-card-title">📋 Team Data Editor</div>
+      <p class="admin-card-desc">Edit team stats stored in Firebase. Click <strong>Import from Google Sheets</strong> to seed the data from the current sheet, then edit teams individually. Toggle the data source on the Team Data page to switch between Sheet and Firebase.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+        <button class="btn-submit" onclick="importTeamDataFromSheets()" id="importTeamDataBtn" style="background:rgba(0,140,255,0.15);border:1px solid rgba(0,140,255,0.4);">📥 Import from Google Sheets</button>
+        <div class="admin-status" id="importTeamDataStatus" style="align-self:center;"></div>
+      </div>
+      <div id="adminTeamEditorList"></div>
+    </div>
+
   </div>
 </div>
 
@@ -8878,6 +9104,14 @@ document.addEventListener('keydown', function(e) {
       <div class="page-title">Team Data</div>
       <div class="page-subtitle">Historical stats &amp; records</div>
       <div class="page-divider"></div>
+    </div>
+    <div id="teamDataSourceToggle" style="display:none;margin-bottom:16px;padding:12px 16px;background:var(--hover);border:1px solid var(--border);border-radius:8px;display:none;align-items:center;gap:12px;flex-wrap:wrap;">
+      <span style="font-size:13px;color:var(--subtext);font-weight:600;letter-spacing:0.04em;">DATA SOURCE</span>
+      <div style="display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;">
+        <button id="tdSourceSheets" onclick="setTeamDataSource('sheets')" style="padding:6px 14px;font-size:13px;border:none;cursor:pointer;transition:background 0.15s;">📊 Google Sheets</button>
+        <button id="tdSourceFirebase" onclick="setTeamDataSource('firebase')" style="padding:6px 14px;font-size:13px;border:none;cursor:pointer;transition:background 0.15s;">🔥 Firebase</button>
+      </div>
+      <span id="teamDataSourceStatus" style="font-size:12px;color:var(--subtext);"></span>
     </div>
     <input class="team-data-search" id="teamDataSearch" type="text" placeholder="Search teams…" oninput="filterTeamCards()" />
     <div id="teamDataContent">
