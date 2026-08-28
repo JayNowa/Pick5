@@ -3053,7 +3053,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.5.7</div>
+    <div class="version-badge">v1.5.8</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -8107,58 +8107,78 @@ function autoCalculateWinPct() {
   });
 }
 
+let _ssDragRowIdx = -1;
+
 function openTeamSpreadsheet() {
   if (!_adminTeamEditorData || _adminTeamEditorData.length === 0) {
     alert('No team data loaded yet. Load the admin page first.');
     return;
   }
-  const overlay = document.getElementById('teamSpreadsheetOverlay');
-  overlay.style.display = 'flex';
+  document.getElementById('teamSpreadsheetOverlay').style.display = 'flex';
   document.body.style.overflow = 'hidden';
   renderTeamSpreadsheet();
 }
 
 function closeTeamSpreadsheet() {
-  const overlay = document.getElementById('teamSpreadsheetOverlay');
-  overlay.style.display = 'none';
+  document.getElementById('teamSpreadsheetOverlay').style.display = 'none';
   document.body.style.overflow = '';
+}
+
+function ssGetLabelOrder() {
+  const seen = new Set();
+  const labels = [];
+  _adminTeamEditorData.forEach(function(team) {
+    (team.stats || []).forEach(function(s) {
+      if (!seen.has(s.label)) { seen.add(s.label); labels.push(s.label); }
+    });
+  });
+  return labels;
+}
+
+function ssApplyLabelOrder(labels) {
+  _adminTeamEditorData.forEach(function(team) {
+    const map = {};
+    (team.stats || []).forEach(function(s) { map[s.label] = s.value; });
+    team.stats = labels.map(function(lbl) {
+      return { label: lbl, value: map[lbl] !== undefined ? map[lbl] : '' };
+    });
+  });
 }
 
 function renderTeamSpreadsheet() {
   const tableEl = document.getElementById('teamSpreadsheetTable');
   if (!tableEl || !_adminTeamEditorData) return;
 
-  // Collect ordered union of all stat labels
-  const labelSet = [];
-  const labelSeen = new Set();
-  _adminTeamEditorData.forEach(function(team) {
-    (team.stats || []).forEach(function(s) {
-      if (!labelSeen.has(s.label)) { labelSeen.add(s.label); labelSet.push(s.label); }
-    });
-  });
-
+  const labels = ssGetLabelOrder();
   const teams = _adminTeamEditorData;
+  const LABEL_W = 200;
   const COL_W = 130;
-  const ROW_H = 36;
-  const LABEL_W = 180;
 
   let html = '<table id="ssTable" style="border-collapse:collapse;min-width:100%;table-layout:fixed;">';
 
-  // Header row — team names
+  // Header row — editable team names + Add Team button
   html += '<thead><tr>';
   html += '<th style="position:sticky;left:0;top:0;z-index:3;background:var(--hover);border:1px solid var(--border);width:' + LABEL_W + 'px;min-width:' + LABEL_W + 'px;padding:8px 12px;font-size:12px;color:var(--subtext);text-align:left;letter-spacing:0.05em;text-transform:uppercase;">Stat</th>';
   teams.forEach(function(team, ti) {
-    html += '<th style="position:sticky;top:0;z-index:2;background:var(--hover);border:1px solid var(--border);width:' + COL_W + 'px;min-width:' + COL_W + 'px;padding:8px 10px;font-size:13px;font-weight:700;color:var(--text);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + escapeHtml(team.name) + '">' + escapeHtml(team.name || 'Unnamed') + '</th>';
+    html += '<th style="position:sticky;top:0;z-index:2;background:var(--hover);border:1px solid var(--border);width:' + COL_W + 'px;min-width:' + COL_W + 'px;padding:4px 6px;text-align:center;">';
+    html += '<input data-team-name="' + ti + '" value="' + escapeHtml(team.name || '') + '" '
+      + 'style="width:100%;border:none;background:transparent;color:var(--text);font-size:13px;font-weight:700;text-align:center;outline:none;padding:4px;box-sizing:border-box;" '
+      + 'oninput="ssUpdateTeamName(this)" />';
+    html += '</th>';
   });
+  html += '<th style="position:sticky;top:0;z-index:2;background:var(--hover);border:1px solid var(--border);min-width:100px;padding:4px 8px;text-align:center;">';
+  html += '<button onclick="ssAddTeam()" style="font-size:12px;padding:5px 10px;background:transparent;border:1px dashed var(--border);border-radius:5px;color:var(--subtext);cursor:pointer;white-space:nowrap;">＋ Team</button>';
+  html += '</th>';
   html += '</tr></thead>';
 
-  // Data rows
+  // Data rows (draggable)
   html += '<tbody>';
-  labelSet.forEach(function(label) {
+  labels.forEach(function(label, rowIdx) {
     const isAuto = isAutoCalcStat(label);
-    const rowBg = isAuto ? 'background:rgba(255,200,50,0.07);' : '';
-    html += '<tr>';
-    html += '<td style="position:sticky;left:0;z-index:1;' + rowBg + 'background:var(--hover);border:1px solid var(--border);padding:4px 12px;font-size:13px;color:var(--text);white-space:nowrap;font-weight:600;">';
+    const rowBg = isAuto ? 'rgba(255,200,50,0.07)' : '';
+    html += '<tr draggable="true" data-row-idx="' + rowIdx + '" style="' + (rowBg ? 'background:' + rowBg + ';' : '') + '">';
+    html += '<td style="position:sticky;left:0;z-index:1;background:' + (rowBg || 'var(--hover)') + ';border:1px solid var(--border);padding:4px 10px;font-size:13px;color:var(--text);white-space:nowrap;font-weight:600;">';
+    html += '<span style="cursor:grab;color:var(--subtext);margin-right:6px;user-select:none;font-size:15px;" title="Drag to reorder">⠿</span>';
     html += escapeHtml(label);
     if (isAuto) html += ' <span style="font-size:10px;background:rgba(255,200,50,0.3);color:#b8860b;border-radius:3px;padding:1px 4px;font-weight:700;vertical-align:middle;">AUTO</span>';
     html += '</td>';
@@ -8166,19 +8186,68 @@ function renderTeamSpreadsheet() {
       const stat = (team.stats || []).find(function(s) { return s.label === label; });
       const val = stat ? (stat.value || '') : '';
       if (isAuto) {
-        html += '<td style="border:1px solid var(--border);padding:4px 10px;font-size:13px;color:var(--subtext);text-align:center;' + rowBg + '">' + escapeHtml(val) + '</td>';
+        html += '<td style="border:1px solid var(--border);padding:4px 10px;font-size:13px;color:var(--subtext);text-align:center;' + (rowBg ? 'background:' + rowBg + ';' : '') + '">' + escapeHtml(val) + '</td>';
       } else {
-        html += '<td style="border:1px solid var(--border);padding:2px 4px;' + rowBg + '">';
+        html += '<td style="border:1px solid var(--border);padding:2px 4px;">';
         html += '<input data-ti="' + ti + '" data-label="' + escapeHtml(label) + '" value="' + escapeHtml(val) + '" '
           + 'style="width:100%;border:none;background:transparent;color:var(--text);font-size:13px;padding:4px 6px;outline:none;text-align:center;box-sizing:border-box;" '
           + 'oninput="ssUpdateCell(this)" />';
         html += '</td>';
       }
     });
+    html += '<td style="border:1px solid var(--border);"></td>';
     html += '</tr>';
   });
+
+  // Add Row button row
+  html += '<tr><td style="position:sticky;left:0;z-index:1;background:var(--hover);border:1px solid var(--border);padding:6px 10px;">';
+  html += '<button onclick="ssAddRow()" style="font-size:12px;padding:5px 12px;background:transparent;border:1px dashed var(--border);border-radius:5px;color:var(--subtext);cursor:pointer;white-space:nowrap;">＋ Add Row</button>';
+  html += '</td>';
+  for (let i = 0; i <= teams.length; i++) html += '<td style="border:1px solid var(--border);background:var(--hover);"></td>';
+  html += '</tr>';
+
   html += '</tbody></table>';
   tableEl.innerHTML = html;
+
+  // Attach drag-and-drop
+  let _dragOverIdx = -1;
+  tableEl.querySelectorAll('tr[data-row-idx]').forEach(function(row) {
+    row.addEventListener('dragstart', function(e) {
+      _ssDragRowIdx = parseInt(this.dataset.rowIdx);
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(function() { row.style.opacity = '0.4'; }, 0);
+    });
+    row.addEventListener('dragend', function() {
+      this.style.opacity = '';
+      tableEl.querySelectorAll('tr[data-row-idx]').forEach(function(r) { r.style.outline = ''; });
+      _dragOverIdx = -1;
+    });
+    row.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      const idx = parseInt(this.dataset.rowIdx);
+      if (idx !== _dragOverIdx) {
+        tableEl.querySelectorAll('tr[data-row-idx]').forEach(function(r) { r.style.outline = ''; });
+        this.style.outline = '2px solid var(--accent)';
+        _dragOverIdx = idx;
+      }
+    });
+    row.addEventListener('drop', function(e) {
+      e.preventDefault();
+      const toIdx = parseInt(this.dataset.rowIdx);
+      if (_ssDragRowIdx < 0 || _ssDragRowIdx === toIdx) return;
+      const currentLabels = ssGetLabelOrder();
+      const moved = currentLabels.splice(_ssDragRowIdx, 1)[0];
+      currentLabels.splice(toIdx, 0, moved);
+      ssApplyLabelOrder(currentLabels);
+      _ssDragRowIdx = -1;
+      renderTeamSpreadsheet();
+    });
+  });
+}
+
+function ssUpdateTeamName(input) {
+  const ti = parseInt(input.dataset.teamName);
+  if (_adminTeamEditorData[ti]) _adminTeamEditorData[ti].name = input.value;
 }
 
 function ssUpdateCell(input) {
@@ -8188,11 +8257,27 @@ function ssUpdateCell(input) {
   const team = _adminTeamEditorData[ti];
   team.stats = team.stats || [];
   let stat = team.stats.find(function(s) { return s.label === label; });
-  if (stat) {
-    stat.value = input.value;
-  } else {
-    team.stats.push({ label: label, value: input.value });
-  }
+  if (stat) { stat.value = input.value; } else { team.stats.push({ label: label, value: input.value }); }
+}
+
+function ssAddRow() {
+  const label = prompt('New stat row label:');
+  if (!label || !label.trim()) return;
+  const lbl = label.trim();
+  _adminTeamEditorData.forEach(function(team) {
+    team.stats = team.stats || [];
+    if (!team.stats.find(function(s) { return s.label === lbl; })) {
+      team.stats.push({ label: lbl, value: '' });
+    }
+  });
+  renderTeamSpreadsheet();
+}
+
+function ssAddTeam() {
+  const labels = ssGetLabelOrder();
+  _adminTeamEditorData.push({ name: 'New Team', stats: labels.map(function(lbl) { return { label: lbl, value: '' }; }) });
+  sortTeamDataAlpha();
+  renderTeamSpreadsheet();
 }
 
 async function saveTeamSpreadsheet() {
