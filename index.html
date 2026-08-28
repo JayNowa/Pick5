@@ -3053,7 +3053,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.5.1</div>
+    <div class="version-badge">v1.5.2</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -7971,16 +7971,26 @@ function toggleAdminTeam(ti) {
   body.style.display = body.style.display === 'none' ? 'block' : 'none';
 }
 
+function sortTeamDataAlpha() {
+  if (!_adminTeamEditorData) return;
+  _adminTeamEditorData.sort(function(a, b) {
+    return (a.name || '').localeCompare(b.name || '');
+  });
+}
+
 function addAdminTeam() {
   if (!_adminTeamEditorData) _adminTeamEditorData = [];
   _adminTeamEditorData.push({ name: 'New Team', stats: [] });
+  sortTeamDataAlpha();
   renderAdminTeamEditorList();
-  // Auto-open the new team
-  const newIdx = _adminTeamEditorData.length - 1;
-  const body = document.getElementById('adminTeamBody-' + newIdx);
-  if (body) body.style.display = 'block';
-  const nameInput = document.getElementById('adminTeamName-' + newIdx);
-  if (nameInput) { nameInput.focus(); nameInput.select(); }
+  // Auto-open the new team (find it by name after sort)
+  const newIdx = _adminTeamEditorData.findIndex(function(t) { return t.name === 'New Team'; });
+  if (newIdx >= 0) {
+    const body = document.getElementById('adminTeamBody-' + newIdx);
+    if (body) body.style.display = 'block';
+    const nameInput = document.getElementById('adminTeamName-' + newIdx);
+    if (nameInput) { nameInput.focus(); nameInput.select(); }
+  }
 }
 
 function addAdminTeamStat(ti) {
@@ -8000,6 +8010,7 @@ async function saveAdminTeam(ti) {
   const statusEl = document.getElementById('adminTeamSaveStatus-' + ti);
   const nameEl = document.getElementById('adminTeamName-' + ti);
   if (nameEl) _adminTeamEditorData[ti].name = nameEl.value.trim();
+  sortTeamDataAlpha();
   autoCalculateTotals();
   autoCalculateYearRankings();
   autoCalculateBestWorstFinish();
@@ -8044,6 +8055,7 @@ async function importTeamDataFromSheets() {
       }
     }
     _adminTeamEditorData = teams;
+    sortTeamDataAlpha();
     autoCalculateTotals();
     autoCalculateYearRankings();
     autoCalculateBestWorstFinish();
