@@ -3053,7 +3053,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.5.0</div>
+    <div class="version-badge">v1.5.1</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -7879,7 +7879,8 @@ function renderAdminTeamEditorList() {
 }
 
 function isAutoCalcStat(label) {
-  return /^\d{4} Rankings$/.test(label) || label === 'Total Wins' || label === 'Total Losses';
+  return /^\d{4} Rankings$/.test(label) || label === 'Total Wins' || label === 'Total Losses' ||
+    label === 'Best finish' || label === 'Worst finish' || label === 'Win%';
 }
 
 function renderAdminTeamStats(ti) {
@@ -8001,6 +8002,8 @@ async function saveAdminTeam(ti) {
   if (nameEl) _adminTeamEditorData[ti].name = nameEl.value.trim();
   autoCalculateTotals();
   autoCalculateYearRankings();
+  autoCalculateBestWorstFinish();
+  autoCalculateWinPct();
   // Re-render stats for all open panels since rankings across all teams may have changed
   _adminTeamEditorData.forEach(function(_, idx) {
     const body = document.getElementById('adminTeamBody-' + idx);
@@ -8043,6 +8046,8 @@ async function importTeamDataFromSheets() {
     _adminTeamEditorData = teams;
     autoCalculateTotals();
     autoCalculateYearRankings();
+    autoCalculateBestWorstFinish();
+    autoCalculateWinPct();
     await window.fbSaveTeamData(_adminTeamEditorData);
     teamDataCache = null;
     renderAdminTeamEditorList();
@@ -8133,6 +8138,44 @@ function autoCalculateYearRankings() {
       const rank = rankMap[ti];
       rankStat.value = (rankCounts[rank] > 1 ? 'T-' : '') + ordinal(rank);
     });
+  });
+}
+
+function autoCalculateBestWorstFinish() {
+  if (!_adminTeamEditorData || _adminTeamEditorData.length === 0) return;
+  _adminTeamEditorData.forEach(function(team) {
+    let bestRank = null, bestYear = null, bestLabel = '';
+    let worstRank = null, worstYear = null, worstLabel = '';
+    (team.stats || []).forEach(function(s) {
+      if (!/^\d{4} Rankings$/.test(s.label) || !s.value) return;
+      const year = s.label.replace(' Rankings', '');
+      const rank = parseInt(s.value.replace(/^T-/, ''));
+      if (isNaN(rank)) return;
+      if (bestRank === null || rank < bestRank || (rank === bestRank && parseInt(year) > parseInt(bestYear))) {
+        bestRank = rank; bestYear = year; bestLabel = s.value;
+      }
+      if (worstRank === null || rank > worstRank || (rank === worstRank && parseInt(year) > parseInt(worstYear))) {
+        worstRank = rank; worstYear = year; worstLabel = s.value;
+      }
+    });
+    const bestStat  = (team.stats || []).find(function(s) { return s.label === 'Best finish'; });
+    const worstStat = (team.stats || []).find(function(s) { return s.label === 'Worst finish'; });
+    if (bestStat)  bestStat.value  = bestRank  !== null ? bestLabel  + ' (' + bestYear  + ')' : '';
+    if (worstStat) worstStat.value = worstRank !== null ? worstLabel + ' (' + worstYear + ')' : '';
+  });
+}
+
+function autoCalculateWinPct() {
+  if (!_adminTeamEditorData || _adminTeamEditorData.length === 0) return;
+  _adminTeamEditorData.forEach(function(team) {
+    const winStat  = (team.stats || []).find(function(s) { return s.label === 'Total Wins'; });
+    const lossStat = (team.stats || []).find(function(s) { return s.label === 'Total Losses'; });
+    const pctStat  = (team.stats || []).find(function(s) { return s.label === 'Win%'; });
+    if (!pctStat) return;
+    const w = winStat  ? parseInt(winStat.value)  : 0;
+    const l = lossStat ? parseInt(lossStat.value) : 0;
+    const total = w + l;
+    pctStat.value = total > 0 ? (w / total * 100).toFixed(1) + '%' : '—';
   });
 }
 
