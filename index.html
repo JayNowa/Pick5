@@ -3053,7 +3053,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.5.3</div>
+    <div class="version-badge">v1.5.4</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -3491,7 +3491,6 @@
   window.fbSaveMlbVisible        = async function(v) { await window.fbSaveUIConfig({ mlbVisible: v }); };
   window.fbSaveStreakBannerVisible = async function(v) { await window.fbSaveUIConfig({ streakBannerVisible: v }); };
   window.fbSaveTestMode          = async function(v) { await window.fbSaveUIConfig({ testMode: v }); };
-  window.fbSaveTeamDataSource    = async function(v) { await window.fbSaveUIConfig({ teamDataSource: v }); };
 
   // Team data stored in Firebase
   window.fbGetTeamData = async function() {
@@ -7201,100 +7200,26 @@ async function loadTeamData() {
   const contentEl = document.getElementById('teamDataContent');
   if (!contentEl) return;
 
-  // Show source toggle for admins
-  const navEl2 = document.getElementById('navEmail');
-  const currentEmail = (navEl2 ? (navEl2.dataset.email || navEl2.textContent) : '').toLowerCase();
-  const isAdminUser = ADMIN_EMAILS.includes(currentEmail);
-  const toggleEl = document.getElementById('teamDataSourceToggle');
-  if (toggleEl && isAdminUser) toggleEl.style.display = 'flex';
-
-  // Determine source
-  let source = 'sheets';
-  try {
-    if (window.fbGetUIConfig) {
-      const cfg = await window.fbGetUIConfig();
-      source = cfg.teamDataSource || 'sheets';
-    }
-  } catch(e) {}
-  updateTeamDataSourceButtons(source);
-
-  if (source === 'firebase') {
-    contentEl.innerHTML = '<div class="team-data-loading">Loading team data…</div>';
-    try {
-      const teams = await window.fbGetTeamData();
-      if (!teams || teams.length === 0) {
-        contentEl.innerHTML = '<div class="team-data-loading">No team data in Firebase yet. Import from Google Sheets in the admin panel.</div>';
-        return;
-      }
-      teamDataCache = teams;
-      renderTeamCards(teams);
-    } catch(e) {
-      contentEl.innerHTML = '<div class="team-data-loading">Failed to load team data from Firebase.</div>';
-      console.error('Team data Firebase error:', e);
-    }
-    return;
-  }
-
-  // Default: Google Sheets
   if (teamDataCache) {
     renderTeamCards(teamDataCache);
     return;
   }
 
   contentEl.innerHTML = '<div class="team-data-loading">Loading team data…</div>';
-
   try {
-    const res = await fetch(TEAM_DATA_CSV_URL + '&cachebust=' + Date.now());
-    if (!res.ok) throw new Error('Failed to fetch');
-    const text = await res.text();
-    const rows = parseCSV(text);
-    if (!rows || rows.length < 2) throw new Error('No data');
-
-    const headers = rows[0];
-    const teams = [];
-    const numTeams = headers.length - 1;
-    for (let t = 0; t < numTeams; t++) {
-      teams.push({ name: headers[t + 1], stats: [] });
+    const teams = await window.fbGetTeamData();
+    if (!teams || teams.length === 0) {
+      contentEl.innerHTML = '<div class="team-data-loading">No team data yet. Add teams in the admin panel.</div>';
+      return;
     }
-    for (let r = 1; r < rows.length; r++) {
-      const label = (rows[r][0] || '').trim();
-      if (!label) continue;
-      for (let t = 0; t < numTeams; t++) {
-        teams[t].stats.push({ label: label, value: (rows[r][t + 1] || '').trim() });
-      }
-    }
-
     teamDataCache = teams;
     renderTeamCards(teams);
   } catch(e) {
-    contentEl.innerHTML = '<div class="team-data-loading">Failed to load team data. Please try again.</div>';
+    contentEl.innerHTML = '<div class="team-data-loading">Failed to load team data.</div>';
     console.error('Team data error:', e);
   }
 }
 
-function updateTeamDataSourceButtons(source) {
-  const sheetsBtn = document.getElementById('tdSourceSheets');
-  const fbBtn = document.getElementById('tdSourceFirebase');
-  if (!sheetsBtn || !fbBtn) return;
-  const activeStyle = 'background:var(--accent);color:#000;font-weight:700;';
-  const inactiveStyle = 'background:transparent;color:var(--subtext);font-weight:400;';
-  sheetsBtn.style.cssText = sheetsBtn.style.cssText + (source === 'sheets' ? activeStyle : inactiveStyle);
-  fbBtn.style.cssText = fbBtn.style.cssText + (source === 'firebase' ? activeStyle : inactiveStyle);
-}
-
-async function setTeamDataSource(source) {
-  const statusEl = document.getElementById('teamDataSourceStatus');
-  if (statusEl) statusEl.textContent = 'Saving…';
-  try {
-    await window.fbSaveTeamDataSource(source);
-    teamDataCache = null;
-    updateTeamDataSourceButtons(source);
-    if (statusEl) statusEl.textContent = '';
-    loadTeamData();
-  } catch(e) {
-    if (statusEl) statusEl.textContent = 'Failed to save.';
-  }
-}
 
 function rankEmoji(rank) {
   const n = parseInt(rank);
@@ -8045,46 +7970,6 @@ async function saveAdminTeam(ti) {
   }
 }
 
-async function importTeamDataFromSheets() {
-  const btn = document.getElementById('importTeamDataBtn');
-  const statusEl = document.getElementById('importTeamDataStatus');
-  if (btn) btn.disabled = true;
-  if (statusEl) { statusEl.textContent = 'Fetching from Google Sheets…'; statusEl.className = 'admin-status'; }
-  try {
-    const res = await fetch(TEAM_DATA_CSV_URL + '&cachebust=' + Date.now());
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const text = await res.text();
-    const rows = parseCSV(text);
-    if (!rows || rows.length < 2) throw new Error('No data in sheet');
-    const headers = rows[0];
-    const numTeams = headers.length - 1;
-    const teams = [];
-    for (let t = 0; t < numTeams; t++) {
-      teams.push({ name: headers[t + 1], stats: [] });
-    }
-    for (let r = 1; r < rows.length; r++) {
-      const label = (rows[r][0] || '').trim();
-      if (!label) continue;
-      for (let t = 0; t < numTeams; t++) {
-        teams[t].stats.push({ label: label, value: (rows[r][t + 1] || '').trim() });
-      }
-    }
-    _adminTeamEditorData = teams;
-    sortTeamDataAlpha();
-    autoCalculateTotals();
-    autoCalculateYearRankings();
-    autoCalculateBestWorstFinish();
-    autoCalculateWinPct();
-    await window.fbSaveTeamData(_adminTeamEditorData);
-    teamDataCache = null;
-    renderAdminTeamEditorList();
-    if (statusEl) { statusEl.textContent = '✓ Imported ' + teams.length + ' teams.'; statusEl.className = 'admin-status success'; }
-  } catch(e) {
-    if (statusEl) { statusEl.textContent = 'Import failed: ' + e.message; statusEl.className = 'admin-status error'; }
-    console.error('Import error:', e);
-  }
-  if (btn) btn.disabled = false;
-}
 
 function ordinal(n) {
   const v = n % 100;
@@ -9289,11 +9174,7 @@ document.addEventListener('keydown', function(e) {
 
     <div class="admin-card" style="margin-top:20px;">
       <div class="admin-card-title">📋 Team Data Editor</div>
-      <p class="admin-card-desc">Edit team stats stored in Firebase. Click <strong>Import from Google Sheets</strong> to seed the data from the current sheet, then edit teams individually. Toggle the data source on the Team Data page to switch between Sheet and Firebase.</p>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
-        <button class="btn-submit" onclick="importTeamDataFromSheets()" id="importTeamDataBtn" style="background:rgba(0,140,255,0.15);border:1px solid rgba(0,140,255,0.4);">📥 Import from Google Sheets</button>
-        <div class="admin-status" id="importTeamDataStatus" style="align-self:center;"></div>
-      </div>
+      <p class="admin-card-desc">Edit team stats stored in Firebase. Click a team to expand and edit its stats.</p>
       <div id="adminTeamEditorList"></div>
     </div>
 
@@ -9363,15 +9244,7 @@ document.addEventListener('keydown', function(e) {
       <div class="page-subtitle">Historical stats &amp; records</div>
       <div class="page-divider"></div>
     </div>
-    <div id="teamDataSourceToggle" style="display:none;margin-bottom:16px;padding:12px 16px;background:var(--hover);border:1px solid var(--border);border-radius:8px;display:none;align-items:center;gap:12px;flex-wrap:wrap;">
-      <span style="font-size:13px;color:var(--subtext);font-weight:600;letter-spacing:0.04em;">DATA SOURCE</span>
-      <div style="display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;">
-        <button id="tdSourceSheets" onclick="setTeamDataSource('sheets')" style="padding:6px 14px;font-size:13px;border:none;cursor:pointer;transition:background 0.15s;">📊 Google Sheets</button>
-        <button id="tdSourceFirebase" onclick="setTeamDataSource('firebase')" style="padding:6px 14px;font-size:13px;border:none;cursor:pointer;transition:background 0.15s;">🔥 Firebase</button>
-      </div>
-      <span id="teamDataSourceStatus" style="font-size:12px;color:var(--subtext);"></span>
-    </div>
-    <input class="team-data-search" id="teamDataSearch" type="text" placeholder="Search teams…" oninput="filterTeamCards()" />
+<input class="team-data-search" id="teamDataSearch" type="text" placeholder="Search teams…" oninput="filterTeamCards()" />
     <div id="teamDataContent">
       <div class="team-data-loading">Loading team data…</div>
     </div>
