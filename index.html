@@ -3053,7 +3053,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.5.8</div>
+    <div class="version-badge">v1.5.9</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -7249,76 +7249,68 @@ function renderTeamCards(teams) {
   const highlightLabels = ['Total Wins','Win%','Best finish','Career Earnings'];
 
   const grid = document.createElement('div');
-  grid.className = 'team-data-grid';
   grid.id = 'teamDataGrid';
 
-  const totalTeams = teams.filter(t => t.name && t.name.trim()).length;
+  const validTeams = teams.filter(t => t.name && t.name.trim());
+  const activeTeams = validTeams.filter(t => !t.inactive);
+  const retiredTeams = validTeams.filter(t => t.inactive);
+  const totalTeams = validTeams.length;
 
-  teams.forEach(function(team) {
-    if (!team.name || !team.name.trim()) return;
+  function makeSectionHeader(label) {
+    const h = document.createElement('div');
+    h.style.cssText = 'width:100%;font-size:12px;font-weight:700;color:var(--subtext);letter-spacing:0.08em;text-transform:uppercase;padding:4px 2px 10px;margin-top:8px;border-bottom:1px solid var(--border);margin-bottom:16px;';
+    h.textContent = label;
+    return h;
+  }
 
-    const card = document.createElement('div');
-    card.className = 'team-data-card';
-    card.dataset.teamname = team.name.toLowerCase();
-
-    // Get inception + name changes for header subtitle
+  function buildCard(team) {
     const inceptionStat = team.stats.find(s => s.label === 'Team Inception');
     const nameChangeStat = team.stats.find(s => s.label === 'Name changes');
     const subtitle = [
       inceptionStat && inceptionStat.value ? 'Est. ' + inceptionStat.value : '',
       nameChangeStat && nameChangeStat.value && nameChangeStat.value !== '0' ? nameChangeStat.value + ' name change' + (nameChangeStat.value !== '1' ? 's' : '') : ''
     ].filter(Boolean).join(' · ');
-
-    // NFL logo slug from team name — try to match common abbreviations
-    const slugMap = {
-      // map will be best-effort; teams are user-defined so we show initials if no match
-    };
-
-    let headerHTML =
-      '<div class="team-data-card-header">' +
-        '<div style="width:44px;height:44px;border-radius:50%;background:rgba(200,169,74,0.15);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:var(--accent);flex-shrink:0;">' +
-          team.name.trim()[0].toUpperCase() +
-        '</div>' +
-        '<div>' +
-          '<div class="team-data-name">' + team.name + '</div>' +
-          (subtitle ? '<div class="team-data-inception">' + subtitle + '</div>' : '') +
-        '</div>' +
-      '</div>';
-
-    // Season records section
+    const card = document.createElement('div');
+    card.className = 'team-data-card';
+    card.dataset.teamname = team.name.toLowerCase();
+    let headerHTML = '<div class="team-data-card-header"><div style="width:44px;height:44px;border-radius:50%;background:rgba(200,169,74,0.15);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:var(--accent);flex-shrink:0;">' + team.name.trim()[0].toUpperCase() + '</div><div><div class="team-data-name">' + team.name + '</div>' + (subtitle ? '<div class="team-data-inception">' + subtitle + '</div>' : '') + '</div></div>';
     let seasonsHTML = '<div class="team-data-section-head">Season Records</div>';
     let hasSeasons = false;
-    for (let y = 2021; y <= 2025; y++) {
+    for (let y = 2021; y <= 2030; y++) {
       const rec = team.stats.find(s => s.label === String(y));
       const rank = team.stats.find(s => s.label === y + ' Rankings');
       if (rec && rec.value) {
         hasSeasons = true;
-        seasonsHTML +=
-          '<div class="team-data-row">' +
-            '<span class="team-data-label">' + y + '</span>' +
-            '<span class="team-data-value">' + rec.value + (rank && rank.value ? ' <span style="color:var(--muted);font-weight:400;font-size:11px;">(#' + rank.value + rankEmojiFull(rank.value, totalTeams) + ')</span>' : '') + '</span>' +
-          '</div>';
+        seasonsHTML += '<div class="team-data-row"><span class="team-data-label">' + y + '</span><span class="team-data-value">' + rec.value + (rank && rank.value ? ' <span style="color:var(--muted);font-weight:400;font-size:11px;">(#' + rank.value + rankEmojiFull(rank.value, totalTeams) + ')</span>' : '') + '</span></div>';
       }
     }
-
-    // Overall stats section
     let overallHTML = '<div class="team-data-section-head" style="margin-top:12px;">Overall</div>';
-    const overallLabels = ['Total Wins','Total Losses','Best finish','Worst finish','Win%','5-0','0-5','Career Earnings'];
-    overallLabels.forEach(function(lbl) {
+    ['Total Wins','Total Losses','Best finish','Worst finish','Win%','5-0','0-5','Career Earnings'].forEach(function(lbl) {
       const stat = team.stats.find(s => s.label === lbl);
       if (stat && stat.value) {
-        const isHighlight = highlightLabels.includes(lbl);
-        overallHTML +=
-          '<div class="team-data-row">' +
-            '<span class="team-data-label">' + lbl + '</span>' +
-            '<span class="team-data-value' + (isHighlight ? ' highlight' : '') + '">' + stat.value + (lbl === 'Best finish' || lbl === 'Worst finish' ? rankEmojiFull(stat.value, totalTeams) : '') + '</span>' +
-          '</div>';
+        const isHighlight = ['Total Wins','Win%','Best finish','Career Earnings'].includes(lbl);
+        overallHTML += '<div class="team-data-row"><span class="team-data-label">' + lbl + '</span><span class="team-data-value' + (isHighlight ? ' highlight' : '') + '">' + stat.value + (lbl === 'Best finish' || lbl === 'Worst finish' ? rankEmojiFull(stat.value, totalTeams) : '') + '</span></div>';
       }
     });
-
     card.innerHTML = headerHTML + (hasSeasons ? seasonsHTML : '') + overallHTML;
-    grid.appendChild(card);
-  });
+    return card;
+  }
+
+  if (activeTeams.length > 0) {
+    grid.appendChild(makeSectionHeader('Active Players'));
+    const activeGrid = document.createElement('div');
+    activeGrid.className = 'team-data-grid';
+    activeTeams.forEach(function(team) { activeGrid.appendChild(buildCard(team)); });
+    grid.appendChild(activeGrid);
+  }
+
+  if (retiredTeams.length > 0) {
+    grid.appendChild(makeSectionHeader('Retired'));
+    const retiredGrid = document.createElement('div');
+    retiredGrid.className = 'team-data-grid';
+    retiredTeams.forEach(function(team) { retiredGrid.appendChild(buildCard(team)); });
+    grid.appendChild(retiredGrid);
+  }
 
   contentEl.innerHTML = '';
   contentEl.appendChild(grid);
@@ -7770,7 +7762,7 @@ function renderAdminTeamEditorList() {
     const header = document.createElement('div');
     header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;background:var(--hover);';
     header.onclick = function() { toggleAdminTeam(ti); };
-    header.innerHTML = '<span style="font-weight:700;color:var(--text);">' + (team.name || 'Unnamed Team') + '</span>' +
+    header.innerHTML = '<span id="adminTeamHeaderName-' + ti + '" style="font-weight:700;color:var(--text);">' + escapeHtml(team.name || 'Unnamed Team') + (team.inactive ? ' <span style="font-size:11px;color:var(--subtext);font-weight:400;background:var(--hover);border:1px solid var(--border);border-radius:4px;padding:1px 6px;margin-left:4px;">Retired</span>' : '') + '</span>' +
       '<span style="font-size:12px;color:var(--subtext);">' + (team.stats ? team.stats.length : 0) + ' stats ▾</span>';
     wrap.appendChild(header);
 
@@ -7782,6 +7774,12 @@ function renderAdminTeamEditorList() {
       '<label style="font-size:12px;color:var(--subtext);display:block;margin-bottom:4px;">Team Name</label>' +
       '<input id="adminTeamName-' + ti + '" value="' + escapeHtml(team.name || '') + '" ' +
         'style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-size:14px;box-sizing:border-box;" />' +
+      '</div>' +
+      '<div style="margin-bottom:12px;">' +
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--subtext);">' +
+          '<input type="checkbox" id="adminTeamInactive-' + ti + '" ' + (team.inactive ? 'checked' : '') + ' onchange="toggleAdminTeamInactive(' + ti + ')" style="width:15px;height:15px;cursor:pointer;accent-color:#c0392b;" />' +
+          'Mark as Retired / Inactive' +
+        '</label>' +
       '</div>' +
       '<div style="font-size:12px;color:var(--subtext);margin-bottom:8px;letter-spacing:0.06em;text-transform:uppercase;">Stats <span style="font-weight:400;text-transform:none;letter-spacing:0;">— drag ⠿ to reorder</span></div>' +
       '<div id="adminTeamStats-' + ti + '"></div>' +
@@ -7930,6 +7928,18 @@ async function deleteAdminTeam(ti) {
     teamDataCache = null;
   } catch(e) {
     alert('Error saving after delete: ' + e.message);
+  }
+}
+
+function toggleAdminTeamInactive(ti) {
+  if (!_adminTeamEditorData[ti]) return;
+  const cb = document.getElementById('adminTeamInactive-' + ti);
+  _adminTeamEditorData[ti].inactive = cb ? cb.checked : false;
+  const headerNameEl = document.getElementById('adminTeamHeaderName-' + ti);
+  if (headerNameEl) {
+    const team = _adminTeamEditorData[ti];
+    headerNameEl.innerHTML = escapeHtml(team.name || 'Unnamed Team') +
+      (team.inactive ? ' <span style="font-size:11px;color:var(--subtext);font-weight:400;background:var(--hover);border:1px solid var(--border);border-radius:4px;padding:1px 6px;margin-left:4px;">Retired</span>' : '');
   }
 }
 
