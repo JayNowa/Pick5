@@ -3053,7 +3053,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.5.5</div>
+    <div class="version-badge">v1.5.6</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -8102,6 +8102,113 @@ function autoCalculateWinPct() {
   });
 }
 
+function openTeamSpreadsheet() {
+  if (!_adminTeamEditorData || _adminTeamEditorData.length === 0) {
+    alert('No team data loaded yet. Load the admin page first.');
+    return;
+  }
+  const overlay = document.getElementById('teamSpreadsheetOverlay');
+  overlay.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  renderTeamSpreadsheet();
+}
+
+function closeTeamSpreadsheet() {
+  const overlay = document.getElementById('teamSpreadsheetOverlay');
+  overlay.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function renderTeamSpreadsheet() {
+  const tableEl = document.getElementById('teamSpreadsheetTable');
+  if (!tableEl || !_adminTeamEditorData) return;
+
+  // Collect ordered union of all stat labels
+  const labelSet = [];
+  const labelSeen = new Set();
+  _adminTeamEditorData.forEach(function(team) {
+    (team.stats || []).forEach(function(s) {
+      if (!labelSeen.has(s.label)) { labelSeen.add(s.label); labelSet.push(s.label); }
+    });
+  });
+
+  const teams = _adminTeamEditorData;
+  const COL_W = 130;
+  const ROW_H = 36;
+  const LABEL_W = 180;
+
+  let html = '<table id="ssTable" style="border-collapse:collapse;min-width:100%;table-layout:fixed;">';
+
+  // Header row — team names
+  html += '<thead><tr>';
+  html += '<th style="position:sticky;left:0;top:0;z-index:3;background:var(--hover);border:1px solid var(--border);width:' + LABEL_W + 'px;min-width:' + LABEL_W + 'px;padding:8px 12px;font-size:12px;color:var(--subtext);text-align:left;letter-spacing:0.05em;text-transform:uppercase;">Stat</th>';
+  teams.forEach(function(team, ti) {
+    html += '<th style="position:sticky;top:0;z-index:2;background:var(--hover);border:1px solid var(--border);width:' + COL_W + 'px;min-width:' + COL_W + 'px;padding:8px 10px;font-size:13px;font-weight:700;color:var(--text);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + escapeHtml(team.name) + '">' + escapeHtml(team.name || 'Unnamed') + '</th>';
+  });
+  html += '</tr></thead>';
+
+  // Data rows
+  html += '<tbody>';
+  labelSet.forEach(function(label) {
+    const isAuto = isAutoCalcStat(label);
+    const rowBg = isAuto ? 'background:rgba(255,200,50,0.07);' : '';
+    html += '<tr>';
+    html += '<td style="position:sticky;left:0;z-index:1;' + rowBg + 'background:var(--hover);border:1px solid var(--border);padding:4px 12px;font-size:13px;color:var(--text);white-space:nowrap;font-weight:600;">';
+    html += escapeHtml(label);
+    if (isAuto) html += ' <span style="font-size:10px;background:rgba(255,200,50,0.3);color:#b8860b;border-radius:3px;padding:1px 4px;font-weight:700;vertical-align:middle;">AUTO</span>';
+    html += '</td>';
+    teams.forEach(function(team, ti) {
+      const stat = (team.stats || []).find(function(s) { return s.label === label; });
+      const val = stat ? (stat.value || '') : '';
+      if (isAuto) {
+        html += '<td style="border:1px solid var(--border);padding:4px 10px;font-size:13px;color:var(--subtext);text-align:center;' + rowBg + '">' + escapeHtml(val) + '</td>';
+      } else {
+        html += '<td style="border:1px solid var(--border);padding:2px 4px;' + rowBg + '">';
+        html += '<input data-ti="' + ti + '" data-label="' + escapeHtml(label) + '" value="' + escapeHtml(val) + '" '
+          + 'style="width:100%;border:none;background:transparent;color:var(--text);font-size:13px;padding:4px 6px;outline:none;text-align:center;box-sizing:border-box;" '
+          + 'oninput="ssUpdateCell(this)" />';
+        html += '</td>';
+      }
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  tableEl.innerHTML = html;
+}
+
+function ssUpdateCell(input) {
+  const ti = parseInt(input.dataset.ti);
+  const label = input.dataset.label;
+  if (!_adminTeamEditorData[ti]) return;
+  const team = _adminTeamEditorData[ti];
+  team.stats = team.stats || [];
+  let stat = team.stats.find(function(s) { return s.label === label; });
+  if (stat) {
+    stat.value = input.value;
+  } else {
+    team.stats.push({ label: label, value: input.value });
+  }
+}
+
+async function saveTeamSpreadsheet() {
+  const statusEl = document.getElementById('spreadsheetSaveStatus');
+  if (statusEl) statusEl.textContent = 'Saving…';
+  sortTeamDataAlpha();
+  autoCalculateTotals();
+  autoCalculateYearRankings();
+  autoCalculateBestWorstFinish();
+  autoCalculateWinPct();
+  try {
+    await window.fbSaveTeamData(_adminTeamEditorData);
+    teamDataCache = null;
+    renderAdminTeamEditorList();
+    renderTeamSpreadsheet();
+    if (statusEl) { statusEl.textContent = 'Saved!'; setTimeout(function() { statusEl.textContent = ''; }, 2000); }
+  } catch(e) {
+    if (statusEl) statusEl.textContent = 'Error saving.';
+  }
+}
+
 function escapeHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -9185,7 +9292,10 @@ document.addEventListener('keydown', function(e) {
 
     <div class="admin-card" style="margin-top:20px;">
       <div class="admin-card-title">📋 Team Data Editor</div>
-      <p class="admin-card-desc">Edit team stats stored in Firebase. Click a team to expand and edit its stats.</p>
+      <p class="admin-card-desc">Edit team stats stored in Firebase. Click a team to expand and edit its stats, or use Spreadsheet View for bulk editing.</p>
+      <div style="margin-bottom:14px;">
+        <button onclick="openTeamSpreadsheet()" style="font-size:13px;padding:7px 16px;background:rgba(0,200,100,0.15);border:1px solid rgba(0,200,100,0.4);border-radius:6px;color:var(--text);cursor:pointer;font-weight:600;">📊 Spreadsheet View</button>
+      </div>
       <div id="adminTeamEditorList"></div>
     </div>
 
@@ -9348,6 +9458,21 @@ document.addEventListener('keydown', function(e) {
   <div class="week-banner-actions">
     <button class="week-banner-btn primary" onclick="showPage('selector');dismissWeekBanner();">View Picks</button>
     <button class="week-banner-btn dismiss" onclick="dismissWeekBanner()">Dismiss</button>
+  </div>
+</div>
+
+<!-- ═══ TEAM DATA SPREADSHEET OVERLAY ═══ -->
+<div id="teamSpreadsheetOverlay" style="display:none;position:fixed;inset:0;z-index:1000;background:var(--bg);flex-direction:column;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--hover);flex-shrink:0;">
+    <span style="font-weight:700;font-size:16px;color:var(--text);">📊 Team Data — Spreadsheet View</span>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <span id="spreadsheetSaveStatus" style="font-size:13px;color:var(--subtext);"></span>
+      <button onclick="saveTeamSpreadsheet()" style="padding:7px 18px;background:var(--accent);border:none;border-radius:6px;color:#000;font-weight:700;font-size:13px;cursor:pointer;">Save All</button>
+      <button onclick="closeTeamSpreadsheet()" style="padding:7px 14px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;cursor:pointer;">✕ Close</button>
+    </div>
+  </div>
+  <div style="overflow:auto;flex:1;padding:0;">
+    <div id="teamSpreadsheetTable"></div>
   </div>
 </div>
 
