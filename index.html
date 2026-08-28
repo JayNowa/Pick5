@@ -3053,7 +3053,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.4.8</div>
+    <div class="version-badge">v1.4.9</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -7975,6 +7975,12 @@ async function saveAdminTeam(ti) {
   const statusEl = document.getElementById('adminTeamSaveStatus-' + ti);
   const nameEl = document.getElementById('adminTeamName-' + ti);
   if (nameEl) _adminTeamEditorData[ti].name = nameEl.value.trim();
+  autoCalculateYearRankings();
+  // Re-render stats for all open panels since rankings across all teams may have changed
+  _adminTeamEditorData.forEach(function(_, idx) {
+    const body = document.getElementById('adminTeamBody-' + idx);
+    if (body && body.style.display !== 'none') renderAdminTeamStats(idx);
+  });
   if (statusEl) statusEl.textContent = 'Saving…';
   try {
     await window.fbSaveTeamData(_adminTeamEditorData);
@@ -8009,8 +8015,9 @@ async function importTeamDataFromSheets() {
         teams[t].stats.push({ label: label, value: (rows[r][t + 1] || '').trim() });
       }
     }
-    await window.fbSaveTeamData(teams);
     _adminTeamEditorData = teams;
+    autoCalculateYearRankings();
+    await window.fbSaveTeamData(_adminTeamEditorData);
     teamDataCache = null;
     renderAdminTeamEditorList();
     if (statusEl) { statusEl.textContent = '✓ Imported ' + teams.length + ' teams.'; statusEl.className = 'admin-status success'; }
@@ -8019,6 +8026,68 @@ async function importTeamDataFromSheets() {
     console.error('Import error:', e);
   }
   if (btn) btn.disabled = false;
+}
+
+function ordinal(n) {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return n + 'th';
+  switch (n % 10) {
+    case 1: return n + 'st';
+    case 2: return n + 'nd';
+    case 3: return n + 'rd';
+    default: return n + 'th';
+  }
+}
+
+function autoCalculateYearRankings() {
+  if (!_adminTeamEditorData || _adminTeamEditorData.length === 0) return;
+
+  // Find all 4-digit year stat labels across all teams
+  const years = new Set();
+  _adminTeamEditorData.forEach(function(team) {
+    (team.stats || []).forEach(function(s) {
+      if (/^\d{4}$/.test(s.label)) years.add(s.label);
+    });
+  });
+
+  years.forEach(function(year) {
+    const rankLabel = year + ' Rankings';
+
+    // Gather wins for teams that have a record for this year (format: "W-L")
+    const teamWins = [];
+    _adminTeamEditorData.forEach(function(team, ti) {
+      const recStat = (team.stats || []).find(function(s) { return s.label === year; });
+      if (!recStat || !recStat.value) return;
+      const wins = parseInt((recStat.value + '').split('-')[0]);
+      if (!isNaN(wins)) teamWins.push({ ti: ti, wins: wins });
+    });
+
+    if (teamWins.length === 0) return;
+
+    // Sort descending by wins
+    teamWins.sort(function(a, b) { return b.wins - a.wins; });
+
+    // Assign ranks — tied teams share the same rank
+    const rankMap = {};
+    teamWins.forEach(function(t, i) {
+      rankMap[t.ti] = (i > 0 && t.wins === teamWins[i - 1].wins)
+        ? rankMap[teamWins[i - 1].ti]
+        : i + 1;
+    });
+
+    // Count how many share each rank to detect ties
+    const rankCounts = {};
+    Object.values(rankMap).forEach(function(r) { rankCounts[r] = (rankCounts[r] || 0) + 1; });
+
+    // Write back to each team's rankings stat (only updates existing rows)
+    _adminTeamEditorData.forEach(function(team, ti) {
+      const rankStat = (team.stats || []).find(function(s) { return s.label === rankLabel; });
+      if (!rankStat) return;
+      if (rankMap[ti] === undefined) { rankStat.value = ''; return; }
+      const rank = rankMap[ti];
+      rankStat.value = (rankCounts[rank] > 1 ? 'T-' : '') + ordinal(rank);
+    });
+  });
 }
 
 function escapeHtml(str) {
