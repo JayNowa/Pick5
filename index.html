@@ -3053,7 +3053,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.5.6</div>
+    <div class="version-badge">v1.5.7</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -8016,12 +8016,16 @@ function autoCalculateYearRankings() {
   years.forEach(function(year) {
     const rankLabel = year + ' Rankings';
 
-    // Gather wins for teams that have a record for this year (format: "W-L")
+    // Gather wins for teams that have a real record for this year (format: "W-L", skipping 0-0)
     const teamWins = [];
+    const didNotPlay = new Set();
     _adminTeamEditorData.forEach(function(team, ti) {
       const recStat = (team.stats || []).find(function(s) { return s.label === year; });
-      if (!recStat || !recStat.value) return;
-      const wins = parseInt((recStat.value + '').split('-')[0]);
+      if (!recStat || !recStat.value) { didNotPlay.add(ti); return; }
+      const parts = (recStat.value + '').split('-');
+      const wins = parseInt(parts[0]);
+      const losses = parseInt(parts[1]);
+      if (!isNaN(wins) && wins === 0 && !isNaN(losses) && losses === 0) { didNotPlay.add(ti); return; }
       if (!isNaN(wins)) teamWins.push({ ti: ti, wins: wins });
     });
 
@@ -8057,6 +8061,7 @@ function autoCalculateYearRankings() {
         }
         rankStat = newRow;
       }
+      if (didNotPlay.has(ti)) { rankStat.value = 'Did Not Play'; return; }
       if (rankMap[ti] === undefined) { rankStat.value = ''; return; }
       const rank = rankMap[ti];
       rankStat.value = (rankCounts[rank] > 1 ? 'T-' : '') + ordinal(rank);
