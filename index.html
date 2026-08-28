@@ -3053,7 +3053,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.4.9</div>
+    <div class="version-badge">v1.5.0</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -7878,6 +7878,10 @@ function renderAdminTeamEditorList() {
   listEl.appendChild(addBtn);
 }
 
+function isAutoCalcStat(label) {
+  return /^\d{4} Rankings$/.test(label) || label === 'Total Wins' || label === 'Total Losses';
+}
+
 function renderAdminTeamStats(ti) {
   const statsEl = document.getElementById('adminTeamStats-' + ti);
   if (!statsEl || !_adminTeamEditorData[ti]) return;
@@ -7885,6 +7889,26 @@ function renderAdminTeamStats(ti) {
   statsEl.innerHTML = '';
   stats.forEach(function(stat, si) {
     const row = document.createElement('div');
+
+    if (isAutoCalcStat(stat.label)) {
+      // Read-only auto-calculated row
+      row.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;align-items:center;opacity:0.85;';
+      const labelEl = document.createElement('div');
+      labelEl.style.cssText = 'flex:1;background:rgba(200,169,74,0.06);border:1px solid rgba(200,169,74,0.18);border-radius:6px;padding:6px 8px;color:var(--subtext);font-size:13px;';
+      labelEl.textContent = stat.label;
+      const valEl = document.createElement('div');
+      valEl.style.cssText = 'flex:1;background:rgba(200,169,74,0.06);border:1px solid rgba(200,169,74,0.18);border-radius:6px;padding:6px 8px;font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;justify-content:space-between;';
+      valEl.innerHTML = escapeHtml(stat.value || '—') + '<span style="font-size:10px;color:var(--accent);letter-spacing:0.07em;font-weight:700;">AUTO</span>';
+      const spacer = document.createElement('div');
+      spacer.style.cssText = 'width:38px;flex-shrink:0;';
+      row.appendChild(labelEl);
+      row.appendChild(valEl);
+      row.appendChild(spacer);
+      statsEl.appendChild(row);
+      return;
+    }
+
+    // Editable row with drag-and-drop
     row.draggable = true;
     row.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;align-items:center;transition:opacity 0.15s;';
     row.dataset.ti = ti; row.dataset.si = si;
@@ -7975,6 +7999,7 @@ async function saveAdminTeam(ti) {
   const statusEl = document.getElementById('adminTeamSaveStatus-' + ti);
   const nameEl = document.getElementById('adminTeamName-' + ti);
   if (nameEl) _adminTeamEditorData[ti].name = nameEl.value.trim();
+  autoCalculateTotals();
   autoCalculateYearRankings();
   // Re-render stats for all open panels since rankings across all teams may have changed
   _adminTeamEditorData.forEach(function(_, idx) {
@@ -8016,6 +8041,7 @@ async function importTeamDataFromSheets() {
       }
     }
     _adminTeamEditorData = teams;
+    autoCalculateTotals();
     autoCalculateYearRankings();
     await window.fbSaveTeamData(_adminTeamEditorData);
     teamDataCache = null;
@@ -8037,6 +8063,26 @@ function ordinal(n) {
     case 3: return n + 'rd';
     default: return n + 'th';
   }
+}
+
+function autoCalculateTotals() {
+  if (!_adminTeamEditorData || _adminTeamEditorData.length === 0) return;
+  _adminTeamEditorData.forEach(function(team) {
+    let totalWins = 0, totalLosses = 0;
+    (team.stats || []).forEach(function(s) {
+      if (/^\d{4}$/.test(s.label) && s.value) {
+        const parts = s.value.split('-');
+        const w = parseInt(parts[0]);
+        const l = parseInt(parts[1]);
+        if (!isNaN(w)) totalWins += w;
+        if (!isNaN(l)) totalLosses += l;
+      }
+    });
+    const winStat  = (team.stats || []).find(function(s) { return s.label === 'Total Wins'; });
+    const lossStat = (team.stats || []).find(function(s) { return s.label === 'Total Losses'; });
+    if (winStat)  winStat.value  = String(totalWins);
+    if (lossStat) lossStat.value = String(totalLosses);
+  });
 }
 
 function autoCalculateYearRankings() {
