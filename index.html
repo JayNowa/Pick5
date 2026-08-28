@@ -3053,7 +3053,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.4.7</div>
+    <div class="version-badge">v1.4.8</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -4762,9 +4762,21 @@ async function fetchAndRenderSpreads(week) {
 
       const vsEl = document.createElement('div');
       vsEl.className = 'spread-vs';
-      vsEl.innerHTML = '<span>@</span><div class="spread-meta-inline">' +
-        (dayStr ? '<span>' + dayStr + '</span>' : '') +
-        (gameTime ? '<span>' + gameTime + '</span>' : '') + '</div>';
+      if (gameStarted && liveMap) {
+        const awayData = liveMap[away];
+        const homeData = liveMap[home];
+        const aScore = awayData ? awayData.awayScore : (homeData ? homeData.awayScore : null);
+        const hScore = awayData ? awayData.homeScore : (homeData ? homeData.homeScore : null);
+        const scoreStr = (aScore !== null && hScore !== null) ? aScore + ' – ' + hScore : '– –';
+        const statusLabel = gameFinal ? 'FINAL' : 'LIVE';
+        const statusColor = gameFinal ? 'var(--subtext)' : '#4caf7d';
+        vsEl.innerHTML = '<span style="font-size:10px;font-weight:700;letter-spacing:0.1em;color:' + statusColor + ';text-transform:uppercase;">' + statusLabel + '</span>' +
+          '<div style="font-size:22px;font-weight:800;color:var(--text);line-height:1.1;">' + scoreStr + '</div>';
+      } else {
+        vsEl.innerHTML = '<span>@</span><div class="spread-meta-inline">' +
+          (dayStr ? '<span>' + dayStr + '</span>' : '') +
+          (gameTime ? '<span>' + gameTime + '</span>' : '') + '</div>';
+      }
 
       const homeBtn = document.createElement('div');
       homeBtn.className = 'team-pick-btn';
