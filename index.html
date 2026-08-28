@@ -3053,7 +3053,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.5.4</div>
+    <div class="version-badge">v1.5.5</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -8042,10 +8042,21 @@ function autoCalculateYearRankings() {
     const rankCounts = {};
     Object.values(rankMap).forEach(function(r) { rankCounts[r] = (rankCounts[r] || 0) + 1; });
 
-    // Write back to each team's rankings stat (only updates existing rows)
+    // Write back to each team's rankings stat; auto-create the row if missing
     _adminTeamEditorData.forEach(function(team, ti) {
-      const rankStat = (team.stats || []).find(function(s) { return s.label === rankLabel; });
-      if (!rankStat) return;
+      let rankStat = (team.stats || []).find(function(s) { return s.label === rankLabel; });
+      if (!rankStat) {
+        // Insert the Rankings row immediately after the year record row
+        team.stats = team.stats || [];
+        const yearIdx = team.stats.findIndex(function(s) { return s.label === year; });
+        const newRow = { label: rankLabel, value: '' };
+        if (yearIdx >= 0) {
+          team.stats.splice(yearIdx + 1, 0, newRow);
+        } else {
+          team.stats.push(newRow);
+        }
+        rankStat = newRow;
+      }
       if (rankMap[ti] === undefined) { rankStat.value = ''; return; }
       const rank = rankMap[ti];
       rankStat.value = (rankCounts[rank] > 1 ? 'T-' : '') + ordinal(rank);
