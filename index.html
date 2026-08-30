@@ -3053,7 +3053,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.6.0</div>
+    <div class="version-badge">v1.6.1</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -8762,10 +8762,11 @@ async function loadWeeklyPicks() {
 
     if (!window.fbGetWeeklyPicks) throw new Error('Firebase not ready');
 
-    // Fetch picks and scores in parallel
-    const [allPicks, scoresMap] = await Promise.all([
+    // Fetch picks, scores, and approved users in parallel
+    const [allPicks, scoresMap, approvedUsers] = await Promise.all([
       window.fbGetWeeklyPicks(weekLabel),
-      fetchScoresMap(week)
+      fetchScoresMap(week),
+      window.fbGetAllApprovedUsers ? window.fbGetAllApprovedUsers() : Promise.resolve([])
     ]);
     loadingEl.style.display = 'none';
 
@@ -9069,6 +9070,34 @@ async function loadWeeklyPicks() {
       elimSection.appendChild(elimLabel);
       elimSection.appendChild(buildPickTable(eliminated));
       tableEl.appendChild(elimSection);
+    }
+
+    // ── No Picks Entered — approved users who didn't submit ──
+    const submittedEmails = new Set(Object.keys(byUser).map(function(e) { return e.toLowerCase(); }));
+    const noPicksUsers = approvedUsers.filter(function(u) {
+      return u.email && !submittedEmails.has(u.email.toLowerCase());
+    }).sort(function(a, b) {
+      return (a.teamName || a.email || '').localeCompare(b.teamName || b.email || '');
+    });
+
+    if (noPicksUsers.length > 0) {
+      const noPicksSection = document.createElement('div');
+      noPicksSection.className = 'wp-section';
+      const noPicksLabel = document.createElement('div');
+      noPicksLabel.className = 'wp-section-label';
+      noPicksLabel.style.color = 'var(--muted)';
+      noPicksLabel.textContent = 'No Picks Entered (' + noPicksUsers.length + ')';
+      noPicksSection.appendChild(noPicksLabel);
+      const noPicksWrap = document.createElement('div');
+      noPicksWrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;padding:12px 0;';
+      noPicksUsers.forEach(function(u) {
+        const chip = document.createElement('div');
+        chip.style.cssText = 'padding:6px 14px;background:var(--hover);border:1px solid var(--border);border-radius:20px;font-size:13px;color:var(--subtext);';
+        chip.textContent = u.teamName || u.email;
+        noPicksWrap.appendChild(chip);
+      });
+      noPicksSection.appendChild(noPicksWrap);
+      tableEl.appendChild(noPicksSection);
     }
 
   } catch(err) {
