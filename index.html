@@ -471,6 +471,26 @@
   }
   .btn-delete-user:hover { background: rgba(255,80,80,0.3); }
   .btn-delete-user:disabled { opacity: 0.4; cursor: default; }
+  .btn-toggle-active {
+    padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer;
+    font-size: 13px; font-weight: 600; transition: background 0.15s;
+  }
+  .btn-deactivate {
+    background: rgba(255,165,0,0.15); color: #ffa500;
+  }
+  .btn-deactivate:hover { background: rgba(255,165,0,0.3); }
+  .btn-activate {
+    background: rgba(80,200,80,0.15); color: #50c850;
+  }
+  .btn-activate:hover { background: rgba(80,200,80,0.3); }
+  .btn-toggle-active:disabled { opacity: 0.4; cursor: default; }
+  .user-row-inactive { opacity: 0.55; }
+  .user-inactive-label {
+    display: inline-block; margin-left: 8px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
+    color: #ffa500; background: rgba(255,165,0,0.15);
+    padding: 1px 7px; border-radius: 20px; vertical-align: middle;
+  }
   .btn-reset-pin {
     padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer;
     font-size: 13px; font-weight: 600;
@@ -3563,7 +3583,8 @@
       pin:      data.pin,
       teamName: data.teamName,
       phone:    data.phone || '',
-      isAdmin:  false
+      isAdmin:  false,
+      isActive: true
     });
     await deleteDoc(pendingRef);
   };
@@ -3583,6 +3604,10 @@
 
   window.fbDeleteApprovedUser = async function(docId) {
     await deleteDoc(doc(db, "approvedUsers", docId));
+  };
+
+  window.fbSetUserActive = async function(docId, active) {
+    await updateDoc(doc(db, "approvedUsers", docId), { isActive: active });
   };
 
   window.fbResetUserPIN = async function(docId) {
@@ -3848,6 +3873,10 @@ async function handleLogin() {
     const user = await fbGetApprovedUser(email);
     if (user && user.pin === pin) {
       staEl.textContent = '';
+      if (user.isActive === false) {
+        showError('Your account has been deactivated. Please contact an admin.');
+        return;
+      }
       if (document.getElementById('rememberMe').checked) {
         localStorage.setItem('pick5-session-email', email);
         localStorage.setItem('pick5-session-team', user.teamName || '');
@@ -3905,7 +3934,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       try {
         const user = await fbGetApprovedUser(savedEmail);
-        if (user) {
+        if (user && user.isActive === false) {
+          localStorage.removeItem('pick5-session-email');
+          localStorage.removeItem('pick5-session-team');
+          staEl.textContent = '';
+        } else if (user) {
           if (user.mustChangePIN) {
             showChangePinModal(user.id, savedEmail, user.teamName || savedTeam || '');
           } else {
@@ -6891,7 +6924,8 @@ async function loadUsersPage() {
 
   users.forEach(function(user) {
     const row = document.createElement('div');
-    row.className = 'user-row';
+    const isActive = user.isActive !== false;
+    row.className = 'user-row' + (isActive ? '' : ' user-row-inactive');
     row.id = 'user-row-' + user.id;
     const initial = (user.teamName || user.email || '?')[0].toUpperCase();
     const isAdmin = user.isAdmin === true;
@@ -6901,13 +6935,14 @@ async function loadUsersPage() {
     row.innerHTML =
       '<div class="user-avatar">' + initial + '</div>' +
       '<div class="user-info">' +
-        '<div class="user-name">' + (user.teamName || '—') + '</div>' +
+        '<div class="user-name">' + (user.teamName || '—') + (isActive ? '' : ' <span class="user-inactive-label">Inactive</span>') + '</div>' +
         '<div class="user-email">' + user.email + '</div>' +
         (user.phone ? '<div class="user-phone">' + user.phone + '</div>' : '') +
         (user.pin ? '<div class="user-phone">PIN: ' + user.pin + '</div>' : '') +
       '</div>' +
       '<span class="user-badge ' + (isAdmin ? 'admin' : 'member') + '">' + (isAdmin ? 'Admin' : 'Member') + '</span>' +
       (!isSelf ? '<button class="btn-reset-pin" data-docid="' + user.id + '" data-name="' + escHtml(user.teamName || user.email) + '" onclick="handleResetPin(this)">Reset PIN</button>' : '') +
+      (!isSelf && !isAdmin ? '<button class="btn-toggle-active ' + (isActive ? 'btn-deactivate' : 'btn-activate') + '" data-docid="' + user.id + '" data-email="' + user.email + '" data-active="' + isActive + '" onclick="handleToggleUserActive(this)">' + (isActive ? 'Deactivate' : 'Activate') + '</button>' : '') +
       (isSelf || isAdmin ? '' : '<button class="btn-delete-user" id="del-' + user.id + '" data-docid="' + user.id + '" data-email="' + user.email + '" onclick="handleDeleteUser(this)">Delete</button>');
 
     listEl.appendChild(row);
@@ -6945,6 +6980,45 @@ async function handleResetPin(btn) {
     showToast('Failed to reset PIN', 'error');
   }
   btn.disabled = false;
+}
+
+async function handleToggleUserActive(btn) {
+  const docId     = btn.dataset.docid;
+  const email     = btn.dataset.email;
+  const isActive  = btn.dataset.active === 'true';
+  const action    = isActive ? 'deactivate' : 'activate';
+  if (!confirm((isActive ? 'Deactivate' : 'Activate') + ' user ' + email + '?')) return;
+  btn.disabled = true;
+  try {
+    await window.fbSetUserActive(docId, !isActive);
+    const row = document.getElementById('user-row-' + docId);
+    if (row) {
+      if (!isActive) {
+        row.classList.remove('user-row-inactive');
+        btn.textContent = 'Deactivate';
+        btn.className = 'btn-toggle-active btn-deactivate';
+        btn.dataset.active = 'true';
+        const nameEl = row.querySelector('.user-name');
+        if (nameEl) nameEl.querySelector('.user-inactive-label') && nameEl.querySelector('.user-inactive-label').remove();
+      } else {
+        row.classList.add('user-row-inactive');
+        btn.textContent = 'Activate';
+        btn.className = 'btn-toggle-active btn-activate';
+        btn.dataset.active = 'false';
+        const nameEl = row.querySelector('.user-name');
+        if (nameEl && !nameEl.querySelector('.user-inactive-label')) {
+          const lbl = document.createElement('span');
+          lbl.className = 'user-inactive-label';
+          lbl.textContent = 'Inactive';
+          nameEl.appendChild(lbl);
+        }
+      }
+    }
+    showToast('User ' + (isActive ? 'deactivated' : 'activated'), 'success');
+  } catch(e) {
+    showToast('Failed to ' + action + ' user', 'error');
+    btn.disabled = false;
+  }
 }
 
 let _cpDocId = null, _cpEmail = null, _cpTeam = null;
