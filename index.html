@@ -3073,7 +3073,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.6.3</div>
+    <div class="version-badge">v1.6.4</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -7330,6 +7330,18 @@ function renderTeamCards(teams) {
   const retiredTeams = validTeams.filter(t => t.inactive);
   const totalTeams = validTeams.length;
 
+  // Per-year count of teams that actually played (not "Did Not Play")
+  const yearPlayedCounts = {};
+  for (let y = 2021; y <= 2030; y++) {
+    const rankLabel = y + ' Rankings';
+    let count = 0;
+    validTeams.forEach(function(t) {
+      const rs = (t.stats || []).find(s => s.label === rankLabel);
+      if (rs && rs.value && rs.value !== 'Did Not Play') count++;
+    });
+    if (count > 0) yearPlayedCounts[y] = count;
+  }
+
   function makeSectionHeader(label) {
     const h = document.createElement('div');
     h.style.cssText = 'width:100%;font-size:12px;font-weight:700;color:var(--subtext);letter-spacing:0.08em;text-transform:uppercase;padding:4px 2px 10px;margin-top:8px;border-bottom:1px solid var(--border);margin-bottom:16px;';
@@ -7355,7 +7367,7 @@ function renderTeamCards(teams) {
       const rank = team.stats.find(s => s.label === y + ' Rankings');
       if (rec && rec.value) {
         hasSeasons = true;
-        seasonsHTML += '<div class="team-data-row"><span class="team-data-label">' + y + '</span><span class="team-data-value">' + rec.value + (rank && rank.value ? ' <span style="color:var(--muted);font-weight:400;font-size:11px;">(#' + rank.value + rankEmojiFull(rank.value, totalTeams) + ')</span>' : '') + '</span></div>';
+        seasonsHTML += '<div class="team-data-row"><span class="team-data-label">' + y + '</span><span class="team-data-value">' + rec.value + (rank && rank.value ? ' <span style="color:var(--muted);font-weight:400;font-size:11px;">(#' + rank.value + rankEmojiFull(rank.value, yearPlayedCounts[y] || totalTeams) + ')</span>' : '') + '</span></div>';
       }
     }
     const overallLabels = ['Total Wins','Total Losses','Best finish','Worst finish','Win%','5-0','0-5','Career Earnings'];
