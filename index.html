@@ -3073,7 +3073,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.6.2</div>
+    <div class="version-badge">v1.6.3</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -8413,7 +8413,13 @@ async function loadLeaderboard() {
   contentEl.innerHTML     = '';
 
   try {
-    const allPicks = await fetchAllPicks();
+    const [allPicks, allApprovedLB] = await Promise.all([
+      fetchAllPicks(),
+      window.fbGetAllApprovedUsers ? window.fbGetAllApprovedUsers() : Promise.resolve([])
+    ]);
+    const activeEmailsLB = new Set(
+      allApprovedLB.filter(function(u) { return u.isActive !== false; }).map(function(u) { return (u.email || '').toLowerCase(); })
+    );
 
     loadingEl.style.display = 'none';
 
@@ -8429,13 +8435,14 @@ async function loadLeaderboard() {
       scoresByWeek[wk] = await fetchESPNScoresMap(wk);
     }));
 
-    // Latest submission per user per week
+    // Latest submission per user per week (active users only)
     const userWeekMap = {};
     const userNames   = {};
     allPicks.forEach(function(doc) {
-      const email = doc.email || 'unknown';
+      const email = (doc.email || 'unknown').toLowerCase();
       const week  = doc.week  || '';
       if (!week) return;
+      if (!activeEmailsLB.has(email)) return;
       userNames[email] = doc.teamName || email;
       if (!userWeekMap[email]) userWeekMap[email] = {};
       if (!userWeekMap[email][week] || (doc.timestamp || 0) > (userWeekMap[email][week].timestamp || 0)) {
@@ -8597,7 +8604,13 @@ async function loadResultsPage() {
   tableEl.innerHTML       = '';
 
   try {
-    const allPicksSnap = await fetchAllPicks();
+    const [allPicksSnap, allApprovedRes] = await Promise.all([
+      fetchAllPicks(),
+      window.fbGetAllApprovedUsers ? window.fbGetAllApprovedUsers() : Promise.resolve([])
+    ]);
+    const activeEmailsRes = new Set(
+      allApprovedRes.filter(function(u) { return u.isActive !== false; }).map(function(u) { return (u.email || '').toLowerCase(); })
+    );
 
     loadingEl.style.display = 'none';
 
@@ -8628,13 +8641,14 @@ async function loadResultsPage() {
       return order(a) - order(b);
     });
 
-    // Get latest submission per user per week
+    // Get latest submission per user per week (active users only)
     const userWeekMap = {};
     const userNames   = {};
     allPicksSnap.forEach(function(doc) {
-      const email = doc.email || 'unknown';
+      const email = (doc.email || 'unknown').toLowerCase();
       const week  = doc.week  || '';
       if (!week) return;
+      if (!activeEmailsRes.has(email)) return;
       userNames[email] = doc.teamName || email;
       if (!userWeekMap[email]) userWeekMap[email] = {};
       if (!userWeekMap[email][week] || (doc.timestamp || 0) > (userWeekMap[email][week].timestamp || 0)) {
@@ -8892,16 +8906,22 @@ async function loadWeeklyPicks() {
       return;
     }
 
-    // Keep only latest submission per user
+    // Build active email set
+    const activeEmailsWP = new Set(
+      approvedUsers.filter(function(u) { return u.isActive !== false; }).map(function(u) { return (u.email || '').toLowerCase(); })
+    );
+
+    // Keep only latest submission per active user
     const byUser = {};
     allPicks.forEach(function(doc) {
       const email = doc.email || 'unknown';
+      if (!activeEmailsWP.has(email.toLowerCase())) return;
       if (!byUser[email] || (doc.timestamp || 0) > (byUser[email].timestamp || 0)) {
         byUser[email] = doc;
       }
     });
 
-    // Keep all users; sort alphabetically as base order for tiebreaking
+    // Keep all active users; sort alphabetically as base order for tiebreaking
     const users = Object.values(byUser).sort(function(a, b) {
       return (a.teamName || a.email || '').localeCompare(b.teamName || b.email || '');
     });
