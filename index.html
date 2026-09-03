@@ -3073,7 +3073,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.6.1</div>
+    <div class="version-badge">v1.6.2</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -7086,7 +7086,7 @@ async function sendPicksReminder() {
     ]);
 
     const pickedEmails = new Set(weekPicks.map(function(d) { return (d.email || '').toLowerCase(); }));
-    const missing = allUsers.filter(function(u) { return !pickedEmails.has((u.email || '').toLowerCase()); });
+    const missing = allUsers.filter(function(u) { return u.isActive !== false && !pickedEmails.has((u.email || '').toLowerCase()); });
 
     if (missing.length === 0) {
       statusEl.textContent = '✓ Everyone has submitted — no reminders needed!';
@@ -7153,7 +7153,7 @@ async function loadMissingPicks() {
 
     // Find users who haven't picked
     const missing = allUsers.filter(function(u) {
-      return !pickedEmails.has((u.email || '').toLowerCase());
+      return u.isActive !== false && !pickedEmails.has((u.email || '').toLowerCase());
     });
 
     if (missing.length === 0) {
@@ -7794,7 +7794,7 @@ async function sendWeeklyRecap(testOnly) {
 
     const recipients = testOnly
       ? ADMIN_EMAILS.slice()
-      : (await window.fbGetAllApprovedUsers()).map(function(u) { return u.email; }).filter(Boolean);
+      : (await window.fbGetAllApprovedUsers()).filter(function(u) { return u.isActive !== false; }).map(function(u) { return u.email; }).filter(Boolean);
     if (recipients.length === 0) throw new Error('No approved users found.');
 
     statusEl.textContent = (testOnly ? 'Test sending to admins' : 'Sending to ' + recipients.length + ' players') + '…';
@@ -9149,7 +9149,7 @@ async function loadWeeklyPicks() {
     // ── No Picks Entered — approved users who didn't submit ──
     const submittedEmails = new Set(Object.keys(byUser).map(function(e) { return e.toLowerCase(); }));
     const noPicksUsers = approvedUsers.filter(function(u) {
-      return u.email && !submittedEmails.has(u.email.toLowerCase());
+      return u.email && u.isActive !== false && !submittedEmails.has(u.email.toLowerCase());
     }).sort(function(a, b) {
       return (a.teamName || a.email || '').localeCompare(b.teamName || b.email || '');
     });
