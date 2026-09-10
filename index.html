@@ -4375,7 +4375,13 @@ function renderPickAllTable(weekKey, picks, scoresMap) {
         + (rec.live ? ' <span style="color:var(--accent);">'  + rec.live + ' live</span>'  : '')
         + '</span>';
       var cards = (row.teamPicks || []).map(function(t) {
-        return _buildPickCard(normalizeTeamAbbr(t), scoresMap);
+        var abbr = normalizeTeamAbbr(t);
+        return { abbr: abbr, result: getPickAllResult(abbr, scoresMap) };
+      }).sort(function(a, b) {
+        // Float live games to the front; everything else stays in original order
+        return (a.result === 'live' ? 0 : 1) - (b.result === 'live' ? 0 : 1);
+      }).map(function(c) {
+        return _buildPickCard(c.abbr, scoresMap);
       }).join('');
       return '<div class="' + blockCls + '">'
         + '<div class="pa-player-header">'
