@@ -4185,7 +4185,7 @@ async function showPickAllWeek(weekKey) {
 // NFL team full name → ESPN abbreviation lookup
 function pickAllTeamAliases() {
   return {
-    'ARIZONA':            'ARI', 'CARDINALS':       'ARI', 'ARI': 'ARI',
+    'ARIZONA':            'ARI', 'CARDINALS':       'ARI', 'ARI': 'ARI', 'AZ': 'ARI',
     'ATLANTA':            'ATL', 'FALCONS':         'ATL', 'ATL': 'ATL',
     'BALTIMORE':          'BAL', 'RAVENS':          'BAL', 'BAL': 'BAL',
     'BUFFALO':            'BUF', 'BILLS':           'BUF', 'BUF': 'BUF',
@@ -4205,7 +4205,7 @@ function pickAllTeamAliases() {
     'LA CHARGERS':        'LAC', 'LOS ANGELES CHARGERS': 'LAC', 'CHARGERS': 'LAC', 'LAC': 'LAC', 'SDG': 'LAC',
     'LA RAMS':            'LAR', 'LOS ANGELES RAMS': 'LAR', 'RAMS': 'LAR', 'LAR': 'LAR', 'STL': 'LAR',
     'MIAMI':              'MIA', 'DOLPHINS':        'MIA', 'MIA': 'MIA',
-    'MINNESOTA':          'MIN', 'VIKINGS':         'MIN', 'MIN': 'MIN',
+    'MINNESOTA':          'MIN', 'VIKINGS':         'MIN', 'MIN': 'MIN', 'MN': 'MIN',
     'NEW ENGLAND':        'NE',  'NEWENGLAND':      'NE',  'PATRIOTS': 'NE', 'NE': 'NE', 'NWE': 'NE',
     'NEW ORLEANS':        'NO',  'NEWORLEANS':      'NO',  'SAINTS': 'NO', 'NO': 'NO', 'NOR': 'NO',
     'NEW YORK GIANTS':    'NYG', 'NY GIANTS':       'NYG', 'GIANTS': 'NYG', 'NYG': 'NYG',
@@ -4227,7 +4227,7 @@ function normalizeTeamAbbr(raw) {
   return map[upper] || upper;
 }
 
-function getPickResult(team, scoresMap) {
+function getPickAllResult(team, scoresMap) {
   if (!team || !scoresMap) return 'pending';
   const abbr = normalizeTeamAbbr(team);
   const game = scoresMap[abbr];
@@ -4247,46 +4247,94 @@ function renderPickAllTable(weekKey, picks, scoresMap) {
   const container = document.getElementById('pickAllTableContainer');
   if (!container) return;
 
+  // Detect new format: picks[].picks is an array of team abbrs
+  const isNewFmt = picks.length > 0 && Array.isArray(picks[0].picks);
+
   let html = '<div style="margin-bottom:10px;color:var(--muted);font-size:13px;">Week ' + weekKey + ' &middot; ' + picks.length + ' players</div>';
-  html += '<div class="pa-table-wrap"><table class="pa-table">';
-  html += '<thead><tr><th>#</th><th>Player</th><th>Pick</th><th>Result</th></tr></thead><tbody>';
 
-  picks.forEach(function(p, idx) {
-    const abbr = normalizeTeamAbbr(p.team);
-    const result = getPickResult(p.team, scoresMap);
-    const game = scoresMap && scoresMap[abbr];
-    const slug = abbr.toLowerCase();
-    const logoSrc = 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/' + slug + '.png&w=24&h=24&transparent=true';
+  if (isNewFmt) {
+    // Pick-em format: each player has an array of picks
+    // Build rows with per-player record, sorted by wins desc
+    const rows = picks.map(function(p) {
+      var rec = { W: 0, L: 0, T: 0, live: 0, pending: 0 };
+      var cells = (p.picks || []).map(function(teamRaw) {
+        var abbr = normalizeTeamAbbr(teamRaw);
+        var r = getPickAllResult(abbr, scoresMap);
+        rec[r] = (rec[r] || 0) + 1;
+        return { abbr: abbr, result: r };
+      });
+      return { name: p.name, cells: cells, rec: rec };
+    }).sort(function(a, b) {
+      if (b.rec.W !== a.rec.W) return b.rec.W - a.rec.W;
+      return a.rec.L - b.rec.L;
+    });
 
-    let resultHtml, rowClass = '';
-    if (result === 'W') {
-      resultHtml = '<span class="pa-result pa-win">W</span>';
-      rowClass = 'pa-row-win';
-    } else if (result === 'L') {
-      resultHtml = '<span class="pa-result pa-loss">L</span>';
-      rowClass = 'pa-row-loss';
-    } else if (result === 'T') {
-      resultHtml = '<span class="pa-result pa-tie">T</span>';
-    } else if (result === 'live' && game) {
-      const isHome = game.homeAbbr === abbr;
-      const myScore  = isHome ? game.homeScore : game.awayScore;
-      const oppScore = isHome ? game.awayScore : game.homeScore;
-      const ahead = myScore >= oppScore;
-      resultHtml = '<span class="pa-result pa-live">' + myScore + '-' + oppScore + ' Q' + game.period + '</span>';
-      rowClass = ahead ? 'pa-row-leading' : 'pa-row-trailing';
-    } else {
-      resultHtml = '<span class="pa-result pa-pending">&mdash;</span>';
-    }
+    html += '<div class="pa-table-wrap"><table class="pa-table">';
+    html += '<thead><tr><th>#</th><th>Player</th><th>W</th><th>L</th><th>Picks</th></tr></thead><tbody>';
 
-    html += '<tr class="' + rowClass + '">'
-      + '<td class="pa-rank">' + (idx + 1) + '</td>'
-      + '<td class="pa-name">' + escPickAll(p.name) + '</td>'
-      + '<td class="pa-team"><img class="pa-team-logo" src="' + logoSrc + '" onerror="this.style.display=\'none\'" alt=""> <span>' + escPickAll(abbr) + '</span></td>'
-      + '<td>' + resultHtml + '</td>'
-      + '</tr>';
-  });
+    rows.forEach(function(row, idx) {
+      var chips = row.cells.map(function(c) {
+        var cls = c.result === 'W' ? 'pa-win' : c.result === 'L' ? 'pa-loss' : c.result === 'T' ? 'pa-tie' : c.result === 'live' ? 'pa-live' : 'pa-pending';
+        var slug = c.abbr.toLowerCase();
+        var logo = 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/' + slug + '.png&w=20&h=20&transparent=true';
+        return '<span class="pa-result ' + cls + '" title="' + escPickAll(c.abbr) + '" style="padding:1px 5px;font-size:11px;margin:1px 2px;white-space:nowrap;">'
+          + '<img src="' + logo + '" style="width:13px;height:13px;vertical-align:middle;margin-right:2px;" onerror="this.style.display=\'none\'">'
+          + escPickAll(c.abbr) + '</span>';
+      }).join('');
 
-  html += '</tbody></table></div>';
+      var rowClass = row.rec.W > row.rec.L ? 'pa-row-win' : row.rec.L > row.rec.W ? 'pa-row-loss' : '';
+      html += '<tr class="' + rowClass + '">'
+        + '<td class="pa-rank">' + (idx + 1) + '</td>'
+        + '<td class="pa-name">' + escPickAll(row.name) + '</td>'
+        + '<td class="pa-wins">' + row.rec.W + '</td>'
+        + '<td class="pa-losses">' + row.rec.L + '</td>'
+        + '<td style="line-height:1.8;">' + chips + '</td>'
+        + '</tr>';
+    });
+
+    html += '</tbody></table></div>';
+  } else {
+    // Legacy format: one pick per player
+    html += '<div class="pa-table-wrap"><table class="pa-table">';
+    html += '<thead><tr><th>#</th><th>Player</th><th>Pick</th><th>Result</th></tr></thead><tbody>';
+
+    picks.forEach(function(p, idx) {
+      var abbr = normalizeTeamAbbr(p.team);
+      var result = getPickAllResult(abbr, scoresMap);
+      var game = scoresMap && scoresMap[abbr];
+      var slug = abbr.toLowerCase();
+      var logoSrc = 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/' + slug + '.png&w=24&h=24&transparent=true';
+
+      var resultHtml, rowClass = '';
+      if (result === 'W') {
+        resultHtml = '<span class="pa-result pa-win">W</span>';
+        rowClass = 'pa-row-win';
+      } else if (result === 'L') {
+        resultHtml = '<span class="pa-result pa-loss">L</span>';
+        rowClass = 'pa-row-loss';
+      } else if (result === 'T') {
+        resultHtml = '<span class="pa-result pa-tie">T</span>';
+      } else if (result === 'live' && game) {
+        var isHome = game.homeAbbr === abbr;
+        var myScore  = isHome ? game.homeScore : game.awayScore;
+        var oppScore = isHome ? game.awayScore : game.homeScore;
+        resultHtml = '<span class="pa-result pa-live">' + myScore + '-' + oppScore + ' Q' + game.period + '</span>';
+        rowClass = myScore >= oppScore ? 'pa-row-leading' : 'pa-row-trailing';
+      } else {
+        resultHtml = '<span class="pa-result pa-pending">&mdash;</span>';
+      }
+
+      html += '<tr class="' + rowClass + '">'
+        + '<td class="pa-rank">' + (idx + 1) + '</td>'
+        + '<td class="pa-name">' + escPickAll(p.name) + '</td>'
+        + '<td class="pa-team"><img class="pa-team-logo" src="' + logoSrc + '" onerror="this.style.display=\'none\'" alt=""> <span>' + escPickAll(abbr) + '</span></td>'
+        + '<td>' + resultHtml + '</td>'
+        + '</tr>';
+    });
+
+    html += '</tbody></table></div>';
+  }
+
   container.innerHTML = html;
 }
 
@@ -4316,12 +4364,16 @@ async function renderPickAllStandings() {
     var sm = pickAllScores[wk] || {};
     weekData.picks.forEach(function(p) {
       if (!playerMap[p.name]) playerMap[p.name] = { W: 0, L: 0, T: 0, live: 0, pending: 0 };
-      var r = getPickResult(p.team, sm);
-      if (r === 'W') playerMap[p.name].W++;
-      else if (r === 'L') playerMap[p.name].L++;
-      else if (r === 'T') playerMap[p.name].T++;
-      else if (r === 'live') playerMap[p.name].live++;
-      else playerMap[p.name].pending++;
+      // Support both new format (p.picks array) and legacy (p.team string)
+      var teams = Array.isArray(p.picks) ? p.picks : (p.team ? [p.team] : []);
+      teams.forEach(function(team) {
+        var r = getPickAllResult(normalizeTeamAbbr(team), sm);
+        if (r === 'W') playerMap[p.name].W++;
+        else if (r === 'L') playerMap[p.name].L++;
+        else if (r === 'T') playerMap[p.name].T++;
+        else if (r === 'live') playerMap[p.name].live++;
+        else playerMap[p.name].pending++;
+      });
     });
   });
 
@@ -4610,26 +4662,42 @@ async function _autoFetchWeeks(weeks) {
 }
 
 // Parse pooltracker.com picks_matrix.asp HTML
-// Tries multiple strategies since we don't control the source HTML
+// Primary: uses #tblPicksMatrix + span.mypick[data-mypick] (known structure)
+// Fallback: heuristic table scan
 function parsePooltrackerHTML(html) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
 
-  // Strategy 1: find a table whose cells look like NFL picks
+  // Primary strategy: use the known table structure
+  const matrix = doc.querySelector('#tblPicksMatrix');
+  if (matrix) {
+    const rows = Array.from(matrix.querySelectorAll('tbody tr'));
+    const players = [];
+    rows.forEach(function(row) {
+      // Player name is in the first td.data_row
+      const nameTd = row.querySelector('td.data_row');
+      if (!nameTd) return;
+      const name = nameTd.textContent.trim();
+      if (!name || /^\d+$/.test(name)) return; // skip if purely numeric (score columns)
+
+      // All game picks are in span.mypick elements with data-mypick attribute
+      const pickSpans = Array.from(row.querySelectorAll('span.mypick'));
+      const picks = pickSpans
+        .map(function(span) { return normalizeTeamAbbr(span.getAttribute('data-mypick') || ''); })
+        .filter(Boolean);
+
+      if (picks.length > 0) {
+        players.push({ name: name, picks: picks });
+      }
+    });
+    if (players.length > 0) return players;
+  }
+
+  // Fallback: heuristic table scan (legacy / HTML structure changes)
   const tables = Array.from(doc.querySelectorAll('table'));
   for (const table of tables) {
     const picks = _tryParsePickTable(table);
     if (picks.length > 0) return picks;
-  }
-
-  // Strategy 2: look for any element with a class/id hinting at picks
-  const pickContainer = doc.querySelector('[class*="pick"], [class*="matrix"], [id*="pick"], [id*="matrix"]');
-  if (pickContainer) {
-    const subTable = pickContainer.querySelector('table');
-    if (subTable) {
-      const picks = _tryParsePickTable(subTable);
-      if (picks.length > 0) return picks;
-    }
   }
 
   return [];
