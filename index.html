@@ -1556,6 +1556,16 @@
   .pa-spot-card.ps-loss { border-color: rgba(224,92,92,0.5);  background: rgba(224,92,92,0.07); }
   .pa-spot-card.ps-live { border-color: rgba(200,169,74,0.6); background: rgba(200,169,74,0.07); animation: pa-pulse 1.5s infinite; }
   .pa-spot-score { font-size: 11px; color: var(--muted); }
+  /* Player blocks in week-picks view */
+  .pa-player-block { margin-bottom: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+  .pa-player-block:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .pa-player-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .pa-player-name { font-size: 15px; font-weight: 700; }
+  .pa-player-record { font-size: 13px; }
+  .pa-player-tb { font-size: 12px; color: var(--muted); background: var(--hover); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border); }
+  .pa-player-cards { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; -webkit-overflow-scrolling: touch; }
+  .pa-player-block.pa-our-block { background: rgba(200,169,74,0.05); border-radius: 10px; padding: 12px 14px; border: 1px solid rgba(200,169,74,0.3); margin-bottom: 18px; }
+  .pa-player-block.pa-our-block .pa-player-name { color: var(--accent); font-weight: 800; }
   /* Mobile: picks table chips wrap, spot grid stays comfortable */
   @media (max-width: 480px) {
     .pa-spot-card { min-width: 60px; padding: 8px 6px 6px; }
@@ -4270,98 +4280,97 @@ function getPickAllResult(team, scoresMap) {
   return 'T';
 }
 
+// Shared card builder used by renderPickAllTable and renderOurTeamSpotlight
+function _buildPickCard(abbr, scoresMap) {
+  var result = getPickAllResult(abbr, scoresMap);
+  var game   = scoresMap && scoresMap[abbr];
+  var slug   = abbr.toLowerCase();
+  var logo   = 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/' + slug + '.png&w=80&h=80&transparent=true';
+  var cardCls = '', badgeHtml = '', scoreHtml = '';
+
+  if (result === 'W' || result === 'L' || result === 'T') {
+    cardCls = result === 'W' ? 'ps-win' : result === 'L' ? 'ps-loss' : '';
+    var badgeCls = result === 'W' ? 'pa-win' : result === 'L' ? 'pa-loss' : 'pa-tie';
+    badgeHtml = '<span class="pa-spot-badge ' + badgeCls + '">' + result + '</span>';
+    if (game && game.isFinal) {
+      var isHome = game.homeAbbr === abbr;
+      scoreHtml = '<span class="pa-spot-score">'
+        + (isHome ? game.homeScore : game.awayScore)
+        + '&ndash;' + (isHome ? game.awayScore : game.homeScore) + '</span>';
+    }
+  } else if (result === 'live' && game) {
+    cardCls = 'ps-live';
+    var isHome = game.homeAbbr === abbr;
+    var mySc   = isHome ? game.homeScore : game.awayScore;
+    var oppSc  = isHome ? game.awayScore : game.homeScore;
+    badgeHtml  = '<span class="pa-spot-badge ' + (mySc >= oppSc ? 'pa-win' : 'pa-loss') + '" style="animation:pa-pulse 1.2s infinite;">LIVE</span>';
+    scoreHtml  = '<span class="pa-spot-score">' + mySc + '&ndash;' + oppSc + (game.period ? ' Q' + game.period : '') + '</span>';
+  } else {
+    badgeHtml = '<span class="pa-spot-badge" style="color:var(--muted);">—</span>';
+  }
+
+  return '<div class="pa-spot-card ' + cardCls + '">'
+    + '<img src="' + logo + '" onerror="this.style.display=\'none\'" alt="' + escPickAll(abbr) + '">'
+    + '<span class="pa-spot-abbr">' + escPickAll(abbr) + '</span>'
+    + badgeHtml + scoreHtml + '</div>';
+}
+
 function renderPickAllTable(weekKey, picks, scoresMap) {
   const container = document.getElementById('pickAllTableContainer');
   if (!container) return;
 
-  // Detect new format: picks[].picks is an array of team abbrs
   const isNewFmt = picks.length > 0 && Array.isArray(picks[0].picks);
-
-  let html = '<div style="margin-bottom:10px;color:var(--muted);font-size:13px;">Week ' + weekKey + ' &middot; ' + picks.length + ' players</div>';
+  let html = '<div style="margin-bottom:14px;color:var(--muted);font-size:13px;">Week ' + weekKey + ' &middot; ' + picks.length + ' players &middot; sorted by wins</div>';
 
   if (isNewFmt) {
-    // Pick-em format: each player has an array of picks
-    // Build rows with per-player record, sorted by wins desc
     const rows = picks.map(function(p) {
       var rec = { W: 0, L: 0, T: 0, live: 0, pending: 0 };
-      var cells = (p.picks || []).map(function(teamRaw) {
-        var abbr = normalizeTeamAbbr(teamRaw);
-        var r = getPickAllResult(abbr, scoresMap);
+      (p.picks || []).forEach(function(teamRaw) {
+        var r = getPickAllResult(normalizeTeamAbbr(teamRaw), scoresMap);
         rec[r] = (rec[r] || 0) + 1;
-        return { abbr: abbr, result: r };
       });
-      return { name: p.name, cells: cells, rec: rec };
+      return { name: p.name, teamPicks: p.picks, tiebreaker: p.tiebreaker, rec: rec };
     }).sort(function(a, b) {
       if (b.rec.W !== a.rec.W) return b.rec.W - a.rec.W;
       return a.rec.L - b.rec.L;
     });
 
-    html += '<div class="pa-table-wrap"><table class="pa-table">';
-    html += '<thead><tr><th>#</th><th>Player</th><th>W</th><th>L</th><th>Picks</th></tr></thead><tbody>';
-
-    rows.forEach(function(row, idx) {
-      var chips = row.cells.map(function(c) {
-        var cls = c.result === 'W' ? 'pa-win' : c.result === 'L' ? 'pa-loss' : c.result === 'T' ? 'pa-tie' : c.result === 'live' ? 'pa-live' : 'pa-pending';
-        var slug = c.abbr.toLowerCase();
-        var logo = 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/' + slug + '.png&w=20&h=20&transparent=true';
-        return '<span class="pa-result ' + cls + '" title="' + escPickAll(c.abbr) + '" style="padding:3px 8px;font-size:13px;margin:2px 3px;white-space:nowrap;">'
-          + '<img src="' + logo + '" style="width:20px;height:20px;vertical-align:middle;margin-right:4px;" onerror="this.style.display=\'none\'">'
-          + escPickAll(c.abbr) + '</span>';
+    html += rows.map(function(row, idx) {
+      var isOurs   = row.name === PA_OUR_TEAM;
+      var blockCls = isOurs ? 'pa-player-block pa-our-block' : 'pa-player-block';
+      var star     = isOurs ? ' ★' : '';
+      var tbHtml   = row.tiebreaker != null ? '<span class="pa-player-tb">TB: ' + row.tiebreaker + '</span>' : '';
+      var rec      = row.rec;
+      var recordHtml = '<span class="pa-player-record">'
+        + '<span style="color:#4caf7d;font-weight:700;">' + rec.W + 'W</span> '
+        + '<span style="color:#e05c5c;font-weight:700;">' + rec.L + 'L</span>'
+        + (rec.T    ? ' <span style="color:var(--muted);">'   + rec.T    + 'T</span>'    : '')
+        + (rec.live ? ' <span style="color:var(--accent);">'  + rec.live + ' live</span>'  : '')
+        + '</span>';
+      var cards = (row.teamPicks || []).map(function(t) {
+        return _buildPickCard(normalizeTeamAbbr(t), scoresMap);
       }).join('');
+      return '<div class="' + blockCls + '">'
+        + '<div class="pa-player-header">'
+        + '<span class="pa-player-name">' + (idx + 1) + '. ' + escPickAll(row.name) + escPickAll(star) + '</span>'
+        + recordHtml + tbHtml
+        + '</div>'
+        + '<div class="pa-player-cards">' + cards + '</div>'
+        + '</div>';
+    }).join('');
 
-      var isOurs = row.name === PA_OUR_TEAM;
-      var rowClass = (isOurs ? 'pa-our-team ' : '') + (row.rec.W > row.rec.L ? 'pa-row-win' : row.rec.L > row.rec.W ? 'pa-row-loss' : '');
-      html += '<tr class="' + rowClass + '">'
-        + '<td class="pa-rank">' + (idx + 1) + '</td>'
-        + '<td class="pa-name">' + escPickAll(row.name) + '</td>'
-        + '<td class="pa-wins">' + row.rec.W + '</td>'
-        + '<td class="pa-losses">' + row.rec.L + '</td>'
-        + '<td style="line-height:1.8;">' + chips + '</td>'
-        + '</tr>';
-    });
-
-    html += '</tbody></table></div>';
   } else {
-    // Legacy format: one pick per player
-    html += '<div class="pa-table-wrap"><table class="pa-table">';
-    html += '<thead><tr><th>#</th><th>Player</th><th>Pick</th><th>Result</th></tr></thead><tbody>';
-
-    picks.forEach(function(p, idx) {
-      var abbr = normalizeTeamAbbr(p.team);
-      var result = getPickAllResult(abbr, scoresMap);
-      var game = scoresMap && scoresMap[abbr];
-      var slug = abbr.toLowerCase();
-      var logoSrc = 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/' + slug + '.png&w=24&h=24&transparent=true';
-
-      var isOurs = p.name === PA_OUR_TEAM;
-      var resultHtml, rowClass = isOurs ? 'pa-our-team ' : '';
-      if (result === 'W') {
-        resultHtml = '<span class="pa-result pa-win">W</span>';
-        rowClass += 'pa-row-win';
-      } else if (result === 'L') {
-        resultHtml = '<span class="pa-result pa-loss">L</span>';
-        rowClass += 'pa-row-loss';
-      } else if (result === 'T') {
-        resultHtml = '<span class="pa-result pa-tie">T</span>';
-      } else if (result === 'live' && game) {
-        var isHome = game.homeAbbr === abbr;
-        var myScore  = isHome ? game.homeScore : game.awayScore;
-        var oppScore = isHome ? game.awayScore : game.homeScore;
-        resultHtml = '<span class="pa-result pa-live">' + myScore + '-' + oppScore + ' Q' + game.period + '</span>';
-        rowClass += myScore >= oppScore ? 'pa-row-leading' : 'pa-row-trailing';
-      } else {
-        resultHtml = '<span class="pa-result pa-pending">&mdash;</span>';
-      }
-
-      html += '<tr class="' + rowClass + '">'
-        + '<td class="pa-rank">' + (idx + 1) + '</td>'
-        + '<td class="pa-name">' + escPickAll(p.name) + '</td>'
-        + '<td class="pa-team"><img class="pa-team-logo" src="' + logoSrc + '" onerror="this.style.display=\'none\'" alt=""> <span>' + escPickAll(abbr) + '</span></td>'
-        + '<td>' + resultHtml + '</td>'
-        + '</tr>';
-    });
-
-    html += '</tbody></table></div>';
+    // Legacy: one pick per player
+    html += picks.map(function(p, idx) {
+      var abbr     = normalizeTeamAbbr(p.team);
+      var isOurs   = p.name === PA_OUR_TEAM;
+      var blockCls = isOurs ? 'pa-player-block pa-our-block' : 'pa-player-block';
+      var star     = isOurs ? ' ★' : '';
+      return '<div class="' + blockCls + '">'
+        + '<div class="pa-player-header"><span class="pa-player-name">' + (idx + 1) + '. ' + escPickAll(p.name) + escPickAll(star) + '</span></div>'
+        + '<div class="pa-player-cards">' + _buildPickCard(abbr, scoresMap) + '</div>'
+        + '</div>';
+    }).join('');
   }
 
   container.innerHTML = html;
@@ -4452,7 +4461,6 @@ async function renderOurTeamSpotlight() {
   const timestamp = document.getElementById('paOurTeamTimestamp');
   if (!container) return;
 
-  // Use currentActiveWeek (same as main Pick 5 site) or fall back to latest imported week
   const weekKey = currentActiveWeek
     ? String(currentActiveWeek)
     : Object.keys(pickAllData).sort(function(a,b){ return (parseInt(b)||0)-(parseInt(a)||0); })[0];
@@ -4464,11 +4472,9 @@ async function renderOurTeamSpotlight() {
     return;
   }
 
-  // Refresh scores for this week (force fresh on each auto-tick)
   pickAllScores[weekKey] = await fetchESPNScoresMap(weekKey);
   const sm = pickAllScores[weekKey] || {};
 
-  // Find our team's entry
   const weekData = pickAllData[weekKey];
   const ourEntry = (weekData.picks || []).find(function(p) { return p.name === PA_OUR_TEAM; });
 
@@ -4477,50 +4483,19 @@ async function renderOurTeamSpotlight() {
     return;
   }
 
-  var hasLive = false;
-  var html = ourEntry.picks.map(function(teamRaw) {
-    var abbr   = normalizeTeamAbbr(teamRaw);
-    var result = getPickAllResult(abbr, sm);
-    var game   = sm[abbr];
-    var slug   = abbr.toLowerCase();
-    var logo   = 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/' + slug + '.png&w=80&h=80&transparent=true';
+  const tbHtml = ourEntry.tiebreaker != null
+    ? '<span class="pa-player-tb" style="margin-left:6px;">TB: ' + ourEntry.tiebreaker + '</span>' : '';
 
-    var cardCls = '', badgeHtml = '', scoreHtml = '';
-    if (result === 'W') {
-      cardCls   = 'ps-win';
-      badgeHtml = '<span class="pa-spot-badge pa-win">W</span>';
-    } else if (result === 'L') {
-      cardCls   = 'ps-loss';
-      badgeHtml = '<span class="pa-spot-badge pa-loss">L</span>';
-    } else if (result === 'T') {
-      badgeHtml = '<span class="pa-spot-badge pa-tie">T</span>';
-    } else if (result === 'live' && game) {
-      hasLive   = true;
-      cardCls   = 'ps-live';
-      var isHome = game.homeAbbr === abbr;
-      var mySc   = isHome ? game.homeScore : game.awayScore;
-      var oppSc  = isHome ? game.awayScore : game.homeScore;
-      var ahead  = mySc >= oppSc;
-      badgeHtml  = '<span class="pa-spot-badge ' + (ahead ? 'pa-win' : 'pa-loss') + '" style="animation:pa-pulse 1.2s infinite;">LIVE</span>';
-      scoreHtml  = '<span class="pa-spot-score">' + mySc + '–' + oppSc + '</span>';
-    } else {
-      badgeHtml = '<span class="pa-spot-badge" style="color:var(--muted);">—</span>';
-    }
-
-    return '<div class="pa-spot-card ' + cardCls + '">'
-      + '<img src="' + logo + '" onerror="this.style.display=\'none\'" alt="' + escPickAll(abbr) + '">'
-      + '<span class="pa-spot-abbr">' + escPickAll(abbr) + '</span>'
-      + badgeHtml
-      + scoreHtml
-      + '</div>';
+  container.innerHTML = ourEntry.picks.map(function(t) {
+    return _buildPickCard(normalizeTeamAbbr(t), sm);
   }).join('');
 
-  container.innerHTML = html;
+  if (label) label.innerHTML = 'Week ' + weekKey + tbHtml;
   if (timestamp) timestamp.textContent = 'Updated ' + new Date().toLocaleTimeString();
 
-  // Return whether any game is still live/pending so caller knows whether to keep polling
-  return hasLive || ourEntry.picks.some(function(t) {
-    return getPickAllResult(normalizeTeamAbbr(t), sm) === 'pending';
+  return ourEntry.picks.some(function(t) {
+    var r = getPickAllResult(normalizeTeamAbbr(t), sm);
+    return r === 'live' || r === 'pending';
   });
 }
 
@@ -4809,8 +4784,12 @@ function parsePooltrackerHTML(html) {
         .map(function(span) { return normalizeTeamAbbr(span.getAttribute('data-mypick') || ''); })
         .filter(Boolean);
 
+      // Tiebreaker is the last td.data_row with inline style="text-align:center;" (no span.mypick)
+      const tbTd = row.querySelector('td.data_row[style*="text-align"]');
+      const tiebreaker = tbTd ? (parseInt(tbTd.textContent.trim()) || null) : null;
+
       if (picks.length > 0) {
-        players.push({ name: name, picks: picks });
+        players.push({ name: name, picks: picks, tiebreaker: tiebreaker });
       }
     });
     if (players.length > 0) return players;
@@ -9895,39 +9874,6 @@ document.addEventListener('keydown', function(e) {
           <button onclick="autoImportPickAllOneWeek()" style="font-size:13px;padding:5px 12px;background:var(--hover);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;font-weight:600;">Fetch</button>
         </div>
         <div class="admin-status" id="pickAllImportStatus" style="margin-top:10px;"></div>
-
-        <!-- ── Manual paste fallback ── -->
-        <details style="margin-top:18px;">
-          <summary style="cursor:pointer;font-size:13px;color:var(--muted);user-select:none;">📋 Manual paste (fallback if auto-fetch fails)</summary>
-          <div style="margin-top:12px;">
-            <div class="admin-card" style="background:var(--hover);margin-bottom:0;">
-              <div class="admin-controls">
-                <div class="field" style="margin-bottom:10px;">
-                  <label>Week</label>
-                  <select id="pickAllImportWeek" style="width:100%;max-width:200px;">
-                    <option value="1">Week 1</option><option value="2">Week 2</option>
-                    <option value="3">Week 3</option><option value="4">Week 4</option>
-                    <option value="5">Week 5</option><option value="6">Week 6</option>
-                    <option value="7">Week 7</option><option value="8">Week 8</option>
-                    <option value="9">Week 9</option><option value="10">Week 10</option>
-                    <option value="11">Week 11</option><option value="12">Week 12</option>
-                    <option value="13">Week 13</option><option value="14">Week 14</option>
-                    <option value="15">Week 15</option><option value="16">Week 16</option>
-                    <option value="17">Week 17</option><option value="18">Week 18</option>
-                  </select>
-                </div>
-                <div class="field" style="margin-bottom:10px;">
-                  <label>Paste picks (<code style="font-size:11px;color:var(--accent);">Player Name, TEAM</code> per line or tab-separated)</label>
-                  <textarea id="pickAllImportText" rows="7" placeholder="Jay, KC&#10;Will, SF&#10;Mike, DAL&#10;Sarah, BUF&#10;..."></textarea>
-                </div>
-                <div style="display:flex;gap:10px;flex-wrap:wrap;">
-                  <button class="btn-submit" style="flex:1;min-width:140px;" onclick="importPickAllData()">📥 Import Week</button>
-                  <button class="btn-submit" style="flex:1;min-width:140px;background:rgba(100,100,200,0.3);border:1px solid rgba(100,100,200,0.5);" onclick="importPickAllMultiWeek()">📋 Import Full Season CSV</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </details>
 
         <!-- Delete week controls -->
         <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
