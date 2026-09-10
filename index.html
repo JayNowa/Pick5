@@ -9911,6 +9911,38 @@ document.addEventListener('keydown', function(e) {
       <div class="page-divider"></div>
     </div>
 
+    <!-- Our Team Spotlight -->
+    <div class="admin-card" id="paOurTeamCard">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+        <div class="admin-card-title" style="margin:0;">⭐ Hakuna Mailata — <span id="paOurTeamWeekLabel">Week —</span></div>
+        <div style="font-size:12px;color:var(--muted);" id="paOurTeamTimestamp"></div>
+      </div>
+      <div id="paOurTeamContainer" class="pa-spot-grid">
+        <div style="color:var(--muted);font-size:13px;padding:16px 0;">Fetching picks…</div>
+      </div>
+    </div>
+
+    <!-- Week Picks & Results -->
+    <div class="admin-card">
+      <div class="admin-card-title">📊 Week Picks &amp; Results</div>
+      <div class="pa-week-tabs" id="pickAllWeekTabs"></div>
+      <div style="margin-bottom:14px;">
+        <button onclick="refreshPickAllScores()" style="font-size:13px;padding:6px 14px;background:var(--hover);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-weight:600;">🔄 Refresh Scores</button>
+        <span id="pickAllScoreTimestamp" style="font-size:12px;color:var(--muted);margin-left:10px;"></span>
+      </div>
+      <div id="pickAllTableContainer">
+        <div style="color:var(--muted);padding:20px 0;">Select a week to view picks.</div>
+      </div>
+    </div>
+
+    <!-- Season Standings -->
+    <div class="admin-card">
+      <div class="admin-card-title">🏆 Season Standings</div>
+      <div id="pickAllStandingsContainer">
+        <div style="color:var(--muted);padding:20px 0;">Import picks to see standings.</div>
+      </div>
+    </div>
+
     <!-- Import Section -->
     <div class="admin-card" id="pickAllImportCard">
       <div class="admin-card-title" onclick="togglePickAllImport()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
@@ -9955,38 +9987,6 @@ document.addEventListener('keydown', function(e) {
           </select>
           <button onclick="deletePickAllWeek()" style="font-size:13px;padding:5px 12px;background:rgba(224,92,92,0.2);border:1px solid rgba(224,92,92,0.4);border-radius:5px;color:#e05c5c;cursor:pointer;font-weight:600;">Delete</button>
         </div>
-      </div>
-    </div>
-
-    <!-- Our Team Spotlight -->
-    <div class="admin-card" id="paOurTeamCard">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
-        <div class="admin-card-title" style="margin:0;">⭐ Hakuna Mailata — <span id="paOurTeamWeekLabel">Week —</span></div>
-        <div style="font-size:12px;color:var(--muted);" id="paOurTeamTimestamp"></div>
-      </div>
-      <div id="paOurTeamContainer" class="pa-spot-grid">
-        <div style="color:var(--muted);font-size:13px;padding:16px 0;">Fetching picks…</div>
-      </div>
-    </div>
-
-    <!-- Week Picks & Results -->
-    <div class="admin-card">
-      <div class="admin-card-title">📊 Week Picks &amp; Results</div>
-      <div class="pa-week-tabs" id="pickAllWeekTabs"></div>
-      <div style="margin-bottom:14px;">
-        <button onclick="refreshPickAllScores()" style="font-size:13px;padding:6px 14px;background:var(--hover);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-weight:600;">🔄 Refresh Scores</button>
-        <span id="pickAllScoreTimestamp" style="font-size:12px;color:var(--muted);margin-left:10px;"></span>
-      </div>
-      <div id="pickAllTableContainer">
-        <div style="color:var(--muted);padding:20px 0;">Select a week to view picks.</div>
-      </div>
-    </div>
-
-    <!-- Season Standings -->
-    <div class="admin-card">
-      <div class="admin-card-title">🏆 Season Standings</div>
-      <div id="pickAllStandingsContainer">
-        <div style="color:var(--muted);padding:20px 0;">Import picks to see standings.</div>
       </div>
     </div>
   </div>
