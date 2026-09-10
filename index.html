@@ -1543,6 +1543,9 @@
   }
   .pa-standings-table td:nth-child(n+3) { text-align: center; }
   .pa-standings-table th:nth-child(n+3) { text-align: center; }
+  .pa-our-team td { background: rgba(200,169,74,0.12) !important; }
+  .pa-our-team .pa-name { color: var(--accent); font-weight: 800; }
+  .pa-our-team td:first-child::after { content: ' ★'; color: var(--accent); }
   /* admin-current-week below (keep original order) */
   .admin-current-week {
     font-size: 15px;
@@ -4182,6 +4185,8 @@ async function showPickAllWeek(weekKey) {
   await renderPickAllStandings();
 }
 
+const PA_OUR_TEAM = 'Hakuna Mailata';
+
 // NFL team full name → ESPN abbreviation lookup
 function pickAllTeamAliases() {
   return {
@@ -4282,7 +4287,8 @@ function renderPickAllTable(weekKey, picks, scoresMap) {
           + escPickAll(c.abbr) + '</span>';
       }).join('');
 
-      var rowClass = row.rec.W > row.rec.L ? 'pa-row-win' : row.rec.L > row.rec.W ? 'pa-row-loss' : '';
+      var isOurs = row.name === PA_OUR_TEAM;
+      var rowClass = (isOurs ? 'pa-our-team ' : '') + (row.rec.W > row.rec.L ? 'pa-row-win' : row.rec.L > row.rec.W ? 'pa-row-loss' : '');
       html += '<tr class="' + rowClass + '">'
         + '<td class="pa-rank">' + (idx + 1) + '</td>'
         + '<td class="pa-name">' + escPickAll(row.name) + '</td>'
@@ -4305,13 +4311,14 @@ function renderPickAllTable(weekKey, picks, scoresMap) {
       var slug = abbr.toLowerCase();
       var logoSrc = 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/' + slug + '.png&w=24&h=24&transparent=true';
 
-      var resultHtml, rowClass = '';
+      var isOurs = p.name === PA_OUR_TEAM;
+      var resultHtml, rowClass = isOurs ? 'pa-our-team ' : '';
       if (result === 'W') {
         resultHtml = '<span class="pa-result pa-win">W</span>';
-        rowClass = 'pa-row-win';
+        rowClass += 'pa-row-win';
       } else if (result === 'L') {
         resultHtml = '<span class="pa-result pa-loss">L</span>';
-        rowClass = 'pa-row-loss';
+        rowClass += 'pa-row-loss';
       } else if (result === 'T') {
         resultHtml = '<span class="pa-result pa-tie">T</span>';
       } else if (result === 'live' && game) {
@@ -4319,7 +4326,7 @@ function renderPickAllTable(weekKey, picks, scoresMap) {
         var myScore  = isHome ? game.homeScore : game.awayScore;
         var oppScore = isHome ? game.awayScore : game.homeScore;
         resultHtml = '<span class="pa-result pa-live">' + myScore + '-' + oppScore + ' Q' + game.period + '</span>';
-        rowClass = myScore >= oppScore ? 'pa-row-leading' : 'pa-row-trailing';
+        rowClass += myScore >= oppScore ? 'pa-row-leading' : 'pa-row-trailing';
       } else {
         resultHtml = '<span class="pa-result pa-pending">&mdash;</span>';
       }
@@ -4395,7 +4402,8 @@ async function renderPickAllStandings() {
     var name = entry[0], rec = entry[1];
     var rank = idx + 1;
     var medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
-    html += '<tr>'
+    var trClass = name === PA_OUR_TEAM ? ' class="pa-our-team"' : '';
+    html += '<tr' + trClass + '>'
       + '<td class="pa-rank">' + medal + '</td>'
       + '<td class="pa-name">' + escPickAll(name) + '</td>'
       + '<td class="pa-wins">' + rec.W + '</td>'
