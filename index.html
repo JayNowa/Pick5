@@ -1560,9 +1560,12 @@
   .pa-player-block { margin-bottom: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
   .pa-player-block:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
   .pa-player-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
-  .pa-player-name { font-size: 15px; font-weight: 700; }
-  .pa-player-record { font-size: 13px; }
-  .pa-player-tb { font-size: 12px; color: var(--muted); background: var(--hover); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border); }
+  .pa-player-name { font-size: 16px; font-weight: 700; }
+  .pa-player-record { font-size: 16px; font-weight: 700; }
+  .pa-player-tb { font-size: 13px; color: var(--muted); background: var(--hover); padding: 3px 9px; border-radius: 4px; border: 1px solid var(--border); }
+  .pa-standings-big { font-size: 16px; }
+  .pa-standings-big th { font-size: 13px; padding: 10px 12px; }
+  .pa-standings-big td { padding: 12px 12px; }
   .pa-player-cards { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; -webkit-overflow-scrolling: touch; }
   .pa-player-block.pa-our-block { background: rgba(200,169,74,0.05); border-radius: 10px; padding: 12px 14px; border: 1px solid rgba(200,169,74,0.3); margin-bottom: 18px; }
   .pa-player-block.pa-our-block .pa-player-name { color: var(--accent); font-weight: 800; }
@@ -3788,7 +3791,11 @@ function buildESPNScoreboardURL(weekValue, year) {
 // Build a live scores map from ESPN scoreboard JSON
 function buildESPNScoresMap(events) {
   const map = {};
-  (events || []).forEach(function(event) {
+  // Sort by game date so __lastGame__ is always the chronologically last game
+  const sorted = (events || []).slice().sort(function(a, b) {
+    return new Date(a.date) - new Date(b.date);
+  });
+  sorted.forEach(function(event) {
     const comp      = event.competitions[0];
     const status    = event.status;
     const stateType = status.type.state; // pre, in, post
@@ -3809,6 +3816,26 @@ function buildESPNScoresMap(events) {
     if (homeAbbr) map[homeAbbr] = gameData;
     if (awayAbbr) map[awayAbbr] = gameData;
   });
+  // Store the last (chronologically latest) game's total for tiebreaker calculation
+  const lastEvent = sorted[sorted.length - 1];
+  if (lastEvent) {
+    const comp = lastEvent.competitions[0];
+    const status = lastEvent.status;
+    const isFinal = status.type.state === 'post';
+    const isLive  = status.type.state === 'in';
+    const home = comp.competitors.find(function(c) { return c.homeAway === 'home'; });
+    const away = comp.competitors.find(function(c) { return c.homeAway === 'away'; });
+    const hSc = parseFloat((home && home.score) || 0);
+    const aSc = parseFloat((away && away.score) || 0);
+    map['__lastGame__'] = {
+      isFinal: isFinal,
+      isLive:  isLive,
+      total:   isFinal ? hSc + aSc : null,
+      homeAbbr: home && home.team ? home.team.abbreviation.toUpperCase() : '',
+      awayAbbr: away && away.team ? away.team.abbreviation.toUpperCase() : '',
+      homeScore: hSc, awayScore: aSc,
+    };
+  }
   return map;
 }
 
@@ -4394,31 +4421,45 @@ async function renderPickAllStandings() {
     }
   }
 
-  // Accumulate per-player records
+  // Accumulate per-player records + tiebreaker diffs
   var playerMap = {};
   allWeeks.forEach(function(wk) {
     var weekData = pickAllData[wk];
     if (!weekData || !weekData.picks) return;
     var sm = pickAllScores[wk] || {};
+    var lastGame = sm['__lastGame__'];
+    var actualTotal = (lastGame && lastGame.isFinal && lastGame.total != null) ? lastGame.total : null;
+
     weekData.picks.forEach(function(p) {
-      if (!playerMap[p.name]) playerMap[p.name] = { W: 0, L: 0, T: 0, live: 0, pending: 0 };
-      // Support both new format (p.picks array) and legacy (p.team string)
+      if (!playerMap[p.name]) playerMap[p.name] = { W: 0, L: 0, T: 0, live: 0, pending: 0, tbDiff: 0, tbWeeks: 0 };
+      var rec = playerMap[p.name];
+
+      // W/L counting — support both new array format and legacy single-team
       var teams = Array.isArray(p.picks) ? p.picks : (p.team ? [p.team] : []);
       teams.forEach(function(team) {
         var r = getPickAllResult(normalizeTeamAbbr(team), sm);
-        if (r === 'W') playerMap[p.name].W++;
-        else if (r === 'L') playerMap[p.name].L++;
-        else if (r === 'T') playerMap[p.name].T++;
-        else if (r === 'live') playerMap[p.name].live++;
-        else playerMap[p.name].pending++;
+        if (r === 'W') rec.W++;
+        else if (r === 'L') rec.L++;
+        else if (r === 'T') rec.T++;
+        else if (r === 'live') rec.live++;
+        else rec.pending++;
       });
+
+      // Tiebreaker diff: |player guess − actual last-game total|
+      if (actualTotal != null && p.tiebreaker != null) {
+        rec.tbDiff += Math.abs(p.tiebreaker - actualTotal);
+        rec.tbWeeks++;
+      }
     });
   });
 
   var players = Object.entries(playerMap).sort(function(a, b) {
     var ar = a[1], br = b[1];
     if (br.W !== ar.W) return br.W - ar.W;
-    return ar.L - br.L;
+    if (ar.L !== br.L) return ar.L - br.L;
+    // Tiebreak by TB accuracy (lower diff = better)
+    if (ar.tbWeeks > 0 && br.tbWeeks > 0) return ar.tbDiff - br.tbDiff;
+    return 0;
   });
 
   if (players.length === 0) {
@@ -4426,22 +4467,23 @@ async function renderPickAllStandings() {
     return;
   }
 
-  var html = '<div class="pa-table-wrap"><table class="pa-table pa-standings-table">'
-    + '<thead><tr><th>#</th><th>Player</th><th>W</th><th>L</th><th>T</th><th>🔴 Live</th><th>⏳</th></tr></thead><tbody>';
+  var html = '<div class="pa-table-wrap"><table class="pa-table pa-standings-table pa-standings-big">'
+    + '<thead><tr><th>#</th><th>Player</th><th>W</th><th>L</th><th>TB ±</th></tr></thead><tbody>';
 
   players.forEach(function(entry, idx) {
     var name = entry[0], rec = entry[1];
     var rank = idx + 1;
     var medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
     var trClass = name === PA_OUR_TEAM ? ' class="pa-our-team"' : '';
+    var tbCell = rec.tbWeeks > 0
+      ? '<span style="font-size:13px;color:var(--muted);">±' + rec.tbDiff + '</span>'
+      : '<span style="color:var(--muted);font-size:12px;">—</span>';
     html += '<tr' + trClass + '>'
       + '<td class="pa-rank">' + medal + '</td>'
       + '<td class="pa-name">' + escPickAll(name) + '</td>'
-      + '<td class="pa-wins">' + rec.W + '</td>'
-      + '<td class="pa-losses">' + rec.L + '</td>'
-      + '<td style="color:var(--muted);">' + (rec.T || 0) + '</td>'
-      + '<td style="color:var(--accent);">' + (rec.live || 0) + '</td>'
-      + '<td style="color:var(--muted);">' + (rec.pending || 0) + '</td>'
+      + '<td class="pa-wins" style="font-size:18px;">' + rec.W + '</td>'
+      + '<td class="pa-losses" style="font-size:18px;">' + rec.L + '</td>'
+      + '<td style="text-align:center;">' + tbCell + '</td>'
       + '</tr>';
   });
 
@@ -4784,9 +4826,16 @@ function parsePooltrackerHTML(html) {
         .map(function(span) { return normalizeTeamAbbr(span.getAttribute('data-mypick') || ''); })
         .filter(Boolean);
 
-      // Tiebreaker is the last td.data_row with inline style="text-align:center;" (no span.mypick)
-      const tbTd = row.querySelector('td.data_row[style*="text-align"]');
-      const tiebreaker = tbTd ? (parseInt(tbTd.textContent.trim()) || null) : null;
+      // Tiebreaker: first numeric-only TD that appears after the last span.mypick cell
+      const allTds = Array.from(row.querySelectorAll('td'));
+      const lastPickIdx = allTds.reduce(function(last, td, idx) {
+        return td.querySelector('span.mypick') ? idx : last;
+      }, -1);
+      var tiebreaker = null;
+      for (var ti = lastPickIdx + 1; ti < allTds.length; ti++) {
+        var tbText = allTds[ti].textContent.trim();
+        if (/^\d+$/.test(tbText)) { tiebreaker = parseInt(tbText, 10); break; }
+      }
 
       if (picks.length > 0) {
         players.push({ name: name, picks: picks, tiebreaker: tiebreaker });
