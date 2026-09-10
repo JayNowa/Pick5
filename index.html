@@ -1556,6 +1556,7 @@
   .pa-spot-card.ps-loss { border-color: rgba(224,92,92,0.5);  background: rgba(224,92,92,0.07); }
   .pa-spot-card.ps-live { border-color: rgba(200,169,74,0.6); background: rgba(200,169,74,0.07); animation: pa-pulse 1.5s infinite; }
   .pa-spot-score { font-size: 11px; color: var(--muted); }
+  .pa-spot-opp { font-size: 10px; color: var(--muted); letter-spacing: 0.01em; line-height: 1.1; }
   /* Player blocks in week-picks view */
   .pa-player-block { margin-bottom: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
   .pa-player-block:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
@@ -4313,7 +4314,16 @@ function _buildPickCard(abbr, scoresMap) {
   var game   = scoresMap && scoresMap[abbr];
   var slug   = abbr.toLowerCase();
   var logo   = 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/' + slug + '.png&w=80&h=80&transparent=true';
-  var cardCls = '', badgeHtml = '', scoreHtml = '';
+  var cardCls = '', badgeHtml = '', scoreHtml = '', oppHtml = '';
+
+  // Opponent line: "vs OPP" if home, "at OPP" if away
+  if (game) {
+    var isHomeTeam = game.homeAbbr === abbr;
+    var oppAbbr = isHomeTeam ? game.awayAbbr : game.homeAbbr;
+    if (oppAbbr) {
+      oppHtml = '<span class="pa-spot-opp">' + (isHomeTeam ? 'vs' : 'at') + ' ' + escPickAll(oppAbbr) + '</span>';
+    }
+  }
 
   if (result === 'W' || result === 'L' || result === 'T') {
     cardCls = result === 'W' ? 'ps-win' : result === 'L' ? 'ps-loss' : '';
@@ -4339,7 +4349,7 @@ function _buildPickCard(abbr, scoresMap) {
   return '<div class="pa-spot-card ' + cardCls + '">'
     + '<img src="' + logo + '" onerror="this.style.display=\'none\'" alt="' + escPickAll(abbr) + '">'
     + '<span class="pa-spot-abbr">' + escPickAll(abbr) + '</span>'
-    + badgeHtml + scoreHtml + '</div>';
+    + oppHtml + badgeHtml + scoreHtml + '</div>';
 }
 
 function renderPickAllTable(weekKey, picks, scoresMap) {
