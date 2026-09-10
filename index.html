@@ -9342,17 +9342,10 @@ async function fetchAllPicks() {
 }
 
 function getActualTiebreaker(scoresMap) {
-  // Find last final game — dedupe by game signature
-  const seen = new Set();
-  let lastGame = null;
-  Object.values(scoresMap).forEach(function(g) {
-    const key = (g.homeAbbr || '') + '_' + (g.awayAbbr || '');
-    if (g.isFinal && !isNaN(g.homeScore) && !isNaN(g.awayScore) && !seen.has(key)) {
-      seen.add(key);
-      lastGame = g;
-    }
-  });
-  if (!lastGame) return null;
+  // Use the chronologically last game of the week (set by buildESPNScoresMap).
+  // Return null if the game hasn't finished yet — callers treat null as "not available".
+  const lastGame = scoresMap && scoresMap['__lastGame__'];
+  if (!lastGame || !lastGame.isFinal) return null;
   return lastGame.homeScore + lastGame.awayScore;
 }
 
