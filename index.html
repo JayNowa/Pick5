@@ -409,7 +409,7 @@
   .container { width: 100%; max-width: 680px; }
 
   #loginPage  { display: flex; }
-  #selectorPage, #myPicksPage, #scoresPage, #adminPage, #weeklyPicksPage, #resultsPage, #leaderboardPage, #usersPage, #teamDataPage, #rulesRecordsPage, #trashTalkPage { display: none; }
+  #selectorPage, #myPicksPage, #scoresPage, #adminPage, #weeklyPicksPage, #resultsPage, #leaderboardPage, #usersPage, #teamDataPage, #rulesRecordsPage, #trashTalkPage, #pickAllPage { display: none; }
 
   .pending-req-row {
     display: flex;
@@ -1501,6 +1501,49 @@
     line-height: 1.6;
     margin-bottom: 20px;
   }
+  /* ── Pick All Page ── */
+  .pa-week-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .pa-week-tab {
+    padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--hover); color: var(--text); font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: background 0.15s, border-color 0.15s;
+  }
+  .pa-week-tab:hover { background: var(--accent); color: #000; border-color: var(--accent); }
+  .pa-week-tab.active { background: var(--accent); color: #000; border-color: var(--accent); }
+  .pa-table-wrap { overflow-x: auto; }
+  .pa-table {
+    width: 100%; border-collapse: collapse; font-size: 14px;
+  }
+  .pa-table th {
+    text-align: left; padding: 8px 10px; border-bottom: 2px solid var(--border);
+    color: var(--muted); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .pa-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .pa-table tr:last-child td { border-bottom: none; }
+  .pa-table tr.pa-row-win td { background: rgba(76,175,125,0.07); }
+  .pa-table tr.pa-row-loss td { background: rgba(224,92,92,0.07); }
+  .pa-table tr.pa-row-leading td { background: rgba(200,169,74,0.07); }
+  .pa-rank { color: var(--muted); font-size: 13px; width: 36px; }
+  .pa-name { font-weight: 600; }
+  .pa-team { display: flex; align-items: center; gap: 6px; }
+  .pa-team-logo { width: 24px; height: 24px; object-fit: contain; }
+  .pa-result { display: inline-block; padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 13px; }
+  .pa-win   { background: rgba(76,175,125,0.2);  color: #4caf7d; }
+  .pa-loss  { background: rgba(224,92,92,0.2);   color: #e05c5c; }
+  .pa-tie   { background: rgba(150,150,150,0.2); color: var(--muted); }
+  .pa-live  { background: rgba(200,169,74,0.2);  color: var(--accent); animation: pa-pulse 1.5s infinite; }
+  .pa-pending { color: var(--muted); }
+  @keyframes pa-pulse { 0%,100%{opacity:1} 50%{opacity:0.55} }
+  .pa-wins    { color: #4caf7d; font-weight: 700; }
+  .pa-losses  { color: #e05c5c; font-weight: 700; }
+  .pa-import-body textarea {
+    width: 100%; box-sizing: border-box; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); padding: 10px; font-size: 13px; font-family: monospace;
+    resize: vertical; min-height: 120px; margin-top: 4px;
+  }
+  .pa-standings-table td:nth-child(n+3) { text-align: center; }
+  .pa-standings-table th:nth-child(n+3) { text-align: center; }
+  /* admin-current-week below (keep original order) */
   .admin-current-week {
     font-size: 15px;
     color: var(--text);
@@ -3007,7 +3050,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.6.6</div>
+    <div class="version-badge">v1.7.0</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -3037,7 +3080,8 @@
       </div>
     </div>
     <button class="admin-corner-btn" id="adminBtn" onclick="showPage('admin')">⚙ Admin</button>
-    <button class="admin-corner-btn" onclick="showPage('users')">👥 Users</button>
+    <button class="admin-corner-btn" id="usersBtn" onclick="showPage('users')">👥 Users</button>
+    <button class="admin-corner-btn" id="pickAllBtn" onclick="showPage('pickAll')">🏆 Pick All</button>
   </div>
 </div>
 
@@ -3600,6 +3644,39 @@
   window.fbDeleteTrashTalk = async function(docId) {
     await deleteDoc(doc(db, "trashTalk", docId));
   };
+
+  // ── Pick All Pool ──
+  window.fbSavePickAllData = async function(weekKey, picks) {
+    const key = 'week_' + String(weekKey).replace(/[^a-zA-Z0-9]/g, '_');
+    await setDoc(doc(db, "pickAll", key), {
+      week: String(weekKey),
+      picks: picks,
+      importedAt: Date.now()
+    });
+  };
+
+  window.fbGetPickAllData = async function(weekKey) {
+    const key = 'week_' + String(weekKey).replace(/[^a-zA-Z0-9]/g, '_');
+    const snap = await getDoc(doc(db, "pickAll", key));
+    return snap.exists() ? snap.data() : null;
+  };
+
+  window.fbGetAllPickAllData = async function() {
+    try {
+      const snap = await getDocs(collection(db, "pickAll"));
+      const result = {};
+      snap.docs.forEach(function(d) {
+        const data = d.data();
+        result[data.week] = data;
+      });
+      return result;
+    } catch(e) { console.error('fbGetAllPickAllData:', e); return {}; }
+  };
+
+  window.fbDeletePickAllWeek = async function(weekKey) {
+    const key = 'week_' + String(weekKey).replace(/[^a-zA-Z0-9]/g, '_');
+    await deleteDoc(doc(db, "pickAll", key));
+  };
 </script>
 
 <script>
@@ -3852,8 +3929,10 @@ function afterLogin(email, teamName) {
     const isAdmin = email && ADMIN_EMAILS.includes(email.toLowerCase());
     const adminBtn = document.getElementById('adminBtn');
     if (adminBtn) adminBtn.style.display = isAdmin ? '' : 'none';
-    const usersBtn = utilBar.querySelector('.admin-corner-btn:not(#adminBtn)');
+    const usersBtn = document.getElementById('usersBtn');
     if (usersBtn) usersBtn.style.display = isAdmin ? '' : 'none';
+    const pickAllBtn = document.getElementById('pickAllBtn');
+    if (pickAllBtn) pickAllBtn.style.display = isAdmin ? '' : 'none';
   }
   // Wait for Firebase to be ready, then load everything
   (async function waitForFirebase() {
@@ -3893,6 +3972,7 @@ async function showPage(page) {
   document.getElementById('teamDataPage').style.display     = 'none';
   document.getElementById('rulesRecordsPage').style.display = 'none';
   document.getElementById('trashTalkPage').style.display    = 'none';
+  document.getElementById('pickAllPage').style.display      = 'none';
 
   document.getElementById('navSelector').classList.remove('active');
   document.getElementById('navMyPicks').classList.remove('active');
@@ -3981,6 +4061,11 @@ async function showPage(page) {
     const ttBadge = document.getElementById('ttNewBadge');
     if (ttBadge) ttBadge.style.display = 'none';
     loadTrashTalk();
+  } else if (page === 'pickAll') {
+    const p = document.getElementById('pickAllPage');
+    p.style.display = 'flex';
+    p.classList.remove('fade-in'); void p.offsetWidth; p.classList.add('fade-in');
+    loadPickAllPage();
   }
 }
 
@@ -4003,6 +4088,7 @@ function logout() {
   document.getElementById('teamDataPage').style.display    = 'none';
   document.getElementById('rulesRecordsPage').style.display = 'none';
   document.getElementById('trashTalkPage').style.display   = 'none';
+  document.getElementById('pickAllPage').style.display     = 'none';
   document.getElementById('navNbaScores').style.display    = 'none';
   document.getElementById('nbaTab').style.display = 'none';
   document.getElementById('mlbTab').style.display = 'none';
@@ -4018,6 +4104,428 @@ function logout() {
   document.getElementById('spreadsSection').style.display = 'none';
   selectedPicks = [];
   clearInterval(scoresRefreshTimer);
+}
+
+// ── Pick All Pool ──
+let pickAllData = {};   // { weekKey: { week, picks, importedAt } }
+let pickAllScores = {}; // { weekKey: scoresMap }
+let pickAllCurrentWeek = null;
+
+async function loadPickAllPage() {
+  const tblEl = document.getElementById('pickAllTableContainer');
+  const stdEl = document.getElementById('pickAllStandingsContainer');
+  if (tblEl) tblEl.innerHTML = '<div style="color:var(--muted);padding:20px 0;">Loading…</div>';
+  if (stdEl) stdEl.innerHTML = '<div style="color:var(--muted);padding:20px 0;">Loading…</div>';
+
+  pickAllData = (window.fbGetAllPickAllData ? await window.fbGetAllPickAllData() : {}) || {};
+
+  renderPickAllWeekTabs();
+  populatePickAllDeleteSelect();
+
+  const weeksWithData = Object.keys(pickAllData).sort(function(a, b) {
+    return (parseInt(b) || 0) - (parseInt(a) || 0);
+  });
+
+  if (weeksWithData.length > 0) {
+    const best = pickAllCurrentWeek && pickAllData[pickAllCurrentWeek]
+      ? pickAllCurrentWeek
+      : weeksWithData[0];
+    await showPickAllWeek(best);
+  } else {
+    if (tblEl) tblEl.innerHTML = '<div style="color:var(--muted);padding:20px 0;">No picks imported yet. Use the import section above.</div>';
+    await renderPickAllStandings();
+  }
+}
+
+function renderPickAllWeekTabs() {
+  const tabs = document.getElementById('pickAllWeekTabs');
+  if (!tabs) return;
+  const weeks = Object.keys(pickAllData).sort(function(a, b) { return (parseInt(a)||0) - (parseInt(b)||0); });
+  if (weeks.length === 0) { tabs.innerHTML = ''; return; }
+  tabs.innerHTML = weeks.map(function(w) {
+    const active = pickAllCurrentWeek === w ? ' active' : '';
+    return '<button class="pa-week-tab' + active + '" onclick="showPickAllWeek(\'' + w + '\')">Wk ' + w + '</button>';
+  }).join('');
+}
+
+function populatePickAllDeleteSelect() {
+  const sel = document.getElementById('pickAllDeleteWeek');
+  if (!sel) return;
+  const weeks = Object.keys(pickAllData).sort(function(a, b) { return (parseInt(a)||0) - (parseInt(b)||0); });
+  sel.innerHTML = '<option value="">— select —</option>' + weeks.map(function(w) {
+    return '<option value="' + w + '">Week ' + w + '</option>';
+  }).join('');
+}
+
+async function showPickAllWeek(weekKey) {
+  pickAllCurrentWeek = weekKey;
+  document.querySelectorAll('.pa-week-tab').forEach(function(btn) {
+    btn.classList.toggle('active', btn.textContent.trim() === 'Wk ' + weekKey);
+  });
+
+  const container = document.getElementById('pickAllTableContainer');
+  if (container) container.innerHTML = '<div style="color:var(--muted);padding:20px 0;">Loading scores…</div>';
+
+  const weekPicks = pickAllData[weekKey];
+  if (!weekPicks || !weekPicks.picks || weekPicks.picks.length === 0) {
+    if (container) container.innerHTML = '<div style="color:var(--muted);padding:20px 0;">No picks for Week ' + weekKey + '.</div>';
+    return;
+  }
+
+  if (!pickAllScores[weekKey]) {
+    pickAllScores[weekKey] = await fetchESPNScoresMap(weekKey);
+  }
+
+  renderPickAllTable(weekKey, weekPicks.picks, pickAllScores[weekKey]);
+  const ts = document.getElementById('pickAllScoreTimestamp');
+  if (ts) ts.textContent = 'Updated ' + new Date().toLocaleTimeString();
+  await renderPickAllStandings();
+}
+
+// NFL team full name → ESPN abbreviation lookup
+function pickAllTeamAliases() {
+  return {
+    'ARIZONA':            'ARI', 'CARDINALS':       'ARI', 'ARI': 'ARI',
+    'ATLANTA':            'ATL', 'FALCONS':         'ATL', 'ATL': 'ATL',
+    'BALTIMORE':          'BAL', 'RAVENS':          'BAL', 'BAL': 'BAL',
+    'BUFFALO':            'BUF', 'BILLS':           'BUF', 'BUF': 'BUF',
+    'CAROLINA':           'CAR', 'PANTHERS':        'CAR', 'CAR': 'CAR',
+    'CHICAGO':            'CHI', 'BEARS':           'CHI', 'CHI': 'CHI',
+    'CINCINNATI':         'CIN', 'BENGALS':         'CIN', 'CIN': 'CIN',
+    'CLEVELAND':          'CLE', 'BROWNS':          'CLE', 'CLE': 'CLE',
+    'DALLAS':             'DAL', 'COWBOYS':         'DAL', 'DAL': 'DAL',
+    'DENVER':             'DEN', 'BRONCOS':         'DEN', 'DEN': 'DEN',
+    'DETROIT':            'DET', 'LIONS':           'DET', 'DET': 'DET',
+    'GREEN BAY':          'GB',  'GREENBAY':        'GB',  'PACKERS': 'GB',  'GB': 'GB', 'GNB': 'GB',
+    'HOUSTON':            'HOU', 'TEXANS':          'HOU', 'HOU': 'HOU',
+    'INDIANAPOLIS':       'IND', 'COLTS':           'IND', 'IND': 'IND',
+    'JACKSONVILLE':       'JAX', 'JAGUARS':         'JAX', 'JAX': 'JAX', 'JAC': 'JAX',
+    'KANSAS CITY':        'KC',  'KANSASCITY':      'KC',  'CHIEFS': 'KC', 'KC': 'KC', 'KAN': 'KC',
+    'LAS VEGAS':          'LV',  'LASVEGAS':        'LV',  'RAIDERS': 'LV', 'LV': 'LV', 'OAK': 'LV',
+    'LA CHARGERS':        'LAC', 'LOS ANGELES CHARGERS': 'LAC', 'CHARGERS': 'LAC', 'LAC': 'LAC', 'SDG': 'LAC',
+    'LA RAMS':            'LAR', 'LOS ANGELES RAMS': 'LAR', 'RAMS': 'LAR', 'LAR': 'LAR', 'STL': 'LAR',
+    'MIAMI':              'MIA', 'DOLPHINS':        'MIA', 'MIA': 'MIA',
+    'MINNESOTA':          'MIN', 'VIKINGS':         'MIN', 'MIN': 'MIN',
+    'NEW ENGLAND':        'NE',  'NEWENGLAND':      'NE',  'PATRIOTS': 'NE', 'NE': 'NE', 'NWE': 'NE',
+    'NEW ORLEANS':        'NO',  'NEWORLEANS':      'NO',  'SAINTS': 'NO', 'NO': 'NO', 'NOR': 'NO',
+    'NEW YORK GIANTS':    'NYG', 'NY GIANTS':       'NYG', 'GIANTS': 'NYG', 'NYG': 'NYG',
+    'NEW YORK JETS':      'NYJ', 'NY JETS':         'NYJ', 'JETS': 'NYJ', 'NYJ': 'NYJ',
+    'PHILADELPHIA':       'PHI', 'EAGLES':          'PHI', 'PHI': 'PHI',
+    'PITTSBURGH':         'PIT', 'STEELERS':        'PIT', 'PIT': 'PIT',
+    'SEATTLE':            'SEA', 'SEAHAWKS':        'SEA', 'SEA': 'SEA',
+    'SAN FRANCISCO':      'SF',  'SANFRANCISCO':    'SF',  '49ERS': 'SF', 'SF': 'SF', 'SFO': 'SF',
+    'TAMPA BAY':          'TB',  'TAMPABAY':        'TB',  'BUCCANEERS': 'TB', 'BUCS': 'TB', 'TB': 'TB', 'TAM': 'TB',
+    'TENNESSEE':          'TEN', 'TITANS':          'TEN', 'TEN': 'TEN',
+    'WASHINGTON':         'WAS', 'COMMANDERS':      'WAS', 'WAS': 'WAS', 'WSH': 'WAS',
+  };
+}
+
+function normalizeTeamAbbr(raw) {
+  if (!raw) return '';
+  const upper = raw.trim().toUpperCase();
+  const map = pickAllTeamAliases();
+  return map[upper] || upper;
+}
+
+function getPickResult(team, scoresMap) {
+  if (!team || !scoresMap) return 'pending';
+  const abbr = normalizeTeamAbbr(team);
+  const game = scoresMap[abbr];
+  if (!game) return 'pending';
+  if (!game.started) return 'pending';
+  if (game.isLive) return 'live';
+  if (!game.isFinal) return 'pending';
+  const isHome = game.homeAbbr === abbr;
+  const myScore  = isHome ? game.homeScore : game.awayScore;
+  const oppScore = isHome ? game.awayScore : game.homeScore;
+  if (myScore > oppScore) return 'W';
+  if (myScore < oppScore) return 'L';
+  return 'T';
+}
+
+function renderPickAllTable(weekKey, picks, scoresMap) {
+  const container = document.getElementById('pickAllTableContainer');
+  if (!container) return;
+
+  let html = '<div style="margin-bottom:10px;color:var(--muted);font-size:13px;">Week ' + weekKey + ' &middot; ' + picks.length + ' players</div>';
+  html += '<div class="pa-table-wrap"><table class="pa-table">';
+  html += '<thead><tr><th>#</th><th>Player</th><th>Pick</th><th>Result</th></tr></thead><tbody>';
+
+  picks.forEach(function(p, idx) {
+    const abbr = normalizeTeamAbbr(p.team);
+    const result = getPickResult(p.team, scoresMap);
+    const game = scoresMap && scoresMap[abbr];
+    const slug = abbr.toLowerCase();
+    const logoSrc = 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/' + slug + '.png&w=24&h=24&transparent=true';
+
+    let resultHtml, rowClass = '';
+    if (result === 'W') {
+      resultHtml = '<span class="pa-result pa-win">W</span>';
+      rowClass = 'pa-row-win';
+    } else if (result === 'L') {
+      resultHtml = '<span class="pa-result pa-loss">L</span>';
+      rowClass = 'pa-row-loss';
+    } else if (result === 'T') {
+      resultHtml = '<span class="pa-result pa-tie">T</span>';
+    } else if (result === 'live' && game) {
+      const isHome = game.homeAbbr === abbr;
+      const myScore  = isHome ? game.homeScore : game.awayScore;
+      const oppScore = isHome ? game.awayScore : game.homeScore;
+      const ahead = myScore >= oppScore;
+      resultHtml = '<span class="pa-result pa-live">' + myScore + '-' + oppScore + ' Q' + game.period + '</span>';
+      rowClass = ahead ? 'pa-row-leading' : 'pa-row-trailing';
+    } else {
+      resultHtml = '<span class="pa-result pa-pending">&mdash;</span>';
+    }
+
+    html += '<tr class="' + rowClass + '">'
+      + '<td class="pa-rank">' + (idx + 1) + '</td>'
+      + '<td class="pa-name">' + escPickAll(p.name) + '</td>'
+      + '<td class="pa-team"><img class="pa-team-logo" src="' + logoSrc + '" onerror="this.style.display=\'none\'" alt=""> <span>' + escPickAll(abbr) + '</span></td>'
+      + '<td>' + resultHtml + '</td>'
+      + '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  container.innerHTML = html;
+}
+
+async function renderPickAllStandings() {
+  const container = document.getElementById('pickAllStandingsContainer');
+  if (!container) return;
+
+  const allWeeks = Object.keys(pickAllData).sort(function(a,b){ return (parseInt(a)||0)-(parseInt(b)||0); });
+  if (allWeeks.length === 0) {
+    container.innerHTML = '<div style="color:var(--muted);padding:20px 0;">No data yet.</div>';
+    return;
+  }
+
+  // Ensure scores loaded for all weeks with data
+  for (var i = 0; i < allWeeks.length; i++) {
+    var wk = allWeeks[i];
+    if (!pickAllScores[wk]) {
+      pickAllScores[wk] = await fetchESPNScoresMap(wk);
+    }
+  }
+
+  // Accumulate per-player records
+  var playerMap = {};
+  allWeeks.forEach(function(wk) {
+    var weekData = pickAllData[wk];
+    if (!weekData || !weekData.picks) return;
+    var sm = pickAllScores[wk] || {};
+    weekData.picks.forEach(function(p) {
+      if (!playerMap[p.name]) playerMap[p.name] = { W: 0, L: 0, T: 0, live: 0, pending: 0 };
+      var r = getPickResult(p.team, sm);
+      if (r === 'W') playerMap[p.name].W++;
+      else if (r === 'L') playerMap[p.name].L++;
+      else if (r === 'T') playerMap[p.name].T++;
+      else if (r === 'live') playerMap[p.name].live++;
+      else playerMap[p.name].pending++;
+    });
+  });
+
+  var players = Object.entries(playerMap).sort(function(a, b) {
+    var ar = a[1], br = b[1];
+    if (br.W !== ar.W) return br.W - ar.W;
+    return ar.L - br.L;
+  });
+
+  if (players.length === 0) {
+    container.innerHTML = '<div style="color:var(--muted);padding:20px 0;">No data yet.</div>';
+    return;
+  }
+
+  var html = '<div class="pa-table-wrap"><table class="pa-table pa-standings-table">'
+    + '<thead><tr><th>#</th><th>Player</th><th>W</th><th>L</th><th>T</th><th>🔴 Live</th><th>⏳</th></tr></thead><tbody>';
+
+  players.forEach(function(entry, idx) {
+    var name = entry[0], rec = entry[1];
+    var rank = idx + 1;
+    var medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+    html += '<tr>'
+      + '<td class="pa-rank">' + medal + '</td>'
+      + '<td class="pa-name">' + escPickAll(name) + '</td>'
+      + '<td class="pa-wins">' + rec.W + '</td>'
+      + '<td class="pa-losses">' + rec.L + '</td>'
+      + '<td style="color:var(--muted);">' + (rec.T || 0) + '</td>'
+      + '<td style="color:var(--accent);">' + (rec.live || 0) + '</td>'
+      + '<td style="color:var(--muted);">' + (rec.pending || 0) + '</td>'
+      + '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  container.innerHTML = html;
+}
+
+function escPickAll(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function importPickAllData() {
+  const statusEl = document.getElementById('pickAllImportStatus');
+  const weekEl   = document.getElementById('pickAllImportWeek');
+  const textEl   = document.getElementById('pickAllImportText');
+  if (!statusEl || !weekEl || !textEl) return;
+
+  const week = weekEl.value;
+  const text = (textEl.value || '').trim();
+  if (!week) { statusEl.textContent = '⚠ Please select a week.'; statusEl.style.color = 'var(--accent)'; return; }
+  if (!text) { statusEl.textContent = '⚠ Please paste pick data.'; statusEl.style.color = 'var(--accent)'; return; }
+
+  statusEl.textContent = 'Parsing…'; statusEl.style.color = 'var(--muted)';
+
+  const picks = parsePickAllSingleWeek(text);
+  if (picks.length === 0) {
+    statusEl.textContent = '⚠ No picks parsed. Use format: Player Name, TEAM (one per line)';
+    statusEl.style.color = '#e05c5c';
+    return;
+  }
+
+  try {
+    await window.fbSavePickAllData(week, picks);
+    pickAllData[week] = { week: week, picks: picks, importedAt: Date.now() };
+    pickAllScores[week] = null; // clear cached scores for fresh fetch
+    renderPickAllWeekTabs();
+    populatePickAllDeleteSelect();
+    await showPickAllWeek(week);
+    statusEl.textContent = '✓ Imported ' + picks.length + ' picks for Week ' + week;
+    statusEl.style.color = '#4caf7d';
+    textEl.value = '';
+  } catch(e) {
+    statusEl.textContent = '✗ Save error: ' + (e.message || e);
+    statusEl.style.color = '#e05c5c';
+  }
+}
+
+// Parse "Name, TEAM" per line (single-week import)
+function parsePickAllSingleWeek(text) {
+  const lines = text.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
+  const picks = [];
+  lines.forEach(function(line) {
+    // Skip obvious header lines
+    if (/^(name|player|rank|#)/i.test(line)) return;
+    var parts = line.indexOf('\t') >= 0 ? line.split('\t') : line.split(',');
+    parts = parts.map(function(p) { return p.trim(); });
+    if (parts.length < 2) return;
+    var name = parts[0], raw = parts[1];
+    if (!name || !raw) return;
+    picks.push({ name: name, team: normalizeTeamAbbr(raw) });
+  });
+  return picks;
+}
+
+// Parse full-season CSV from pooltracker.com
+// Expected header row: Name, Week 1, Week 2, ..., Week 18
+async function importPickAllMultiWeek() {
+  const statusEl = document.getElementById('pickAllImportStatus');
+  const textEl   = document.getElementById('pickAllImportText');
+  if (!statusEl || !textEl) return;
+
+  const text = (textEl.value || '').trim();
+  if (!text) { statusEl.textContent = '⚠ Please paste multi-week CSV data.'; statusEl.style.color = 'var(--accent)'; return; }
+
+  statusEl.textContent = 'Parsing multi-week CSV…'; statusEl.style.color = 'var(--muted)';
+
+  const lines = text.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
+  if (lines.length < 2) { statusEl.textContent = '⚠ Need at least a header row and one data row.'; statusEl.style.color = '#e05c5c'; return; }
+
+  // Parse header to find week columns
+  const headerRaw = lines[0];
+  const sep = headerRaw.indexOf('\t') >= 0 ? '\t' : ',';
+  const headers = headerRaw.split(sep).map(function(h) { return h.trim(); });
+
+  // Find "Name" column (first column typically)
+  var nameCol = 0;
+
+  // Find week columns: "Week 1", "Wk 1", "1", etc.
+  var weekCols = []; // [{weekKey, colIdx}]
+  headers.forEach(function(h, i) {
+    if (i === nameCol) return;
+    var m = h.match(/(?:week|wk)?\s*(\d+)/i);
+    if (m) weekCols.push({ weekKey: m[1], colIdx: i });
+  });
+
+  if (weekCols.length === 0) {
+    statusEl.textContent = '⚠ Could not find week columns in header. Expected "Week 1", "Week 2", etc.';
+    statusEl.style.color = '#e05c5c';
+    return;
+  }
+
+  // Build per-week picks
+  var byWeek = {};
+  weekCols.forEach(function(wc) { byWeek[wc.weekKey] = []; });
+
+  for (var i = 1; i < lines.length; i++) {
+    var row = lines[i].split(sep).map(function(c) { return c.trim(); });
+    var playerName = row[nameCol] || '';
+    if (!playerName) continue;
+    weekCols.forEach(function(wc) {
+      var raw = row[wc.colIdx] || '';
+      if (!raw || raw === '-' || raw === '' || raw.toLowerCase() === 'elim') return;
+      byWeek[wc.weekKey].push({ name: playerName, team: normalizeTeamAbbr(raw) });
+    });
+  }
+
+  // Save each week
+  var saved = 0;
+  try {
+    for (var wk in byWeek) {
+      if (byWeek[wk].length === 0) continue;
+      await window.fbSavePickAllData(wk, byWeek[wk]);
+      pickAllData[wk] = { week: wk, picks: byWeek[wk], importedAt: Date.now() };
+      pickAllScores[wk] = null;
+      saved++;
+    }
+    renderPickAllWeekTabs();
+    populatePickAllDeleteSelect();
+    const bestWeek = Object.keys(byWeek).sort(function(a,b){return (parseInt(b)||0)-(parseInt(a)||0);})[0];
+    if (bestWeek) await showPickAllWeek(bestWeek);
+    statusEl.textContent = '✓ Imported ' + saved + ' weeks of picks.';
+    statusEl.style.color = '#4caf7d';
+    textEl.value = '';
+  } catch(e) {
+    statusEl.textContent = '✗ Save error: ' + (e.message || e);
+    statusEl.style.color = '#e05c5c';
+  }
+}
+
+async function deletePickAllWeek() {
+  const sel = document.getElementById('pickAllDeleteWeek');
+  if (!sel || !sel.value) return;
+  const wk = sel.value;
+  if (!confirm('Delete all picks for Week ' + wk + '?')) return;
+  try {
+    await window.fbDeletePickAllWeek(wk);
+    delete pickAllData[wk];
+    delete pickAllScores[wk];
+    if (pickAllCurrentWeek === wk) pickAllCurrentWeek = null;
+    renderPickAllWeekTabs();
+    populatePickAllDeleteSelect();
+    const remaining = Object.keys(pickAllData);
+    if (remaining.length > 0) {
+      await showPickAllWeek(remaining.sort(function(a,b){return (parseInt(b)||0)-(parseInt(a)||0);})[0]);
+    } else {
+      const tbl = document.getElementById('pickAllTableContainer');
+      if (tbl) tbl.innerHTML = '<div style="color:var(--muted);padding:20px 0;">No picks imported yet.</div>';
+      await renderPickAllStandings();
+    }
+  } catch(e) { alert('Error deleting: ' + (e.message || e)); }
+}
+
+async function refreshPickAllScores() {
+  if (!pickAllCurrentWeek) return;
+  pickAllScores[pickAllCurrentWeek] = null;
+  await showPickAllWeek(pickAllCurrentWeek);
+}
+
+function togglePickAllImport() {
+  const body = document.getElementById('pickAllImportBody');
+  const toggle = document.getElementById('pickAllImportToggle');
+  if (!body || !toggle) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : '';
+  toggle.textContent = isOpen ? '▶' : '▼';
 }
 
 // ── Trash Talk ──
@@ -8950,6 +9458,93 @@ document.addEventListener('keydown', function(e) {
       <div id="mlbStandingsContent"></div>
     </div>
 
+  </div>
+</div>
+
+
+<!-- ═══ PICK ALL PAGE ═══ -->
+<div class="page with-nav" id="pickAllPage">
+  <div class="container" style="max-width:860px;">
+    <div class="page-header">
+      <div class="page-title">🏆 Pick All</div>
+      <div class="page-subtitle">Pool tracker standings &amp; live results</div>
+      <div class="page-divider"></div>
+    </div>
+
+    <!-- Import Section -->
+    <div class="admin-card" id="pickAllImportCard">
+      <div class="admin-card-title" onclick="togglePickAllImport()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+        <span>📥 Import Picks from pooltracker.com</span>
+        <span id="pickAllImportToggle" style="font-size:14px;color:var(--muted);">▼</span>
+      </div>
+      <div id="pickAllImportBody" class="pa-import-body">
+        <p class="admin-card-desc" style="margin-top:10px;">
+          Go to <strong>pooltracker.com</strong> → your pool → view the picks table for the week.
+          Copy and paste the player names and picks below in the format shown.
+          You can also paste a full multi-week export from pooltracker.com.
+        </p>
+
+        <!-- Single-week import -->
+        <div class="admin-card" style="background:var(--hover);margin-bottom:14px;">
+          <div style="font-weight:700;font-size:14px;margin-bottom:10px;color:var(--text);">Single Week Import</div>
+          <div class="admin-controls">
+            <div class="field" style="margin-bottom:10px;">
+              <label>Week</label>
+              <select id="pickAllImportWeek" style="width:100%;max-width:200px;">
+                <option value="1">Week 1</option><option value="2">Week 2</option>
+                <option value="3">Week 3</option><option value="4">Week 4</option>
+                <option value="5">Week 5</option><option value="6">Week 6</option>
+                <option value="7">Week 7</option><option value="8">Week 8</option>
+                <option value="9">Week 9</option><option value="10">Week 10</option>
+                <option value="11">Week 11</option><option value="12">Week 12</option>
+                <option value="13">Week 13</option><option value="14">Week 14</option>
+                <option value="15">Week 15</option><option value="16">Week 16</option>
+                <option value="17">Week 17</option><option value="18">Week 18</option>
+              </select>
+            </div>
+            <div class="field" style="margin-bottom:10px;">
+              <label>Paste picks (one per line: <code style="font-size:11px;color:var(--accent);">Player Name, TEAM</code> or tab-separated)</label>
+              <textarea id="pickAllImportText" rows="7" placeholder="Jay, KC&#10;Will, SF&#10;Mike, DAL&#10;Sarah, BUF&#10;..."></textarea>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <button class="btn-submit" style="flex:1;min-width:140px;" onclick="importPickAllData()">📥 Import Week</button>
+              <button class="btn-submit" style="flex:1;min-width:140px;background:rgba(100,100,200,0.3);border:1px solid rgba(100,100,200,0.5);" onclick="importPickAllMultiWeek()">📋 Import Full Season CSV</button>
+            </div>
+            <div class="admin-status" id="pickAllImportStatus" style="margin-top:8px;"></div>
+          </div>
+        </div>
+
+        <!-- Delete week controls -->
+        <div style="margin-top:4px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <label style="font-size:13px;color:var(--muted);">Delete week:</label>
+          <select id="pickAllDeleteWeek" style="font-size:13px;padding:4px 8px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+            <option value="">— select —</option>
+          </select>
+          <button onclick="deletePickAllWeek()" style="font-size:13px;padding:5px 12px;background:rgba(224,92,92,0.2);border:1px solid rgba(224,92,92,0.4);border-radius:5px;color:#e05c5c;cursor:pointer;font-weight:600;">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Week Picks & Results -->
+    <div class="admin-card">
+      <div class="admin-card-title">📊 Week Picks &amp; Results</div>
+      <div class="pa-week-tabs" id="pickAllWeekTabs"></div>
+      <div style="margin-bottom:14px;">
+        <button onclick="refreshPickAllScores()" style="font-size:13px;padding:6px 14px;background:var(--hover);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-weight:600;">🔄 Refresh Scores</button>
+        <span id="pickAllScoreTimestamp" style="font-size:12px;color:var(--muted);margin-left:10px;"></span>
+      </div>
+      <div id="pickAllTableContainer">
+        <div style="color:var(--muted);padding:20px 0;">Select a week to view picks.</div>
+      </div>
+    </div>
+
+    <!-- Season Standings -->
+    <div class="admin-card">
+      <div class="admin-card-title">🏆 Season Standings</div>
+      <div id="pickAllStandingsContainer">
+        <div style="color:var(--muted);padding:20px 0;">Import picks to see standings.</div>
+      </div>
+    </div>
   </div>
 </div>
 
