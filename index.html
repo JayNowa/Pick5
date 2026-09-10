@@ -4528,6 +4528,204 @@ function togglePickAllImport() {
   toggle.textContent = isOpen ? '▶' : '▼';
 }
 
+// ── Auto-import from pooltracker.com via /api/pooltracker proxy ──
+
+async function autoImportPickAllWeek() {
+  // Fetch the "current active week" or week 1 if unknown
+  const week = currentActiveWeek ? (parseInt(currentActiveWeek) || 1) : 1;
+  await _autoFetchWeeks([week]);
+}
+
+async function autoImportPickAllAllWeeks() {
+  const weeks = [];
+  for (let i = 1; i <= 18; i++) weeks.push(i);
+  await _autoFetchWeeks(weeks);
+}
+
+async function autoImportPickAllOneWeek() {
+  const sel = document.getElementById('pickAllAutoWeek');
+  const week = parseInt(sel ? sel.value : '1') || 1;
+  await _autoFetchWeeks([week]);
+}
+
+async function _autoFetchWeeks(weeks) {
+  const statusEl = document.getElementById('pickAllImportStatus');
+  let imported = 0, skipped = 0;
+
+  for (const week of weeks) {
+    if (statusEl) {
+      statusEl.textContent = 'Fetching Week ' + week + '…';
+      statusEl.style.color = 'var(--muted)';
+    }
+
+    try {
+      const resp = await fetch('/api/pooltracker?week=' + week);
+      if (!resp.ok) throw new Error('Proxy returned HTTP ' + resp.status);
+      const html = await resp.text();
+
+      const picks = parsePooltrackerHTML(html);
+
+      if (picks.length === 0) {
+        skipped++;
+        continue;
+      }
+
+      await window.fbSavePickAllData(String(week), picks);
+      pickAllData[String(week)] = { week: String(week), picks, importedAt: Date.now() };
+      pickAllScores[String(week)] = null;
+      imported++;
+
+      // Polite delay between requests when fetching many weeks
+      if (weeks.length > 1) await new Promise(r => setTimeout(r, 300));
+
+    } catch (e) {
+      if (statusEl) {
+        statusEl.textContent = '✗ Week ' + week + ' failed: ' + e.message
+          + (weeks.length > 1 ? ' — continuing…' : '');
+        statusEl.style.color = '#e05c5c';
+      }
+      if (weeks.length === 1) return;
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
+
+  renderPickAllWeekTabs();
+  populatePickAllDeleteSelect();
+
+  const latest = Object.keys(pickAllData).sort(function(a, b) {
+    return (parseInt(b) || 0) - (parseInt(a) || 0);
+  })[0];
+  if (latest) await showPickAllWeek(latest);
+
+  if (statusEl) {
+    if (imported === 0 && skipped > 0) {
+      statusEl.textContent = 'No picks found yet for those weeks (pool may not be set yet).';
+      statusEl.style.color = 'var(--muted)';
+    } else {
+      statusEl.textContent = '✓ Imported ' + imported + ' week' + (imported !== 1 ? 's' : '')
+        + (skipped > 0 ? ' (' + skipped + ' empty/not set)' : '');
+      statusEl.style.color = '#4caf7d';
+    }
+  }
+}
+
+// Parse pooltracker.com picks_matrix.asp HTML
+// Tries multiple strategies since we don't control the source HTML
+function parsePooltrackerHTML(html) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+
+  // Strategy 1: find a table whose cells look like NFL picks
+  const tables = Array.from(doc.querySelectorAll('table'));
+  for (const table of tables) {
+    const picks = _tryParsePickTable(table);
+    if (picks.length > 0) return picks;
+  }
+
+  // Strategy 2: look for any element with a class/id hinting at picks
+  const pickContainer = doc.querySelector('[class*="pick"], [class*="matrix"], [id*="pick"], [id*="matrix"]');
+  if (pickContainer) {
+    const subTable = pickContainer.querySelector('table');
+    if (subTable) {
+      const picks = _tryParsePickTable(subTable);
+      if (picks.length > 0) return picks;
+    }
+  }
+
+  return [];
+}
+
+const NFL_ABBRS = new Set([
+  'ARI','ATL','BAL','BUF','CAR','CHI','CIN','CLE','DAL','DEN','DET','GB',
+  'HOU','IND','JAX','KC','LAC','LAR','LV','MIA','MIN','NE','NO','NYG','NYJ',
+  'PHI','PIT','SEA','SF','TB','TEN','WAS',
+  // pooltracker might use different abbrs
+  'GNB','KAN','NWE','NOR','SDG','STL','OAK','JAC','WSH','TAM','SFO','NOR'
+]);
+
+function _isNFLTeam(text) {
+  if (!text) return false;
+  const t = text.trim().toUpperCase();
+  if (NFL_ABBRS.has(t)) return true;
+  // Also accept if it matches a known full name
+  return !!pickAllTeamAliases()[t];
+}
+
+function _tryParsePickTable(table) {
+  const rows = Array.from(table.querySelectorAll('tr'));
+  if (rows.length < 2) return [];
+
+  // Read all rows as arrays of text
+  const data = rows.map(function(row) {
+    return Array.from(row.querySelectorAll('td, th')).map(function(cell) {
+      // Get text, stripping inner tags but keeping alt text from images
+      let text = '';
+      cell.childNodes.forEach(function(node) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          text += node.textContent;
+        } else if (node.nodeName === 'IMG') {
+          text += (node.getAttribute('alt') || node.getAttribute('title') || '') + ' ';
+        } else {
+          text += node.textContent;
+        }
+      });
+      return text.replace(/\s+/g, ' ').trim();
+    });
+  });
+
+  if (data.length === 0 || data[0].length < 2) return [];
+
+  // Find the header row (first row with text content)
+  let headerIdx = 0;
+  const header = data[headerIdx].map(function(h) { return h.toLowerCase(); });
+
+  // Identify name column: look for "player", "name", or first non-numeric column
+  let nameCol = -1, teamCol = -1;
+
+  header.forEach(function(h, i) {
+    if (/player|name/i.test(h) && nameCol === -1) nameCol = i;
+    if (/pick|team|selection/i.test(h) && teamCol === -1) teamCol = i;
+  });
+
+  // If no explicit headers, scan first data row for a column that looks like NFL team
+  if (teamCol === -1) {
+    for (let row = 1; row < data.length; row++) {
+      for (let col = 0; col < data[row].length; col++) {
+        if (_isNFLTeam(data[row][col])) {
+          teamCol = col;
+          // Name is probably the column before, or the first non-number column
+          nameCol = col > 0 ? col - 1 : (col + 1 < data[row].length ? col + 1 : -1);
+          // If nameCol cell looks like a number/rank, try col 0 or col before rank
+          if (nameCol >= 0 && /^\d+$/.test((data[row][nameCol] || '').trim())) {
+            if (nameCol + 1 !== col) nameCol = nameCol + 1 < col ? nameCol + 1 : -1;
+          }
+          break;
+        }
+      }
+      if (teamCol !== -1) break;
+    }
+  }
+
+  if (teamCol === -1) return [];
+  if (nameCol === -1) nameCol = teamCol > 0 ? 0 : 1;
+
+  // Extract picks from data rows (skip header row)
+  const picks = [];
+  for (let r = 1; r < data.length; r++) {
+    const row = data[r];
+    if (row.length <= Math.max(nameCol, teamCol)) continue;
+    const name = (row[nameCol] || '').trim();
+    const teamRaw = (row[teamCol] || '').trim();
+    if (!name || !teamRaw) continue;
+    if (/^(player|name|pick|team)/i.test(name)) continue; // skip repeated headers
+    if (teamRaw === '-' || teamRaw === '' || /^(elim|out|bye)/i.test(teamRaw)) continue;
+    const abbr = normalizeTeamAbbr(teamRaw);
+    picks.push({ name: name, team: abbr });
+  }
+
+  return picks;
+}
+
 // ── Trash Talk ──
 function ttRelativeTime(ts) {
   const diff = Date.now() - ts;
@@ -9479,43 +9677,69 @@ document.addEventListener('keydown', function(e) {
       </div>
       <div id="pickAllImportBody" class="pa-import-body">
         <p class="admin-card-desc" style="margin-top:10px;">
-          Go to <strong>pooltracker.com</strong> → your pool → view the picks table for the week.
-          Copy and paste the player names and picks below in the format shown.
-          You can also paste a full multi-week export from pooltracker.com.
+          Auto-fetch picks directly from <strong>pooltracker.com</strong> — no copy/paste needed.
+          Choose one week or pull the entire season at once.
         </p>
 
-        <!-- Single-week import -->
-        <div class="admin-card" style="background:var(--hover);margin-bottom:14px;">
-          <div style="font-weight:700;font-size:14px;margin-bottom:10px;color:var(--text);">Single Week Import</div>
-          <div class="admin-controls">
-            <div class="field" style="margin-bottom:10px;">
-              <label>Week</label>
-              <select id="pickAllImportWeek" style="width:100%;max-width:200px;">
-                <option value="1">Week 1</option><option value="2">Week 2</option>
-                <option value="3">Week 3</option><option value="4">Week 4</option>
-                <option value="5">Week 5</option><option value="6">Week 6</option>
-                <option value="7">Week 7</option><option value="8">Week 8</option>
-                <option value="9">Week 9</option><option value="10">Week 10</option>
-                <option value="11">Week 11</option><option value="12">Week 12</option>
-                <option value="13">Week 13</option><option value="14">Week 14</option>
-                <option value="15">Week 15</option><option value="16">Week 16</option>
-                <option value="17">Week 17</option><option value="18">Week 18</option>
-              </select>
-            </div>
-            <div class="field" style="margin-bottom:10px;">
-              <label>Paste picks (one per line: <code style="font-size:11px;color:var(--accent);">Player Name, TEAM</code> or tab-separated)</label>
-              <textarea id="pickAllImportText" rows="7" placeholder="Jay, KC&#10;Will, SF&#10;Mike, DAL&#10;Sarah, BUF&#10;..."></textarea>
-            </div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;">
-              <button class="btn-submit" style="flex:1;min-width:140px;" onclick="importPickAllData()">📥 Import Week</button>
-              <button class="btn-submit" style="flex:1;min-width:140px;background:rgba(100,100,200,0.3);border:1px solid rgba(100,100,200,0.5);" onclick="importPickAllMultiWeek()">📋 Import Full Season CSV</button>
-            </div>
-            <div class="admin-status" id="pickAllImportStatus" style="margin-top:8px;"></div>
-          </div>
+        <!-- ── Auto-import (primary) ── -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+          <button class="btn-submit" style="flex:1;min-width:160px;background:linear-gradient(135deg,#c8a94a,#a8893a);color:#000;"
+            onclick="autoImportPickAllWeek()">⚡ Fetch Current Week</button>
+          <button class="btn-submit" style="flex:1;min-width:160px;background:linear-gradient(135deg,#4a6fa8,#2e4d7a);"
+            onclick="autoImportPickAllAllWeeks()">🌐 Fetch All Weeks (1–18)</button>
         </div>
+        <div style="margin-bottom:4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <label style="font-size:13px;color:var(--muted);">Or fetch specific week:</label>
+          <select id="pickAllAutoWeek" style="font-size:13px;padding:4px 8px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+            <option value="1">Week 1</option><option value="2">Week 2</option>
+            <option value="3">Week 3</option><option value="4">Week 4</option>
+            <option value="5">Week 5</option><option value="6">Week 6</option>
+            <option value="7">Week 7</option><option value="8">Week 8</option>
+            <option value="9">Week 9</option><option value="10">Week 10</option>
+            <option value="11">Week 11</option><option value="12">Week 12</option>
+            <option value="13">Week 13</option><option value="14">Week 14</option>
+            <option value="15">Week 15</option><option value="16">Week 16</option>
+            <option value="17">Week 17</option><option value="18">Week 18</option>
+          </select>
+          <button onclick="autoImportPickAllOneWeek()" style="font-size:13px;padding:5px 12px;background:var(--hover);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;font-weight:600;">Fetch</button>
+        </div>
+        <div class="admin-status" id="pickAllImportStatus" style="margin-top:10px;"></div>
+
+        <!-- ── Manual paste fallback ── -->
+        <details style="margin-top:18px;">
+          <summary style="cursor:pointer;font-size:13px;color:var(--muted);user-select:none;">📋 Manual paste (fallback if auto-fetch fails)</summary>
+          <div style="margin-top:12px;">
+            <div class="admin-card" style="background:var(--hover);margin-bottom:0;">
+              <div class="admin-controls">
+                <div class="field" style="margin-bottom:10px;">
+                  <label>Week</label>
+                  <select id="pickAllImportWeek" style="width:100%;max-width:200px;">
+                    <option value="1">Week 1</option><option value="2">Week 2</option>
+                    <option value="3">Week 3</option><option value="4">Week 4</option>
+                    <option value="5">Week 5</option><option value="6">Week 6</option>
+                    <option value="7">Week 7</option><option value="8">Week 8</option>
+                    <option value="9">Week 9</option><option value="10">Week 10</option>
+                    <option value="11">Week 11</option><option value="12">Week 12</option>
+                    <option value="13">Week 13</option><option value="14">Week 14</option>
+                    <option value="15">Week 15</option><option value="16">Week 16</option>
+                    <option value="17">Week 17</option><option value="18">Week 18</option>
+                  </select>
+                </div>
+                <div class="field" style="margin-bottom:10px;">
+                  <label>Paste picks (<code style="font-size:11px;color:var(--accent);">Player Name, TEAM</code> per line or tab-separated)</label>
+                  <textarea id="pickAllImportText" rows="7" placeholder="Jay, KC&#10;Will, SF&#10;Mike, DAL&#10;Sarah, BUF&#10;..."></textarea>
+                </div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                  <button class="btn-submit" style="flex:1;min-width:140px;" onclick="importPickAllData()">📥 Import Week</button>
+                  <button class="btn-submit" style="flex:1;min-width:140px;background:rgba(100,100,200,0.3);border:1px solid rgba(100,100,200,0.5);" onclick="importPickAllMultiWeek()">📋 Import Full Season CSV</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </details>
 
         <!-- Delete week controls -->
-        <div style="margin-top:4px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
           <label style="font-size:13px;color:var(--muted);">Delete week:</label>
           <select id="pickAllDeleteWeek" style="font-size:13px;padding:4px 8px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);">
             <option value="">— select —</option>
