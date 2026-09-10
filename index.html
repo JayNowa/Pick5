@@ -1556,7 +1556,9 @@
   .pa-spot-card.ps-loss { border-color: rgba(224,92,92,0.5);  background: rgba(224,92,92,0.07); }
   .pa-spot-card.ps-live { border-color: rgba(200,169,74,0.6); background: rgba(200,169,74,0.07); animation: pa-pulse 1.5s infinite; }
   .pa-spot-score { font-size: 11px; color: var(--muted); }
-  .pa-spot-opp { font-size: 10px; color: var(--muted); letter-spacing: 0.01em; line-height: 1.1; }
+  .pa-spot-opp { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .pa-spot-opp-label { font-size: 10px; color: var(--muted); letter-spacing: 0.01em; line-height: 1; }
+  .pa-spot-opp img { width: 22px; height: 22px; object-fit: contain; }
   /* Player blocks in week-picks view */
   .pa-player-block { margin-bottom: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
   .pa-player-block:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
@@ -4316,12 +4318,17 @@ function _buildPickCard(abbr, scoresMap) {
   var logo   = 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/' + slug + '.png&w=80&h=80&transparent=true';
   var cardCls = '', badgeHtml = '', scoreHtml = '', oppHtml = '';
 
-  // Opponent line: "vs OPP" if home, "at OPP" if away
+  // Opponent line: "vs/at" label + small logo
   if (game) {
     var isHomeTeam = game.homeAbbr === abbr;
     var oppAbbr = isHomeTeam ? game.awayAbbr : game.homeAbbr;
     if (oppAbbr) {
-      oppHtml = '<span class="pa-spot-opp">' + (isHomeTeam ? 'vs' : 'at') + ' ' + escPickAll(oppAbbr) + '</span>';
+      var oppSlug = oppAbbr.toLowerCase();
+      var oppLogo = 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/' + oppSlug + '.png&w=44&h=44&transparent=true';
+      oppHtml = '<div class="pa-spot-opp">'
+        + '<span class="pa-spot-opp-label">' + (isHomeTeam ? 'vs' : 'at') + ' ' + escPickAll(oppAbbr) + '</span>'
+        + '<img src="' + oppLogo + '" onerror="this.style.display=\'none\'" alt="' + escPickAll(oppAbbr) + '">'
+        + '</div>';
     }
   }
 
