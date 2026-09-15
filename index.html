@@ -3492,6 +3492,15 @@
     if (newWeek && newWeek !== _cachedWeek) {
       _cachedWeek = newWeek;
       showWeekBanner(newWeek);
+      // Keep scoresWeek in sync so Results/Leaderboard/My Picks use the right week
+      const aw = newWeek.toString().toLowerCase();
+      if (aw === 'hof game' || aw === 'hof') {
+        scoresSeasonType = 1; scoresWeek = 1;
+      } else if (aw.includes('pre')) {
+        scoresSeasonType = 1; scoresWeek = (parseInt(aw.replace(/[^0-9]/g, '')) || 1) + 1;
+      } else {
+        scoresSeasonType = 2; scoresWeek = parseInt(newWeek) || 1;
+      }
     }
   });
 
@@ -3786,7 +3795,7 @@ function buildESPNScoreboardURL(weekValue, year) {
     seasontype = 1;
     week = (parseInt(wv.replace(/[^0-9]/g, '')) || 1) + 1; // Pre Week N → ESPN week N+1
   } else {
-    week = parseInt(weekValue) || 1;
+    week = parseInt(weekValue.toString().replace(/[^0-9]/g, '')) || 1;
   }
   return 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=' + year + '&seasontype=' + seasontype + '&week=' + week;
 }
