@@ -5400,8 +5400,7 @@ async function submitSpreadsPicks() {
 
   try {
     const fbPromise = window.fbSavePick ? window.fbSavePick(payload) : Promise.resolve();
-    const _fd1 = new FormData(); _fd1.append('data', JSON.stringify(payload));
-    const sheetPromise = fetch(PICKS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: _fd1 });
+    const sheetPromise = fetch(PICKS_SCRIPT_URL + '?data=' + encodeURIComponent(JSON.stringify(payload)), { mode: 'no-cors' });
     await Promise.all([fbPromise, sheetPromise]);
     btn.textContent = 'Picks Saved ✓';
     btn.style.background = 'linear-gradient(135deg, #4caf7d 0%, #2e7d52 100%)';
@@ -7586,10 +7585,7 @@ async function sendPicksReminder() {
     const allPlayers = allUsers.map(function(u) { return { email: u.email, teamName: u.teamName || u.email }; });
     const recipients = missing.map(function(u) { return { email: u.email, teamName: u.teamName || u.email }; });
 
-    await fetch(PICKS_SCRIPT_URL, {
-      method: 'POST', mode: 'no-cors',
-      body: (() => { const fd = new FormData(); fd.append('data', JSON.stringify({ type: 'picksReminder', week: weekLabel, recipients: recipients, allPlayers: allPlayers })); return fd; })()
-    });
+    await fetch(PICKS_SCRIPT_URL + '?data=' + encodeURIComponent(JSON.stringify({ type: 'picksReminder', week: weekLabel, recipients: recipients, allPlayers: allPlayers })), { mode: 'no-cors' });
 
     statusEl.textContent = '✅ Reminder sent to ' + missing.length + ' player' + (missing.length !== 1 ? 's' : '') + '!';
     statusEl.className = 'admin-status success';
@@ -8295,11 +8291,7 @@ async function sendWeeklyRecap(testOnly) {
 
     statusEl.textContent = (testOnly ? 'Test sending to admins' : 'Sending to ' + recipients.length + ' players') + '…';
 
-    await fetch(PICKS_SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      body: (() => { const fd = new FormData(); fd.append('data', JSON.stringify({ type: 'weeklyRecap', week: weekLabel, recipients: recipients, weekResults: weekResults, leaderboard: leaderboard, perfectScores: perfectScores, shutouts: shutouts })); return fd; })()
-    });
+    await fetch(PICKS_SCRIPT_URL + '?data=' + encodeURIComponent(JSON.stringify({ type: 'weeklyRecap', week: weekLabel, recipients: recipients, weekResults: weekResults, leaderboard: leaderboard, perfectScores: perfectScores, shutouts: shutouts })), { mode: 'no-cors' });
 
     statusEl.textContent = testOnly ? '✅ Test recap sent to admins!' : '✅ Recap sent to ' + recipients.length + ' players!';
     statusEl.className = 'admin-status success';
