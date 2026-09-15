@@ -5,7 +5,7 @@ const PT_POOL_ID   = '256835';
 const PT_PLAYER_ID = '3593112';
 const PT_T         = '1851';
 
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbztFBbjlNk0tVO6b7-whzajFVLQOr0fArr1n3qU8zHDe3SECKvk8Rnm5uzPOk0aJW8r7w/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6dH6UV1BVH6Nzm_z_BwDi6oecp4AGcJ-0OkJhhUzSS07QD1cb84LCHjhQiSSremAd6Q/exec';
 
 export default {
   async fetch(request, env) {
