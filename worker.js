@@ -5,6 +5,8 @@ const PT_POOL_ID   = '256835';
 const PT_PLAYER_ID = '3593112';
 const PT_T         = '1851';
 
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbztFBbjlNk0tVO6b7-whzajFVLQOr0fArr1n3qU8zHDe3SECKvk8Rnm5uzPOk0aJW8r7w/exec';
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -17,6 +19,34 @@ export default {
           'Access-Control-Max-Age': '86400',
         },
       });
+    }
+
+    // Email proxy — forwards JSON POST to Apps Script, handling the POST→GET redirect
+    if (url.pathname === '/api/email') {
+      if (request.method === 'OPTIONS') {
+        return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Content-Type' } });
+      }
+      try {
+        const body = await request.text();
+        // Step 1: hit /exec — expect a redirect
+        const initial = await fetch(APPS_SCRIPT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: body,
+          redirect: 'manual',
+        });
+        // Step 2: follow redirect as POST (preserving body)
+        const target = initial.headers.get('Location') || APPS_SCRIPT_URL;
+        const final = await fetch(target, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: body,
+        });
+        const text = await final.text();
+        return new Response(text, { headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'text/plain' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      }
     }
 
     if (url.pathname === '/api/pooltracker') {
