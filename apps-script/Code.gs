@@ -9,7 +9,7 @@ var SHEET_ID            = '1wCbkfJMaFQoV3gYwFbxrijqLsxpLUXdlK4YM52ijrPE';
 function doGet(e) { return doPost(e); }
 
 function doPost(e) {
-  console.log('doPost called - v10');
+  console.log('doPost called - v12');
   try {
     var raw = (e.postData && e.postData.contents)
            || (e.parameter && e.parameter.data)
@@ -320,23 +320,30 @@ function sendWeeklyRecapEmail(data) {
   <p style="color:#6b7588;font-size:12px;text-align:center;margin:24px 0 0;">Good luck next week! 🏆</p>
 </div>`;
 
-    // Send individually to avoid the 50-recipient-per-message limit
+    // BCC-batch to stay within daily Gmail quota (1 send call per batch of 25)
     const toList = recipients.map(r => typeof r === 'string' ? r : (r.email || '')).filter(Boolean);
+    const batchSize = 25;
     const failed = [];
-    toList.forEach(function(email) {
+    for (let i = 0; i < toList.length; i += batchSize) {
+      const batch = toList.slice(i, i + batchSize);
       try {
-        MailApp.sendEmail({ to: email, subject: '📊 Pick 5 — ' + week + ' Recap', htmlBody: htmlBody });
+        MailApp.sendEmail({
+          to: ADMIN_EMAILS[0],
+          bcc: batch.join(','),
+          subject: '📊 Pick 5 — ' + week + ' Recap',
+          htmlBody: htmlBody
+        });
       } catch(e) {
-        Logger.log('Recap failed for ' + email + ': ' + e);
-        failed.push(email);
+        Logger.log('Recap batch failed (starting ' + i + '): ' + e);
+        failed.push.apply(failed, batch);
       }
-    });
+    }
 
     if (failed.length > 0) {
       MailApp.sendEmail({
         to: ADMIN_EMAILS.join(','),
         subject: '⚠️ Pick 5 Recap — ' + failed.length + ' emails not sent',
-        body: 'The following recipients did not receive the ' + week + ' recap (likely hit daily quota):\n\n' + failed.join('\n')
+        body: 'The following recipients did not receive the ' + week + ' recap:\n\n' + failed.join('\n')
       });
     }
 
