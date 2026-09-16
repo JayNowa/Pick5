@@ -322,15 +322,25 @@ function sendWeeklyRecapEmail(data) {
 
     // Send individually to avoid the 50-recipient-per-message limit
     const toList = recipients.map(r => typeof r === 'string' ? r : (r.email || '')).filter(Boolean);
+    const failed = [];
     toList.forEach(function(email) {
       try {
         MailApp.sendEmail({ to: email, subject: '📊 Pick 5 — ' + week + ' Recap', htmlBody: htmlBody });
       } catch(e) {
         Logger.log('Recap failed for ' + email + ': ' + e);
+        failed.push(email);
       }
     });
 
-    Logger.log('Weekly recap sent to ' + toList.length + ' recipients for ' + week);
+    if (failed.length > 0) {
+      MailApp.sendEmail({
+        to: ADMIN_EMAILS.join(','),
+        subject: '⚠️ Pick 5 Recap — ' + failed.length + ' emails not sent',
+        body: 'The following recipients did not receive the ' + week + ' recap (likely hit daily quota):\n\n' + failed.join('\n')
+      });
+    }
+
+    Logger.log('Weekly recap: ' + (toList.length - failed.length) + ' sent, ' + failed.length + ' failed for ' + week);
 
   } catch(err) {
     Logger.log('Recap email failed: ' + err.toString());
