@@ -455,7 +455,7 @@ function sendAdminSummaryEmail(weekLabel, noPicksUsers, partialUsers, allUsers) 
   if (noPicksUsers.length === 0 && partialUsers.length === 0) {
     var subject = '✅ Pick5 ' + weekLabel + ' — Everyone has submitted!';
     var body    = 'All ' + allUsers.length + ' active players have submitted 5 picks for ' + weekLabel + '. Nothing to do!';
-    ADMIN_EMAILS.forEach(function(a) { MailApp.sendEmail({ to: a, subject: subject, body: body }); });
+    MailApp.sendEmail({ to: ADMIN_EMAILS.join(','), subject: subject, body: body });
     return;
   }
 
@@ -474,7 +474,7 @@ function sendAdminSummaryEmail(weekLabel, noPicksUsers, partialUsers, allUsers) 
   var total   = noPicksUsers.length + partialUsers.length;
   var subject = '⏰ Pick5 ' + weekLabel + ' — ' + total + ' player' + (total !== 1 ? 's' : '') + ' need a nudge';
   var body    = 'Reminder emails have been sent. Here\'s who still needs to act:\n\n' + lines.join('\n');
-  ADMIN_EMAILS.forEach(function(a) { MailApp.sendEmail({ to: a, subject: subject, body: body }); });
+  MailApp.sendEmail({ to: ADMIN_EMAILS.join(','), subject: subject, body: body });
 }
 
 // ─── TEST FUNCTIONS ───────────────────────────────────────────────────────────
