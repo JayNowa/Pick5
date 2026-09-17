@@ -452,29 +452,116 @@ function sendReminderEmail(email, teamName, weekLabel, pickCount) {
 }
 
 function sendAdminSummaryEmail(weekLabel, noPicksUsers, partialUsers, allUsers) {
+  var subject, htmlBody;
+
   if (noPicksUsers.length === 0 && partialUsers.length === 0) {
-    var subject = '✅ Pick5 ' + weekLabel + ' — Everyone has submitted!';
-    var body    = 'All ' + allUsers.length + ' active players have submitted 5 picks for ' + weekLabel + '. Nothing to do!';
-    MailApp.sendEmail({ to: ADMIN_EMAILS.join(','), subject: subject, body: body });
+    subject = '✅ Pick5 ' + weekLabel + ' — Everyone has submitted!';
+    htmlBody = `
+<div style="background:#0a0c10;padding:36px 20px;font-family:Arial,sans-serif;max-width:540px;margin:0 auto;">
+  <div style="text-align:center;margin-bottom:28px;">
+    <div style="font-size:32px;margin-bottom:6px;">🏈</div>
+    <h1 style="color:#c8a94a;font-size:22px;letter-spacing:2px;margin:0;text-transform:uppercase;">Pick 5 Admin</h1>
+    <p style="color:#6b7588;font-size:12px;letter-spacing:2px;text-transform:uppercase;margin:6px 0 0;">${weekLabel} Reminder Summary</p>
+  </div>
+  <div style="background:linear-gradient(135deg,rgba(76,175,125,0.12),rgba(76,175,125,0.04));border:1px solid rgba(76,175,125,0.4);border-radius:8px;padding:20px 24px;text-align:center;">
+    <div style="font-size:28px;margin-bottom:8px;">🎉</div>
+    <p style="color:#4caf7d;font-size:18px;font-weight:bold;margin:0 0 6px;">All ${allUsers.length} players have submitted!</p>
+    <p style="color:#6b7588;font-size:14px;margin:0;">Nothing to do — everyone is locked in for ${weekLabel}.</p>
+  </div>
+</div>`;
+    MailApp.sendEmail({ to: ADMIN_EMAILS.join(','), subject: subject, htmlBody: htmlBody });
     return;
   }
 
-  var lines = [];
-  if (noPicksUsers.length > 0) {
-    lines.push('=== NO PICKS SUBMITTED (' + noPicksUsers.length + ') ===');
-    noPicksUsers.forEach(function(u) { lines.push('  ' + u.teamName + ' | ' + u.email + ' | ' + (u.phone || '—')); });
-    lines.push('');
-  }
-  if (partialUsers.length > 0) {
-    lines.push('=== PARTIAL PICKS (' + partialUsers.length + ') ===');
-    partialUsers.forEach(function(u) { lines.push('  ' + u.teamName + ' | ' + u.email + ' | ' + (u.phone || '—') + ' | ' + u.count + '/5 picks'); });
-    lines.push('');
+  function buildRows(users, showCount) {
+    return users.map(function(u) {
+      var countCell = showCount
+        ? `<td style="padding:10px 14px;text-align:right;"><span style="color:#c8a94a;font-weight:bold;">${u.count}/5</span></td>`
+        : `<td style="padding:10px 14px;text-align:right;"><span style="color:#e05555;font-weight:bold;">0/5</span></td>`;
+      return `<tr style="border-bottom:1px solid #1e2535;">
+        <td style="padding:10px 14px;color:#f0f2f5;font-size:14px;font-weight:600;">${u.teamName || '—'}</td>
+        <td style="padding:10px 14px;color:#6b7588;font-size:13px;">${u.email}</td>
+        <td style="padding:10px 14px;color:#6b7588;font-size:13px;">${u.phone || '—'}</td>
+        ${countCell}
+      </tr>`;
+    }).join('');
   }
 
-  var total   = noPicksUsers.length + partialUsers.length;
-  var subject = '⏰ Pick5 ' + weekLabel + ' — ' + total + ' player' + (total !== 1 ? 's' : '') + ' need a nudge';
-  var body    = 'Reminder emails have been sent. Here\'s who still needs to act:\n\n' + lines.join('\n');
-  MailApp.sendEmail({ to: ADMIN_EMAILS.join(','), subject: subject, body: body });
+  var noPicksSection = '';
+  if (noPicksUsers.length > 0) {
+    noPicksSection = `
+    <div style="margin-bottom:24px;">
+      <p style="color:#e05555;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin:0 0 10px;border-bottom:1px solid #2a3040;padding-bottom:8px;">
+        💀 No Picks Submitted (${noPicksUsers.length})
+      </p>
+      <div style="background:#13171f;border:1px solid #2a3040;border-radius:8px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="background:rgba(224,85,85,0.06);border-bottom:1px solid #2a3040;">
+              <th style="padding:8px 14px;color:#6b7588;font-size:11px;letter-spacing:1px;text-transform:uppercase;text-align:left;font-weight:normal;">Team</th>
+              <th style="padding:8px 14px;color:#6b7588;font-size:11px;letter-spacing:1px;text-transform:uppercase;text-align:left;font-weight:normal;">Email</th>
+              <th style="padding:8px 14px;color:#6b7588;font-size:11px;letter-spacing:1px;text-transform:uppercase;text-align:left;font-weight:normal;">Phone</th>
+              <th style="padding:8px 14px;color:#6b7588;font-size:11px;letter-spacing:1px;text-transform:uppercase;text-align:right;font-weight:normal;">Picks</th>
+            </tr>
+          </thead>
+          <tbody>${buildRows(noPicksUsers, false)}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }
+
+  var partialSection = '';
+  if (partialUsers.length > 0) {
+    partialSection = `
+    <div style="margin-bottom:24px;">
+      <p style="color:#c8a94a;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin:0 0 10px;border-bottom:1px solid #2a3040;padding-bottom:8px;">
+        ⚠️ Partial Picks (${partialUsers.length})
+      </p>
+      <div style="background:#13171f;border:1px solid #2a3040;border-radius:8px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="background:rgba(200,169,74,0.06);border-bottom:1px solid #2a3040;">
+              <th style="padding:8px 14px;color:#6b7588;font-size:11px;letter-spacing:1px;text-transform:uppercase;text-align:left;font-weight:normal;">Team</th>
+              <th style="padding:8px 14px;color:#6b7588;font-size:11px;letter-spacing:1px;text-transform:uppercase;text-align:left;font-weight:normal;">Email</th>
+              <th style="padding:8px 14px;color:#6b7588;font-size:11px;letter-spacing:1px;text-transform:uppercase;text-align:left;font-weight:normal;">Phone</th>
+              <th style="padding:8px 14px;color:#6b7588;font-size:11px;letter-spacing:1px;text-transform:uppercase;text-align:right;font-weight:normal;">Picks</th>
+            </tr>
+          </thead>
+          <tbody>${buildRows(partialUsers, true)}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }
+
+  var total = noPicksUsers.length + partialUsers.length;
+  subject = '⏰ Pick5 ' + weekLabel + ' — ' + total + ' player' + (total !== 1 ? 's' : '') + ' need a nudge';
+  htmlBody = `
+<div style="background:#0a0c10;padding:36px 20px;font-family:Arial,sans-serif;max-width:560px;margin:0 auto;">
+  <div style="text-align:center;margin-bottom:28px;">
+    <div style="font-size:32px;margin-bottom:6px;">🏈</div>
+    <h1 style="color:#c8a94a;font-size:22px;letter-spacing:2px;margin:0;text-transform:uppercase;">Pick 5 Admin</h1>
+    <p style="color:#6b7588;font-size:12px;letter-spacing:2px;text-transform:uppercase;margin:6px 0 0;">${weekLabel} Reminder Summary</p>
+  </div>
+  <div style="background:#13171f;border:1px solid #2a3040;border-radius:8px;padding:14px 20px;margin-bottom:24px;display:flex;justify-content:space-between;gap:12px;text-align:center;">
+    <div style="flex:1;">
+      <p style="color:#6b7588;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin:0 0 4px;">Total Players</p>
+      <p style="color:#f0f2f5;font-size:22px;font-weight:bold;margin:0;">${allUsers.length}</p>
+    </div>
+    <div style="flex:1;border-left:1px solid #2a3040;">
+      <p style="color:#6b7588;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin:0 0 4px;">No Picks</p>
+      <p style="color:#e05555;font-size:22px;font-weight:bold;margin:0;">${noPicksUsers.length}</p>
+    </div>
+    <div style="flex:1;border-left:1px solid #2a3040;">
+      <p style="color:#6b7588;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin:0 0 4px;">Partial</p>
+      <p style="color:#c8a94a;font-size:22px;font-weight:bold;margin:0;">${partialUsers.length}</p>
+    </div>
+  </div>
+  ${noPicksSection}
+  ${partialSection}
+  <p style="color:#6b7588;font-size:12px;text-align:center;margin:0;">Reminder emails have been sent to all ${total} player${total !== 1 ? 's' : ''} above.</p>
+</div>`;
+
+  MailApp.sendEmail({ to: ADMIN_EMAILS.join(','), subject: subject, htmlBody: htmlBody });
 }
 
 // ─── TEST FUNCTIONS ───────────────────────────────────────────────────────────
