@@ -4742,6 +4742,25 @@ async function deletePickAllWeek() {
   } catch(e) { alert('Error deleting: ' + (e.message || e)); }
 }
 
+async function deleteAllPickAllData() {
+  const weeks = Object.keys(pickAllData);
+  if (weeks.length === 0) { alert('No Pick All data to delete.'); return; }
+  if (!confirm('Delete ALL imported picks for ALL ' + weeks.length + ' week(s)? This cannot be undone.')) return;
+  try {
+    await Promise.all(weeks.map(wk => window.fbDeletePickAllWeek(wk)));
+    pickAllData = {};
+    pickAllScores = {};
+    pickAllCurrentWeek = null;
+    renderPickAllWeekTabs();
+    populatePickAllDeleteSelect();
+    const tbl = document.getElementById('pickAllTableContainer');
+    if (tbl) tbl.innerHTML = '<div style="color:var(--muted);padding:20px 0;">No picks imported yet.</div>';
+    await renderPickAllStandings();
+    const status = document.getElementById('pickAllImportStatus');
+    if (status) { status.textContent = 'All Pick All data deleted.'; setTimeout(() => { status.textContent = ''; }, 3000); }
+  } catch(e) { alert('Error deleting: ' + (e.message || e)); }
+}
+
 async function refreshPickAllScores() {
   if (!pickAllCurrentWeek) return;
   pickAllScores[pickAllCurrentWeek] = null;
@@ -10000,6 +10019,7 @@ document.addEventListener('keydown', function(e) {
             <option value="">— select —</option>
           </select>
           <button onclick="deletePickAllWeek()" style="font-size:13px;padding:5px 12px;background:rgba(224,92,92,0.2);border:1px solid rgba(224,92,92,0.4);border-radius:5px;color:#e05c5c;cursor:pointer;font-weight:600;">Delete</button>
+          <button onclick="deleteAllPickAllData()" style="font-size:13px;padding:5px 12px;background:rgba(224,92,92,0.15);border:1px solid rgba(224,92,92,0.35);border-radius:5px;color:#e05c5c;cursor:pointer;font-weight:600;">🗑 Delete All Weeks</button>
         </div>
       </div>
     </div>
