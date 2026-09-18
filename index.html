@@ -3086,7 +3086,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.7.1</div>
+    <div class="version-badge">v1.7.3</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -3727,7 +3727,7 @@
 <script>
 // ── Constants ──
 const ADMIN_EMAILS     = ["jenowakoski@gmail.com", "wcgriffiths14@gmail.com"];
-const PICKS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6dH6UV1BVH6Nzm_z_BwDi6oecp4AGcJ-0OkJhhUzSS07QD1cb84LCHjhQiSSremAd6Q/exec';
+const PICKS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyL4_EspoDrjO8xykvZ6aOgbxYhFTXia8v1Moh1UEvh_45q4ZvpVOTnPka8t3Hjzo-XBw/exec';
 const PICKS_DB_URL     = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS9-umRqGXfrl2flUZQ2pQaGaNT0FB8VsmjbFOs9Yjjh8PH2DaTGyAWEkEvWf5HUjHxgzyq7Z5XrvY2/pub?gid=0&single=true&output=csv';
 const SPREADS_CSV_URL  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTCZp0JY_6F3IQ_Uv7pRTTLRymDJ6NG8t9nT6KrFZ5pru7yZykoa5h2prW91r0x9kbej0aCZKHrSxH8/pub?gid=1821550063&single=true&output=csv';
 const RULES_CSV_URL    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSrOK6gU_IKZDjDFPVzPS4feK73hhXXbD1EOWkvcJ_LpUwhD_8K5iyb22Q4kuORdEfQeSCtvKM4GI2Z/pub?gid=0&single=true&output=csv';
@@ -4634,7 +4634,12 @@ function parsePickAllSingleWeek(text) {
     if (parts.length < 2) return;
     var name = parts[0], raw = parts[1];
     if (!name || !raw) return;
-    picks.push({ name: name, team: normalizeTeamAbbr(raw) });
+    var normalizedTeam = normalizeTeamAbbr(raw);
+    // Reject entries where the "team" column doesn't look like a real NFL team
+    // abbreviation. This catches accidental pastes of the Picks spreadsheet
+    // (where column 2 is the player's pool team name, not an NFL pick).
+    if (!_isNFLTeam(normalizedTeam)) return;
+    picks.push({ name: name, team: normalizedTeam });
   });
   return picks;
 }
@@ -4873,10 +4878,14 @@ function parsePooltrackerHTML(html) {
         players.push({ name: name, picks: picks, tiebreaker: tiebreaker });
       }
     });
-    if (players.length > 0) return players;
+    // If the known matrix element is present, trust it exclusively.
+    // Falling through to the heuristic scanner when the matrix is empty
+    // risks picking up other tables (e.g. date/score summaries) and
+    // misidentifying date columns as player names.
+    return players;
   }
 
-  // Fallback: heuristic table scan (legacy / HTML structure changes)
+  // Fallback: heuristic table scan — only reached if #tblPicksMatrix is absent
   const tables = Array.from(doc.querySelectorAll('table'));
   for (const table of tables) {
     const picks = _tryParsePickTable(table);
@@ -4969,6 +4978,9 @@ function _tryParsePickTable(table) {
     const teamRaw = (row[teamCol] || '').trim();
     if (!name || !teamRaw) continue;
     if (/^(player|name|pick|team)/i.test(name)) continue; // skip repeated headers
+    // Skip rows where the name looks like a date/timestamp — these indicate
+    // the wrong column was chosen as the player name.
+    if (/\d{4}-\d{2}-\d{2}T|\d{1,2}\/\d{1,2}\/\d{4}/.test(name)) continue;
     if (teamRaw === '-' || teamRaw === '' || /^(elim|out|bye)/i.test(teamRaw)) continue;
     const abbr = normalizeTeamAbbr(teamRaw);
     picks.push({ name: name, team: abbr });
@@ -5409,7 +5421,11 @@ async function submitSpreadsPicks() {
 
   try {
     const fbPromise = window.fbSavePick ? window.fbSavePick(payload) : Promise.resolve();
-    const sheetPromise = fetch('/api/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const sheetPromise = fetch(PICKS_SCRIPT_URL, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
     await Promise.all([fbPromise, sheetPromise]);
     btn.textContent = 'Picks Saved ✓';
     btn.style.background = 'linear-gradient(135deg, #4caf7d 0%, #2e7d52 100%)';
@@ -7594,7 +7610,12 @@ async function sendPicksReminder() {
     const allPlayers = allUsers.map(function(u) { return { email: u.email, teamName: u.teamName || u.email }; });
     const recipients = missing.map(function(u) { return { email: u.email, teamName: u.teamName || u.email }; });
 
-    await fetch('/api/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'picksReminder', week: weekLabel, recipients: recipients, allPlayers: allPlayers }) });
+    await fetch(PICKS_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'picksReminder', week: weekLabel, recipients: recipients, allPlayers: allPlayers })
+    });
 
     statusEl.textContent = '✅ Reminder sent to ' + missing.length + ' player' + (missing.length !== 1 ? 's' : '') + '!';
     statusEl.className = 'admin-status success';
@@ -8300,7 +8321,12 @@ async function sendWeeklyRecap(testOnly) {
 
     statusEl.textContent = (testOnly ? 'Test sending to admins' : 'Sending to ' + recipients.length + ' players') + '…';
 
-    await fetch('/api/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'weeklyRecap', week: weekLabel, recipients: recipients, weekResults: weekResults, leaderboard: leaderboard, perfectScores: perfectScores, shutouts: shutouts }) });
+    await fetch(PICKS_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'weeklyRecap', week: weekLabel, recipients: recipients, weekResults: weekResults, leaderboard: leaderboard, perfectScores: perfectScores, shutouts: shutouts })
+    });
 
     statusEl.textContent = testOnly ? '✅ Test recap sent to admins!' : '✅ Recap sent to ' + recipients.length + ' players!';
     statusEl.className = 'admin-status success';
