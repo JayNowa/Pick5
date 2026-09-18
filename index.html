@@ -3086,7 +3086,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.7.3</div>
+    <div class="version-badge">v1.7.4</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -4876,17 +4876,23 @@ function parsePooltrackerHTML(html) {
       const name = nameTd.textContent.trim();
       if (!name || /^\d+$/.test(name)) return; // skip if purely numeric (score columns)
 
-      // All game picks are in span.mypick elements with data-mypick attribute
-      const pickSpans = Array.from(row.querySelectorAll('span.mypick'));
-      const picks = pickSpans
-        .map(function(span) { return normalizeTeamAbbr(span.getAttribute('data-mypick') || ''); })
-        .filter(Boolean);
-
-      // Tiebreaker: first numeric-only TD that appears after the last span.mypick cell
+      // Collect picks from upcoming games (span.mypick[data-mypick]) and completed games (span.pw / span.pl)
       const allTds = Array.from(row.querySelectorAll('td'));
-      const lastPickIdx = allTds.reduce(function(last, td, idx) {
-        return td.querySelector('span.mypick') ? idx : last;
-      }, -1);
+      const picks = [];
+      var lastPickIdx = -1;
+      allTds.forEach(function(td, idx) {
+        var mypick = td.querySelector('span.mypick');
+        if (mypick) {
+          var team = normalizeTeamAbbr(mypick.getAttribute('data-mypick') || '');
+          if (team) { picks.push(team); lastPickIdx = idx; }
+        } else {
+          var resultSpan = td.querySelector('span.pw, span.pl');
+          if (resultSpan) {
+            var team = normalizeTeamAbbr(resultSpan.textContent.trim());
+            if (team) { picks.push(team); lastPickIdx = idx; }
+          }
+        }
+      });
       var tiebreaker = null;
       for (var ti = lastPickIdx + 1; ti < allTds.length; ti++) {
         var tbText = allTds[ti].textContent.trim();
