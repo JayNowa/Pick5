@@ -4634,7 +4634,12 @@ function parsePickAllSingleWeek(text) {
     if (parts.length < 2) return;
     var name = parts[0], raw = parts[1];
     if (!name || !raw) return;
-    picks.push({ name: name, team: normalizeTeamAbbr(raw) });
+    var normalizedTeam = normalizeTeamAbbr(raw);
+    // Reject entries where the "team" column doesn't look like a real NFL team
+    // abbreviation. This catches accidental pastes of the Picks spreadsheet
+    // (where column 2 is the player's pool team name, not an NFL pick).
+    if (!_isNFLTeam(normalizedTeam)) return;
+    picks.push({ name: name, team: normalizedTeam });
   });
   return picks;
 }
@@ -4873,10 +4878,14 @@ function parsePooltrackerHTML(html) {
         players.push({ name: name, picks: picks, tiebreaker: tiebreaker });
       }
     });
-    if (players.length > 0) return players;
+    // If the known matrix element is present, trust it exclusively.
+    // Falling through to the heuristic scanner when the matrix is empty
+    // risks picking up other tables (e.g. date/score summaries) and
+    // misidentifying date columns as player names.
+    return players;
   }
 
-  // Fallback: heuristic table scan (legacy / HTML structure changes)
+  // Fallback: heuristic table scan — only reached if #tblPicksMatrix is absent
   const tables = Array.from(doc.querySelectorAll('table'));
   for (const table of tables) {
     const picks = _tryParsePickTable(table);
@@ -4969,6 +4978,9 @@ function _tryParsePickTable(table) {
     const teamRaw = (row[teamCol] || '').trim();
     if (!name || !teamRaw) continue;
     if (/^(player|name|pick|team)/i.test(name)) continue; // skip repeated headers
+    // Skip rows where the name looks like a date/timestamp — these indicate
+    // the wrong column was chosen as the player name.
+    if (/\d{4}-\d{2}-\d{2}T|\d{1,2}\/\d{1,2}\/\d{4}/.test(name)) continue;
     if (teamRaw === '-' || teamRaw === '' || /^(elim|out|bye)/i.test(teamRaw)) continue;
     const abbr = normalizeTeamAbbr(teamRaw);
     picks.push({ name: name, team: abbr });
