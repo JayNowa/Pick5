@@ -564,6 +564,65 @@ function sendAdminSummaryEmail(weekLabel, noPicksUsers, partialUsers, allUsers) 
   MailApp.sendEmail({ to: ADMIN_EMAILS.join(','), subject: subject, htmlBody: htmlBody });
 }
 
+// ─── ONE-TIME EXPORT ─────────────────────────────────────────────────────────
+
+function exportAllPicksToSheet() {
+  var baseUrl = 'https://firestore.googleapis.com/v1/projects/' + FIREBASE_PROJECT_ID + '/databases/(default)/documents';
+  var allDocs = [];
+  var pageToken = '';
+
+  // Paginate through all picks documents
+  do {
+    var url = baseUrl + '/picks?key=' + FIREBASE_API_KEY + '&pageSize=300';
+    if (pageToken) url += '&pageToken=' + encodeURIComponent(pageToken);
+    var resp = UrlFetchApp.fetch(url);
+    var data = JSON.parse(resp.getContentText());
+    if (data.documents) allDocs = allDocs.concat(data.documents);
+    pageToken = data.nextPageToken || '';
+  } while (pageToken);
+
+  Logger.log('Total picks documents fetched: ' + allDocs.length);
+
+  var ss    = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = ss.getSheetByName('Picks') || ss.insertSheet('Picks');
+
+  // Clear and write header
+  sheet.clearContents();
+  sheet.appendRow(['Timestamp', 'Team Name', 'Email', 'Week',
+                   'Pick 1', 'Pick 2', 'Pick 3', 'Pick 4', 'Pick 5',
+                   'Spread 1', 'Spread 2', 'Spread 3', 'Spread 4', 'Spread 5',
+                   'Tiebreaker', 'Tiebreaker Game']);
+
+  // Sort: by week then team name
+  var rows = allDocs.map(function(doc) {
+    var f = doc.fields || {};
+    function str(k) { return (f[k] && f[k].stringValue) || ''; }
+    function num(k) { return (f[k] && (f[k].integerValue || f[k].doubleValue)) || ''; }
+
+    var ts = str('submittedAt') || str('timestamp') || '';
+    var tbVal = str('tiebreaker') || num('tiebreaker') || '';
+
+    return [
+      ts, str('teamName') || str('name'), str('email'), str('week'),
+      str('pick1'), str('pick2'), str('pick3'), str('pick4'), str('pick5'),
+      str('spread1'), str('spread2'), str('spread3'), str('spread4'), str('spread5'),
+      tbVal, str('tiebreakerGame')
+    ];
+  });
+
+  rows.sort(function(a, b) {
+    var wA = a[3] || '', wB = b[3] || '';
+    if (wA < wB) return -1;
+    if (wA > wB) return 1;
+    return (a[1] || '').localeCompare(b[1] || '');
+  });
+
+  rows.forEach(function(row) { sheet.appendRow(row); });
+
+  Logger.log('Export complete. ' + rows.length + ' rows written to Picks sheet.');
+  SpreadsheetApp.flush();
+}
+
 // ─── TEST FUNCTIONS ───────────────────────────────────────────────────────────
 
 function testConfirmation() {
