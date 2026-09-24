@@ -170,6 +170,7 @@ function sendPicksReminderEmail(data) {
   try {
     const week       = data.week       || 'this week';
     const recipients = data.recipients || [];
+    const allPlayers = data.allPlayers || [];
 
     recipients.forEach(recipient => {
       const toEmail = typeof recipient === 'string' ? recipient : (recipient.email || '');
@@ -201,6 +202,15 @@ function sendPicksReminderEmail(data) {
     });
 
     Logger.log('Reminder sent to ' + recipients.length + ' players for ' + week);
+
+    // Send admin summary (recipients = no picks, no partial data available from web trigger)
+    var noPicksUsers = recipients.map(function(r) {
+      return { email: typeof r === 'string' ? r : (r.email || ''), teamName: typeof r === 'string' ? r : (r.teamName || r.email || ''), phone: '', count: 0 };
+    });
+    var allUsers = allPlayers.map(function(p) {
+      return { email: typeof p === 'string' ? p : (p.email || ''), teamName: typeof p === 'string' ? p : (p.teamName || p.email || '') };
+    });
+    sendAdminSummaryEmail(week, noPicksUsers, [], allUsers.length ? allUsers : noPicksUsers);
 
   } catch(err) {
     Logger.log('Reminder failed: ' + err.toString());
