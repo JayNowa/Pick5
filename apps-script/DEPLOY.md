@@ -19,6 +19,26 @@
 - The version number in `doPost` logs (e.g. `doPost called - v12`) will reflect the latest version.
 - To test, run one of the test functions (`testConfirmation`, `testReminder`, `testRecap`) directly from the editor and check your inbox.
 
+## Setting up the automated picks reminder
+
+The `sendAutomatedPicksReminder` function needs a time-based trigger to run on a schedule.
+This is a one-time setup — it survives future deployments and does not need to be recreated.
+
+1. In the Apps Script editor, click **Triggers** (clock icon in the left sidebar).
+2. Click **+ Add Trigger** (bottom right).
+3. Set the following:
+   - **Function to run:** `sendAutomatedPicksReminder`
+   - **Deployment:** Head
+   - **Event source:** Time-driven
+   - **Type:** Day timer (or Week timer if you prefer)
+   - **Time:** Pick a time before the weekly deadline (e.g. Thursday 8–9am)
+4. Click **Save**.
+
+The trigger will now run automatically on that schedule, check Firebase for missing picks,
+send reminder emails to those who haven't submitted, and email the admin summary to both admins.
+
+> **Note:** If you want it to run more than once (e.g. Thursday and Saturday), add a second trigger pointing to the same function.
+
 ## Deployment URL
 
 ```
