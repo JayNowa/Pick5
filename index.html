@@ -4376,6 +4376,42 @@ function renderPickAllTable(weekKey, picks, scoresMap) {
   let html = '<div style="margin-bottom:14px;color:var(--muted);font-size:13px;">Week ' + weekKey + ' &middot; ' + picks.length + ' players &middot; sorted by wins</div>';
 
   if (isNewFmt) {
+    // ── Pick Distribution ──
+    var paPickCounts = {};
+    picks.forEach(function(p) {
+      (p.picks || []).forEach(function(teamRaw) {
+        var abbr = normalizeTeamAbbr(teamRaw);
+        if (!abbr) return;
+        var gameData = scoresMap && scoresMap[abbr];
+        if (!gameData || !gameData.started) return;
+        paPickCounts[abbr] = (paPickCounts[abbr] || 0) + 1;
+      });
+    });
+    var paSortedTeams = Object.keys(paPickCounts).sort();
+    var distHtml = '<div class="wp-dist wp-dist-collapsible" style="margin-top:0;margin-bottom:20px;">'
+      + '<button class="wp-dist-toggle" onclick="this.closest(\'.wp-dist\').classList.toggle(\'open\')">'
+      + 'Pick Distribution <span class="wp-dist-chevron">▼</span></button>'
+      + '<div class="wp-dist-body" style="flex-direction:column;">';
+    if (paSortedTeams.length === 0) {
+      distHtml += '<div style="font-size:14px;color:var(--muted);text-align:center;padding:16px 12px;">No picks from games that have started yet.</div>';
+    } else {
+      distHtml += '<div class="wp-dist-grid">';
+      paSortedTeams.forEach(function(abbr) {
+        var result = getPickAllResult(abbr, scoresMap);
+        var cls = result === 'W' ? ' win' : result === 'L' ? ' loss' : '';
+        var slug = abbr.toLowerCase();
+        var logo = 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/' + slug + '.png&w=80&h=80&transparent=true';
+        distHtml += '<div class="wp-dist-item' + cls + '">'
+          + '<img src="' + logo + '" onerror="this.style.display=\'none\'" alt="' + escPickAll(abbr) + '">'
+          + '<span class="wp-dist-abbr">' + escPickAll(abbr) + '</span>'
+          + '<span class="wp-dist-count">' + paPickCounts[abbr] + '</span>'
+          + '</div>';
+      });
+      distHtml += '</div><div style="font-size:12px;color:var(--muted);text-align:center;padding:8px 12px 4px;">* Only showing teams whose game has started</div>';
+    }
+    distHtml += '</div></div>';
+    html += distHtml;
+
     const rows = picks.map(function(p) {
       var rec = { W: 0, L: 0, T: 0, live: 0, pending: 0 };
       (p.picks || []).forEach(function(teamRaw) {
@@ -9399,6 +9435,8 @@ function getActualTiebreakerFromWeek(weekScores) {
   return getActualTiebreaker(weekScores);
 }
 
+let _wpLbScoresCache = {};
+
 async function loadWeeklyPicks() {
   const loadingEl  = document.getElementById('weeklyPicksLoading');
   const errorEl    = document.getElementById('weeklyPicksError');
@@ -9703,7 +9741,67 @@ async function loadWeeklyPicks() {
     }
 
     // ── Everyone's Picks (0 losses) + Eliminated (1+ losses) ──
+
+    // Build leaderboard rank map so rows sort by season standings
+    const lbRankMap = {};
+    try {
+      const _allHistPicks = await fetchAllPicks();
+      if (_allHistPicks.length > 0) {
+        const _activeEmails = new Set(approvedUsers.filter(function(u) { return u.isActive !== false; }).map(function(u) { return (u.email || '').toLowerCase(); }));
+        const _uwMap = {};
+        _allHistPicks.forEach(function(doc) {
+          const email = (doc.email || 'unknown').toLowerCase();
+          const wk = doc.week || '';
+          if (!wk || !_activeEmails.has(email)) return;
+          if (!_uwMap[email]) _uwMap[email] = {};
+          if (!_uwMap[email][wk] || (doc.timestamp || 0) > (_uwMap[email][wk].timestamp || 0)) _uwMap[email][wk] = doc;
+        });
+        const _uniqueWks = [...new Set(_allHistPicks.map(function(d) { return d.week; }).filter(Boolean))];
+        const _swMap = {};
+        await Promise.all(_uniqueWks.map(async function(wk) {
+          if (wk === weekLabel) { _swMap[wk] = scoresMap; return; }
+          if (!_wpLbScoresCache[wk]) {
+            const wkNum = parseInt(wk.replace(/\D/g, '')) || wk;
+            _wpLbScoresCache[wk] = await fetchESPNScoresMap(wkNum);
+          }
+          _swMap[wk] = _wpLbScoresCache[wk];
+        }));
+        const _allWks = new Set(Object.values(_uwMap).flatMap(function(wm) { return Object.keys(wm); }));
+        const _standings = Object.keys(_uwMap).map(function(email) {
+          let w = 0, l = 0, tbD = 0, tbC = 0;
+          _allWks.forEach(function(wk) {
+            const doc = (_uwMap[email] || {})[wk];
+            const ws = _swMap[wk] || {};
+            const wf = isWeekFullyFinal(ws);
+            if (!doc) { if (wf) l += 5; return; }
+            const picks5 = [doc.pick1, doc.pick2, doc.pick3, doc.pick4, doc.pick5];
+            const sprd5  = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5];
+            picks5.forEach(function(pick, pi) {
+              if (!pick || !pick.trim()) { if (wf) l++; return; }
+              const r = getPickResult(pick, sprd5[pi] || '', ws);
+              if (r === 'win') w++; else if (r === 'loss') l++;
+            });
+            const lba = getActualTiebreakerFromWeek(ws);
+            if (lba !== null) {
+              tbD += Math.abs((doc.tiebreaker !== undefined && doc.tiebreaker !== '' ? parseInt(doc.tiebreaker) : 0) - lba);
+              tbC++;
+            }
+          });
+          return { email, w, l, tbD, tbC };
+        });
+        _standings.sort(function(a, b) {
+          if (b.w !== a.w) return b.w - a.w;
+          if (a.tbC > 0 && b.tbC > 0) return a.tbD - b.tbD;
+          return 0;
+        });
+        _standings.forEach(function(entry, idx) { lbRankMap[entry.email] = idx; });
+      }
+    } catch(e) { console.error('LB rank error:', e); }
+
     function byRecord(a, b) {
+      const rankA = lbRankMap[(a.email || '').toLowerCase()];
+      const rankB = lbRankMap[(b.email || '').toLowerCase()];
+      if (rankA !== undefined && rankB !== undefined && rankA !== rankB) return rankA - rankB;
       const ra = userRecords[a.email || 'unknown'] || {};
       const rb = userRecords[b.email || 'unknown'] || {};
       if (rb.wins !== ra.wins) return rb.wins - ra.wins;
