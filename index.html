@@ -3086,7 +3086,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.7.5</div>
+    <div class="version-badge">v1.7.6</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -4182,6 +4182,7 @@ let pickAllData = {};   // { weekKey: { week, picks, importedAt } }
 let pickAllScores = {}; // { weekKey: scoresMap }
 let pickAllCurrentWeek = null;
 let pickAllOurTeamTimer = null;
+let pickAllSortMode = 'weekly'; // 'weekly' | 'leaderboard'
 
 async function loadPickAllPage() {
   const tblEl = document.getElementById('pickAllTableContainer');
@@ -4368,14 +4369,101 @@ function _buildPickCard(abbr, scoresMap) {
     + oppHtml + badgeHtml + scoreHtml + '</div>';
 }
 
+function computePickAllSeasonRankMap() {
+  var playerMap = {};
+  var allWeeks = Object.keys(pickAllData).sort(function(a,b){ return (parseInt(a)||0)-(parseInt(b)||0); });
+  allWeeks.forEach(function(wk) {
+    var weekData = pickAllData[wk];
+    if (!weekData || !weekData.picks) return;
+    var sm = pickAllScores[wk] || {};
+    var lastGame = sm['__lastGame__'];
+    var actualTotal = (lastGame && lastGame.isFinal && lastGame.total != null) ? lastGame.total : null;
+    weekData.picks.forEach(function(p) {
+      if (!playerMap[p.name]) playerMap[p.name] = { W: 0, L: 0, tbDiff: 0, tbWeeks: 0 };
+      var rec = playerMap[p.name];
+      var teams = Array.isArray(p.picks) ? p.picks : (p.team ? [p.team] : []);
+      teams.forEach(function(team) {
+        var r = getPickAllResult(normalizeTeamAbbr(team), sm);
+        if (r === 'W') rec.W++; else if (r === 'L') rec.L++;
+      });
+      if (actualTotal != null && p.tiebreaker != null) {
+        rec.tbDiff += Math.abs(p.tiebreaker - actualTotal);
+        rec.tbWeeks++;
+      }
+    });
+  });
+  var sorted = Object.entries(playerMap).sort(function(a, b) {
+    var ar = a[1], br = b[1];
+    if (br.W !== ar.W) return br.W - ar.W;
+    if (ar.L !== br.L) return ar.L - br.L;
+    if (ar.tbWeeks > 0 && br.tbWeeks > 0) return ar.tbDiff - br.tbDiff;
+    return 0;
+  });
+  var rankMap = {};
+  sorted.forEach(function(entry, idx) { rankMap[entry[0]] = idx; });
+  return rankMap;
+}
+
+function setPickAllSort(mode, weekKey) {
+  pickAllSortMode = mode;
+  var weekPicks = pickAllData[weekKey];
+  if (weekPicks && weekPicks.picks) {
+    renderPickAllTable(weekKey, weekPicks.picks, pickAllScores[weekKey] || {});
+  }
+}
+
 function renderPickAllTable(weekKey, picks, scoresMap) {
   const container = document.getElementById('pickAllTableContainer');
   if (!container) return;
 
   const isNewFmt = picks.length > 0 && Array.isArray(picks[0].picks);
-  let html = '<div style="margin-bottom:14px;color:var(--muted);font-size:13px;">Week ' + weekKey + ' &middot; ' + picks.length + ' players &middot; sorted by wins</div>';
+  var wkBtn   = 'class="pa-week-tab' + (pickAllSortMode === 'weekly'      ? ' active' : '') + '" onclick="setPickAllSort(\'weekly\',\'' + weekKey + '\')"';
+  var lbBtn   = 'class="pa-week-tab' + (pickAllSortMode === 'leaderboard' ? ' active' : '') + '" onclick="setPickAllSort(\'leaderboard\',\'' + weekKey + '\')"';
+  let html = '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">'
+    + '<span style="color:var(--muted);font-size:13px;">Week ' + weekKey + ' &middot; ' + picks.length + ' players</span>'
+    + '<div style="display:flex;gap:4px;margin-left:auto;">'
+    + '<button ' + wkBtn + ' style="font-size:12px;padding:4px 10px;">📅 This Week</button>'
+    + '<button ' + lbBtn + ' style="font-size:12px;padding:4px 10px;">🏆 Season</button>'
+    + '</div></div>';
 
   if (isNewFmt) {
+    // ── Pick Distribution ──
+    var paPickCounts = {};
+    picks.forEach(function(p) {
+      (p.picks || []).forEach(function(teamRaw) {
+        var abbr = normalizeTeamAbbr(teamRaw);
+        if (!abbr) return;
+        var gameData = scoresMap && scoresMap[abbr];
+        if (!gameData || !gameData.started) return;
+        paPickCounts[abbr] = (paPickCounts[abbr] || 0) + 1;
+      });
+    });
+    var paSortedTeams = Object.keys(paPickCounts).sort();
+    var distHtml = '<div class="wp-dist wp-dist-collapsible" style="margin-top:0;margin-bottom:20px;">'
+      + '<button class="wp-dist-toggle" onclick="this.closest(\'.wp-dist\').classList.toggle(\'open\')">'
+      + 'Pick Distribution <span class="wp-dist-chevron">▼</span></button>'
+      + '<div class="wp-dist-body" style="flex-direction:column;">';
+    if (paSortedTeams.length === 0) {
+      distHtml += '<div style="font-size:14px;color:var(--muted);text-align:center;padding:16px 12px;">No picks from games that have started yet.</div>';
+    } else {
+      distHtml += '<div class="wp-dist-grid">';
+      paSortedTeams.forEach(function(abbr) {
+        var result = getPickAllResult(abbr, scoresMap);
+        var cls = result === 'W' ? ' win' : result === 'L' ? ' loss' : '';
+        var slug = abbr.toLowerCase();
+        var logo = 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/' + slug + '.png&w=80&h=80&transparent=true';
+        distHtml += '<div class="wp-dist-item' + cls + '">'
+          + '<img src="' + logo + '" onerror="this.style.display=\'none\'" alt="' + escPickAll(abbr) + '">'
+          + '<span class="wp-dist-abbr">' + escPickAll(abbr) + '</span>'
+          + '<span class="wp-dist-count">' + paPickCounts[abbr] + '</span>'
+          + '</div>';
+      });
+      distHtml += '</div><div style="font-size:12px;color:var(--muted);text-align:center;padding:8px 12px 4px;">* Only showing teams whose game has started</div>';
+    }
+    distHtml += '</div></div>';
+    html += distHtml;
+
+    var paSeasonRanks = pickAllSortMode === 'leaderboard' ? computePickAllSeasonRankMap() : null;
     const rows = picks.map(function(p) {
       var rec = { W: 0, L: 0, T: 0, live: 0, pending: 0 };
       (p.picks || []).forEach(function(teamRaw) {
@@ -4384,6 +4472,10 @@ function renderPickAllTable(weekKey, picks, scoresMap) {
       });
       return { name: p.name, teamPicks: p.picks, tiebreaker: p.tiebreaker, rec: rec };
     }).sort(function(a, b) {
+      if (paSeasonRanks) {
+        var ra = paSeasonRanks[a.name], rb = paSeasonRanks[b.name];
+        if (ra !== undefined && rb !== undefined && ra !== rb) return ra - rb;
+      }
       if (b.rec.W !== a.rec.W) return b.rec.W - a.rec.W;
       return a.rec.L - b.rec.L;
     });
