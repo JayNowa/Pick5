@@ -9516,13 +9516,48 @@ async function loadWeeklyPicks() {
 
     if (!window.fbGetWeeklyPicks) throw new Error('Firebase not ready');
 
-    // Fetch picks, scores, and approved users in parallel
-    const [allPicks, scoresMap, approvedUsers] = await Promise.all([
+    // Fetch picks, scores, approved users, and all-week picks in parallel
+    const [allPicks, scoresMap, approvedUsers, allPicksAllWeeks] = await Promise.all([
       window.fbGetWeeklyPicks(weekLabel),
       fetchScoresMap(week),
-      window.fbGetAllApprovedUsers ? window.fbGetAllApprovedUsers() : Promise.resolve([])
+      window.fbGetAllApprovedUsers ? window.fbGetAllApprovedUsers() : Promise.resolve([]),
+      window.fbGetAllPicks ? window.fbGetAllPicks() : Promise.resolve([])
     ]);
     loadingEl.style.display = 'none';
+
+    // Compute season W/L records per user across all weeks
+    const seasonRecords = {};
+    try {
+      const allWeekLabels = [...new Set((allPicksAllWeeks || []).map(function(d) { return d.week; }).filter(Boolean))];
+      const allScoresByWeek = {};
+      allScoresByWeek[weekLabel] = scoresMap;
+      await Promise.all(allWeekLabels.filter(function(w) { return w !== weekLabel; }).map(async function(wk) {
+        try { allScoresByWeek[wk] = await fetchESPNScoresMap(wk); } catch(e) { allScoresByWeek[wk] = {}; }
+      }));
+      const uwMap = {};
+      (allPicksAllWeeks || []).forEach(function(doc) {
+        const email = (doc.email || '').toLowerCase();
+        const wk = doc.week || '';
+        if (!email || !wk) return;
+        if (!uwMap[email]) uwMap[email] = {};
+        if (!uwMap[email][wk] || (doc.timestamp || 0) > (uwMap[email][wk].timestamp || 0)) uwMap[email][wk] = doc;
+      });
+      Object.keys(uwMap).forEach(function(email) {
+        let tw = 0, tl = 0;
+        Object.keys(uwMap[email]).forEach(function(wk) {
+          const doc = uwMap[email][wk];
+          const ws  = allScoresByWeek[wk] || {};
+          const wff = isWeekFullyFinal(ws);
+          [doc.pick1, doc.pick2, doc.pick3, doc.pick4, doc.pick5].forEach(function(pick, pi) {
+            const spread = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5][pi] || '';
+            if (!pick || !pick.trim()) { if (wff) tl++; return; }
+            const r = getPickResult(pick, spread, ws);
+            if (r === 'win') tw++; else if (r === 'loss') tl++;
+          });
+        });
+        seasonRecords[email] = { tw, tl };
+      });
+    } catch(e) { console.error('Season records error:', e); }
 
     // Populate tiebreaker widget from spread data
     (async function() {
@@ -9704,6 +9739,17 @@ async function loadWeeklyPicks() {
       } else { tbTd.textContent = '—'; tbTd.style.color = 'var(--muted)'; }
       tr.appendChild(tbTd);
 
+      const seasonTd = document.createElement('td');
+      seasonTd.className = 'wp-record';
+      const sr = seasonRecords[(doc.email || '').toLowerCase()];
+      if (sr && (sr.tw > 0 || sr.tl > 0)) {
+        seasonTd.innerHTML = '<span class="wins">' + sr.tw + 'W</span> <span class="losses">' + sr.tl + 'L</span>';
+      } else {
+        seasonTd.style.color = 'var(--muted)';
+        seasonTd.textContent = '—';
+      }
+      tr.appendChild(seasonTd);
+
       return tr;
     }
 
@@ -9712,7 +9758,7 @@ async function loadWeeklyPicks() {
       const wrap = document.createElement('div'); wrap.className = 'wp-table-wrap';
       const table = document.createElement('table'); table.className = 'wp-table';
       const thead = document.createElement('thead'); const hrow = document.createElement('tr');
-      ['User','Pick 1','Pick 2','Pick 3','Pick 4','Pick 5','Record','Tiebreaker'].forEach(function(h) {
+      ['User','Pick 1','Pick 2','Pick 3','Pick 4','Pick 5','Record','Tiebreaker','Season'].forEach(function(h) {
         const th = document.createElement('th'); th.textContent = h; hrow.appendChild(th);
       });
       thead.appendChild(hrow); table.appendChild(thead);
