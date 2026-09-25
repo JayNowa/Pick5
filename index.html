@@ -9435,8 +9435,6 @@ function getActualTiebreakerFromWeek(weekScores) {
   return getActualTiebreaker(weekScores);
 }
 
-let _wpLbScoresCache = {};
-
 async function loadWeeklyPicks() {
   const loadingEl  = document.getElementById('weeklyPicksLoading');
   const errorEl    = document.getElementById('weeklyPicksError');
@@ -9741,67 +9739,7 @@ async function loadWeeklyPicks() {
     }
 
     // ── Everyone's Picks (0 losses) + Eliminated (1+ losses) ──
-
-    // Build leaderboard rank map so rows sort by season standings
-    const lbRankMap = {};
-    try {
-      const _allHistPicks = await fetchAllPicks();
-      if (_allHistPicks.length > 0) {
-        const _activeEmails = new Set(approvedUsers.filter(function(u) { return u.isActive !== false; }).map(function(u) { return (u.email || '').toLowerCase(); }));
-        const _uwMap = {};
-        _allHistPicks.forEach(function(doc) {
-          const email = (doc.email || 'unknown').toLowerCase();
-          const wk = doc.week || '';
-          if (!wk || !_activeEmails.has(email)) return;
-          if (!_uwMap[email]) _uwMap[email] = {};
-          if (!_uwMap[email][wk] || (doc.timestamp || 0) > (_uwMap[email][wk].timestamp || 0)) _uwMap[email][wk] = doc;
-        });
-        const _uniqueWks = [...new Set(_allHistPicks.map(function(d) { return d.week; }).filter(Boolean))];
-        const _swMap = {};
-        await Promise.all(_uniqueWks.map(async function(wk) {
-          if (wk === weekLabel) { _swMap[wk] = scoresMap; return; }
-          if (!_wpLbScoresCache[wk]) {
-            const wkNum = parseInt(wk.replace(/\D/g, '')) || wk;
-            _wpLbScoresCache[wk] = await fetchESPNScoresMap(wkNum);
-          }
-          _swMap[wk] = _wpLbScoresCache[wk];
-        }));
-        const _allWks = new Set(Object.values(_uwMap).flatMap(function(wm) { return Object.keys(wm); }));
-        const _standings = Object.keys(_uwMap).map(function(email) {
-          let w = 0, l = 0, tbD = 0, tbC = 0;
-          _allWks.forEach(function(wk) {
-            const doc = (_uwMap[email] || {})[wk];
-            const ws = _swMap[wk] || {};
-            const wf = isWeekFullyFinal(ws);
-            if (!doc) { if (wf) l += 5; return; }
-            const picks5 = [doc.pick1, doc.pick2, doc.pick3, doc.pick4, doc.pick5];
-            const sprd5  = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5];
-            picks5.forEach(function(pick, pi) {
-              if (!pick || !pick.trim()) { if (wf) l++; return; }
-              const r = getPickResult(pick, sprd5[pi] || '', ws);
-              if (r === 'win') w++; else if (r === 'loss') l++;
-            });
-            const lba = getActualTiebreakerFromWeek(ws);
-            if (lba !== null) {
-              tbD += Math.abs((doc.tiebreaker !== undefined && doc.tiebreaker !== '' ? parseInt(doc.tiebreaker) : 0) - lba);
-              tbC++;
-            }
-          });
-          return { email, w, l, tbD, tbC };
-        });
-        _standings.sort(function(a, b) {
-          if (b.w !== a.w) return b.w - a.w;
-          if (a.tbC > 0 && b.tbC > 0) return a.tbD - b.tbD;
-          return 0;
-        });
-        _standings.forEach(function(entry, idx) { lbRankMap[entry.email] = idx; });
-      }
-    } catch(e) { console.error('LB rank error:', e); }
-
     function byRecord(a, b) {
-      const rankA = lbRankMap[(a.email || '').toLowerCase()];
-      const rankB = lbRankMap[(b.email || '').toLowerCase()];
-      if (rankA !== undefined && rankB !== undefined && rankA !== rankB) return rankA - rankB;
       const ra = userRecords[a.email || 'unknown'] || {};
       const rb = userRecords[b.email || 'unknown'] || {};
       if (rb.wins !== ra.wins) return rb.wins - ra.wins;
