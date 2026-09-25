@@ -4369,6 +4369,25 @@ function _buildPickCard(abbr, scoresMap) {
     + oppHtml + badgeHtml + scoreHtml + '</div>';
 }
 
+function computePickAllSeasonRecordMap() {
+  var playerMap = {};
+  var allWeeks = Object.keys(pickAllData).sort(function(a,b){ return (parseInt(a)||0)-(parseInt(b)||0); });
+  allWeeks.forEach(function(wk) {
+    var weekData = pickAllData[wk];
+    if (!weekData || !weekData.picks) return;
+    var sm = pickAllScores[wk] || {};
+    weekData.picks.forEach(function(p) {
+      if (!playerMap[p.name]) playerMap[p.name] = { W: 0, L: 0 };
+      var teams = Array.isArray(p.picks) ? p.picks : (p.team ? [p.team] : []);
+      teams.forEach(function(team) {
+        var r = getPickAllResult(normalizeTeamAbbr(team), sm);
+        if (r === 'W') playerMap[p.name].W++; else if (r === 'L') playerMap[p.name].L++;
+      });
+    });
+  });
+  return playerMap;
+}
+
 function computePickAllSeasonRankMap() {
   var playerMap = {};
   var allWeeks = Object.keys(pickAllData).sort(function(a,b){ return (parseInt(a)||0)-(parseInt(b)||0); });
@@ -4463,7 +4482,8 @@ function renderPickAllTable(weekKey, picks, scoresMap) {
     distHtml += '</div></div>';
     html += distHtml;
 
-    var paSeasonRanks = pickAllSortMode === 'leaderboard' ? computePickAllSeasonRankMap() : null;
+    var paSeasonRanks   = pickAllSortMode === 'leaderboard' ? computePickAllSeasonRankMap() : null;
+    var paSeasonRecords = computePickAllSeasonRecordMap();
     const rows = picks.map(function(p) {
       var rec = { W: 0, L: 0, T: 0, live: 0, pending: 0 };
       (p.picks || []).forEach(function(teamRaw) {
@@ -4485,6 +4505,10 @@ function renderPickAllTable(weekKey, picks, scoresMap) {
       var blockCls = isOurs ? 'pa-player-block pa-our-block' : 'pa-player-block';
       var star     = isOurs ? ' ★' : '';
       var tbHtml   = row.tiebreaker != null ? '<span class="pa-player-tb">TB: ' + row.tiebreaker + '</span>' : '';
+      var sr       = paSeasonRecords[row.name] || { W: 0, L: 0 };
+      var seasonHtml = (sr.W > 0 || sr.L > 0)
+        ? '<span class="pa-player-tb" style="margin-left:4px;"><span style="color:#4caf7d;font-weight:700;">' + sr.W + 'W</span> <span style="color:#e05c5c;font-weight:700;">' + sr.L + 'L</span> <span style="color:var(--muted);font-size:11px;">season</span></span>'
+        : '';
       var rec      = row.rec;
       var recordHtml = '<span class="pa-player-record">'
         + '<span style="color:#4caf7d;font-weight:700;">' + rec.W + 'W</span> '
@@ -4504,7 +4528,7 @@ function renderPickAllTable(weekKey, picks, scoresMap) {
       return '<div class="' + blockCls + '">'
         + '<div class="pa-player-header">'
         + '<span class="pa-player-name">' + (idx + 1) + '. ' + escPickAll(row.name) + escPickAll(star) + '</span>'
-        + recordHtml + tbHtml
+        + recordHtml + tbHtml + seasonHtml
         + '</div>'
         + '<div class="pa-player-cards">' + cards + '</div>'
         + '</div>';
@@ -9516,48 +9540,13 @@ async function loadWeeklyPicks() {
 
     if (!window.fbGetWeeklyPicks) throw new Error('Firebase not ready');
 
-    // Fetch picks, scores, approved users, and all-week picks in parallel
-    const [allPicks, scoresMap, approvedUsers, allPicksAllWeeks] = await Promise.all([
+    // Fetch picks, scores, and approved users in parallel
+    const [allPicks, scoresMap, approvedUsers] = await Promise.all([
       window.fbGetWeeklyPicks(weekLabel),
       fetchScoresMap(week),
-      window.fbGetAllApprovedUsers ? window.fbGetAllApprovedUsers() : Promise.resolve([]),
-      window.fbGetAllPicks ? window.fbGetAllPicks() : Promise.resolve([])
+      window.fbGetAllApprovedUsers ? window.fbGetAllApprovedUsers() : Promise.resolve([])
     ]);
     loadingEl.style.display = 'none';
-
-    // Compute season W/L records per user across all weeks
-    const seasonRecords = {};
-    try {
-      const allWeekLabels = [...new Set((allPicksAllWeeks || []).map(function(d) { return d.week; }).filter(Boolean))];
-      const allScoresByWeek = {};
-      allScoresByWeek[weekLabel] = scoresMap;
-      await Promise.all(allWeekLabels.filter(function(w) { return w !== weekLabel; }).map(async function(wk) {
-        try { allScoresByWeek[wk] = await fetchESPNScoresMap(wk); } catch(e) { allScoresByWeek[wk] = {}; }
-      }));
-      const uwMap = {};
-      (allPicksAllWeeks || []).forEach(function(doc) {
-        const email = (doc.email || '').toLowerCase();
-        const wk = doc.week || '';
-        if (!email || !wk) return;
-        if (!uwMap[email]) uwMap[email] = {};
-        if (!uwMap[email][wk] || (doc.timestamp || 0) > (uwMap[email][wk].timestamp || 0)) uwMap[email][wk] = doc;
-      });
-      Object.keys(uwMap).forEach(function(email) {
-        let tw = 0, tl = 0;
-        Object.keys(uwMap[email]).forEach(function(wk) {
-          const doc = uwMap[email][wk];
-          const ws  = allScoresByWeek[wk] || {};
-          const wff = isWeekFullyFinal(ws);
-          [doc.pick1, doc.pick2, doc.pick3, doc.pick4, doc.pick5].forEach(function(pick, pi) {
-            const spread = [doc.spread1, doc.spread2, doc.spread3, doc.spread4, doc.spread5][pi] || '';
-            if (!pick || !pick.trim()) { if (wff) tl++; return; }
-            const r = getPickResult(pick, spread, ws);
-            if (r === 'win') tw++; else if (r === 'loss') tl++;
-          });
-        });
-        seasonRecords[email] = { tw, tl };
-      });
-    } catch(e) { console.error('Season records error:', e); }
 
     // Populate tiebreaker widget from spread data
     (async function() {
@@ -9739,17 +9728,6 @@ async function loadWeeklyPicks() {
       } else { tbTd.textContent = '—'; tbTd.style.color = 'var(--muted)'; }
       tr.appendChild(tbTd);
 
-      const seasonTd = document.createElement('td');
-      seasonTd.className = 'wp-record';
-      const sr = seasonRecords[(doc.email || '').toLowerCase()];
-      if (sr && (sr.tw > 0 || sr.tl > 0)) {
-        seasonTd.innerHTML = '<span class="wins">' + sr.tw + 'W</span> <span class="losses">' + sr.tl + 'L</span>';
-      } else {
-        seasonTd.style.color = 'var(--muted)';
-        seasonTd.textContent = '—';
-      }
-      tr.appendChild(seasonTd);
-
       return tr;
     }
 
@@ -9758,7 +9736,7 @@ async function loadWeeklyPicks() {
       const wrap = document.createElement('div'); wrap.className = 'wp-table-wrap';
       const table = document.createElement('table'); table.className = 'wp-table';
       const thead = document.createElement('thead'); const hrow = document.createElement('tr');
-      ['User','Pick 1','Pick 2','Pick 3','Pick 4','Pick 5','Record','Tiebreaker','Season'].forEach(function(h) {
+      ['User','Pick 1','Pick 2','Pick 3','Pick 4','Pick 5','Record','Tiebreaker'].forEach(function(h) {
         const th = document.createElement('th'); th.textContent = h; hrow.appendChild(th);
       });
       thead.appendChild(hrow); table.appendChild(thead);
