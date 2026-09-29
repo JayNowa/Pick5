@@ -2277,6 +2277,31 @@
     letter-spacing: 0.1em;
     color: var(--accent);
   }
+  .results-totals-row td {
+    background: rgba(200,169,74,0.06);
+    border-top: 2px solid var(--border);
+  }
+  .results-totals-row td:first-child {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 14px;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    background: rgba(200,169,74,0.06);
+  }
+  .results-week-total {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 16px;
+    letter-spacing: 0.08em;
+    color: var(--text);
+    display: block;
+  }
+  .results-week-pct {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    display: block;
+    margin-top: 2px;
+  }
 
 
   /* ── TIEBREAKER ── */
@@ -9383,6 +9408,12 @@ async function loadResultsPage() {
     thead.appendChild(headerRow);
     table.appendChild(thead);
 
+    // Accumulators for weekly and season totals
+    const weekWins = {};
+    const weekLosses = {};
+    allWeeks.forEach(function(wk) { weekWins[wk] = 0; weekLosses[wk] = 0; });
+    let grandWins = 0, grandLosses = 0;
+
     // Body rows
     const tbody = document.createElement('tbody');
     users.forEach(function(email) {
@@ -9420,6 +9451,10 @@ async function loadResultsPage() {
 
         totalWins   += w;
         totalLosses += l;
+        weekWins[week]   += w;
+        weekLosses[week] += l;
+        grandWins   += w;
+        grandLosses += l;
 
         const badge = document.createElement('span');
         badge.className = 'result-badge';
@@ -9474,6 +9509,41 @@ async function loadResultsPage() {
     });
 
     table.appendChild(tbody);
+
+    // League totals footer row
+    const tfoot = document.createElement('tfoot');
+    const footerRow = document.createElement('tr');
+    footerRow.className = 'results-totals-row';
+
+    const footLabelTd = document.createElement('td');
+    footLabelTd.textContent = 'League Total';
+    footerRow.appendChild(footLabelTd);
+
+    allWeeks.forEach(function(week) {
+      const td = document.createElement('td');
+      const w = weekWins[week] || 0;
+      const l = weekLosses[week] || 0;
+      const total = w + l;
+      const pct = total > 0 ? ((w / total) * 100).toFixed(1) : null;
+      td.innerHTML = '<span class="results-week-total">' + w + '-' + l + '</span>' +
+        (pct !== null ? '<span class="results-week-pct">' + pct + '%</span>' : '');
+      footerRow.appendChild(td);
+    });
+
+    const footTotalTd = document.createElement('td');
+    const grandTotal = grandWins + grandLosses;
+    const grandPct = grandTotal > 0 ? ((grandWins / grandTotal) * 100).toFixed(1) : null;
+    footTotalTd.innerHTML = '<span class="results-total">' + grandWins + '-' + grandLosses + '</span>' +
+      (grandPct !== null ? '<br><span class="results-week-pct">' + grandPct + '%</span>' : '');
+    footerRow.appendChild(footTotalTd);
+
+    const footTbTd = document.createElement('td');
+    footTbTd.innerHTML = '<span style="color:var(--muted);">—</span>';
+    footerRow.appendChild(footTbTd);
+
+    tfoot.appendChild(footerRow);
+    table.appendChild(tfoot);
+
     wrap.appendChild(table);
     tableEl.appendChild(wrap);
 
