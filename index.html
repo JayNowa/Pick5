@@ -4477,8 +4477,6 @@ function renderPickAllTable(weekKey, picks, scoresMap) {
       (p.picks || []).forEach(function(teamRaw) {
         var abbr = normalizeTeamAbbr(teamRaw);
         if (!abbr) return;
-        var gameData = scoresMap && scoresMap[abbr];
-        if (!gameData || !gameData.started) return;
         paPickCounts[abbr] = (paPickCounts[abbr] || 0) + 1;
       });
     });
@@ -4488,7 +4486,7 @@ function renderPickAllTable(weekKey, picks, scoresMap) {
       + 'Pick Distribution <span class="wp-dist-chevron">▼</span></button>'
       + '<div class="wp-dist-body" style="flex-direction:column;">';
     if (paSortedTeams.length === 0) {
-      distHtml += '<div style="font-size:14px;color:var(--muted);text-align:center;padding:16px 12px;">No picks from games that have started yet.</div>';
+      distHtml += '<div style="font-size:14px;color:var(--muted);text-align:center;padding:16px 12px;">No picks imported yet.</div>';
     } else {
       distHtml += '<div class="wp-dist-grid">';
       paSortedTeams.forEach(function(abbr) {
@@ -4502,7 +4500,7 @@ function renderPickAllTable(weekKey, picks, scoresMap) {
           + '<span class="wp-dist-count">' + paPickCounts[abbr] + '</span>'
           + '</div>';
       });
-      distHtml += '</div><div style="font-size:12px;color:var(--muted);text-align:center;padding:8px 12px 4px;">* Only showing teams whose game has started</div>';
+      distHtml += '</div>';
     }
     distHtml += '</div></div>';
     html += distHtml;
