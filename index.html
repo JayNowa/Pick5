@@ -2425,15 +2425,14 @@
   .lb-rank.loser  { color: var(--error); }
   .lb-rank.other  { color: var(--muted); font-size: 20px; }
 
-  .lb-info { flex: 1; min-width: 0; }
+  .lb-info { flex: 1 1 150px; min-width: 0; }
   .lb-name {
     font-family: 'Bebas Neue', sans-serif;
     font-size: 22px;
     letter-spacing: 0.08em;
     color: var(--text);
-    line-height: 1;
-    overflow: hidden;
-    white-space: nowrap;
+    line-height: 1.1;
+    overflow-wrap: anywhere;
   }
   .lb-email {
     font-size: 12px;
@@ -3111,7 +3110,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.7.7</div>
+    <div class="version-badge">v1.7.8</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
