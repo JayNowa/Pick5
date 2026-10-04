@@ -3110,7 +3110,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.7.8</div>
+    <div class="version-badge">v1.7.9</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -4328,9 +4328,16 @@ function normalizeTeamAbbr(raw) {
   return map[upper] || upper;
 }
 
+// ESPN keys Washington as WSH while Pick All normalizes it to WAS
+function paGameKey(abbr, scoresMap) {
+  if (!scoresMap || scoresMap[abbr]) return abbr;
+  var alt = abbr === 'WAS' ? 'WSH' : abbr === 'WSH' ? 'WAS' : null;
+  return alt && scoresMap[alt] ? alt : abbr;
+}
+
 function getPickAllResult(team, scoresMap) {
   if (!team || !scoresMap) return 'pending';
-  const abbr = normalizeTeamAbbr(team);
+  const abbr = paGameKey(normalizeTeamAbbr(team), scoresMap);
   const game = scoresMap[abbr];
   if (!game) return 'pending';
   if (!game.started) return 'pending';
@@ -4347,14 +4354,15 @@ function getPickAllResult(team, scoresMap) {
 // Shared card builder used by renderPickAllTable and renderOurTeamSpotlight
 function _buildPickCard(abbr, scoresMap) {
   var result = getPickAllResult(abbr, scoresMap);
-  var game   = scoresMap && scoresMap[abbr];
+  var key    = paGameKey(abbr, scoresMap);
+  var game   = scoresMap && scoresMap[key];
   var slug   = abbr.toLowerCase();
   var logo   = 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/' + slug + '.png&w=80&h=80&transparent=true';
   var cardCls = '', badgeHtml = '', scoreHtml = '', oppHtml = '';
 
   // Opponent line: "vs/at" label + small logo
   if (game) {
-    var isHomeTeam = game.homeAbbr === abbr;
+    var isHomeTeam = game.homeAbbr === key;
     var oppAbbr = isHomeTeam ? game.awayAbbr : game.homeAbbr;
     if (oppAbbr) {
       var oppSlug = oppAbbr.toLowerCase();
@@ -4371,14 +4379,14 @@ function _buildPickCard(abbr, scoresMap) {
     var badgeCls = result === 'W' ? 'pa-win' : result === 'L' ? 'pa-loss' : 'pa-tie';
     badgeHtml = '<span class="pa-spot-badge ' + badgeCls + '">' + result + '</span>';
     if (game && game.isFinal) {
-      var isHome = game.homeAbbr === abbr;
+      var isHome = game.homeAbbr === key;
       scoreHtml = '<span class="pa-spot-score">'
         + (isHome ? game.homeScore : game.awayScore)
         + '&ndash;' + (isHome ? game.awayScore : game.homeScore) + '</span>';
     }
   } else if (result === 'live' && game) {
     cardCls = 'ps-live';
-    var isHome = game.homeAbbr === abbr;
+    var isHome = game.homeAbbr === key;
     var mySc   = isHome ? game.homeScore : game.awayScore;
     var oppSc  = isHome ? game.awayScore : game.homeScore;
     badgeHtml  = '<span class="pa-spot-badge ' + (mySc >= oppSc ? 'pa-win' : 'pa-loss') + '" style="animation:pa-pulse 1.2s infinite;">LIVE</span>';
