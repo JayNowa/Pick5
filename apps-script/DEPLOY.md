@@ -17,7 +17,7 @@
 ## Verify it worked
 
 - The version number in `doPost` logs (e.g. `doPost called - v12`) will reflect the latest version.
-- To test, run one of the test functions (`testConfirmation`, `testReminder`, `testRecap`) directly from the editor and check your inbox.
+- To test, run one of the test functions (`testConfirmation`, `testRecap`) directly from the editor and check your inbox.
 
 ## Setting up the automated picks reminder
 

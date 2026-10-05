@@ -3113,7 +3113,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.8.0</div>
+    <div class="version-badge">v1.8.1</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -7750,48 +7750,26 @@ function updateUsersCount() {
 }
 
 // ── Admin: Send Picks Reminder ──
+// Runs sendAutomatedPicksReminder in Apps Script (same code as the scheduled trigger)
 async function sendPicksReminder() {
   const statusEl = document.getElementById('reminderStatus');
   const btnEl    = document.getElementById('sendReminderBtn');
 
+  if (!confirm('Send reminder emails now to everyone with missing or partial picks? A summary will also be emailed to the admins.')) return;
+
   btnEl.disabled = true;
-  statusEl.textContent = 'Checking missing picks…';
+  statusEl.textContent = 'Sending…';
   statusEl.className = 'admin-status';
 
   try {
-    const activeWeek = window.fbGetSpreadsWeek ? await window.fbGetSpreadsWeek() : null;
-    if (!activeWeek) throw new Error('No active week set.');
-    const weekLabel = (isNaN(parseInt(activeWeek)) || activeWeek.toString().toLowerCase().includes('week'))
-      ? activeWeek : 'Week ' + activeWeek;
-
-    const [allUsers, weekPicks] = await Promise.all([
-      window.fbGetAllApprovedUsers ? window.fbGetAllApprovedUsers() : [],
-      window.fbGetWeeklyPicks ? window.fbGetWeeklyPicks(weekLabel) : []
-    ]);
-
-    const pickedEmails = new Set(weekPicks.map(function(d) { return (d.email || '').toLowerCase(); }));
-    const missing = allUsers.filter(function(u) { return u.isActive !== false && !pickedEmails.has((u.email || '').toLowerCase()); });
-
-    if (missing.length === 0) {
-      statusEl.textContent = '✓ Everyone has submitted — no reminders needed!';
-      statusEl.className = 'admin-status success';
-      btnEl.disabled = false;
-      return;
-    }
-
-    statusEl.textContent = 'Sending to ' + missing.length + ' player' + (missing.length !== 1 ? 's' : '') + '…';
-
-    const allPlayers = allUsers.map(function(u) { return { email: u.email, teamName: u.teamName || u.email }; });
-    const recipients = missing.map(function(u) { return { email: u.email, teamName: u.teamName || u.email }; });
-
     await fetch(PICKS_SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'picksReminder', week: weekLabel, recipients: recipients, allPlayers: allPlayers })
+      body: JSON.stringify({ type: 'runAutomatedReminder' })
     });
 
-    statusEl.textContent = '✅ Reminder sent to ' + missing.length + ' player' + (missing.length !== 1 ? 's' : '') + '!';
+    statusEl.textContent = '✅ Reminder run started. Check your email for the admin summary.';
     statusEl.className = 'admin-status success';
 
   } catch(err) {
@@ -10266,7 +10244,7 @@ document.addEventListener('keydown', function(e) {
     <!-- Missing Picks -->
     <div class="admin-card" id="missingPicksCard">
       <div class="admin-card-title">📋 Missing Picks</div>
-      <p class="admin-card-desc">Users who have not submitted picks for the current active week.</p>
+      <p class="admin-card-desc">Users who have not submitted all 5 picks for the current active week.</p>
       <div id="missingPicksLoading" style="color:var(--muted);font-size:14px;margin-bottom:8px;">Loading…</div>
       <div id="missingPicksList"></div>
       <div style="margin-top:16px;">

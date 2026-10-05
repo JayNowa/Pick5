@@ -9,7 +9,7 @@ var SHEET_ID            = '1wCbkfJMaFQoV3gYwFbxrijqLsxpLUXdlK4YM52ijrPE';
 function doGet(e) { return doPost(e); }
 
 function doPost(e) {
-  console.log('doPost called - v12');
+  console.log('doPost called - v13');
   try {
     var raw = (e.postData && e.postData.contents)
            || (e.parameter && e.parameter.data)
@@ -18,7 +18,7 @@ function doPost(e) {
     var data = JSON.parse(raw);
 
     if (data.type === 'weeklyRecap')   { sendWeeklyRecapEmail(data);   return ContentService.createTextOutput('Recap sent'); }
-    if (data.type === 'picksReminder') { sendPicksReminderEmail(data); return ContentService.createTextOutput('Reminder sent'); }
+    if (data.type === 'runAutomatedReminder') { sendAutomatedPicksReminder(); return ContentService.createTextOutput('Reminder run complete'); }
 
     logPicksToSheet(data);
     sendPicksConfirmation(data);
@@ -161,60 +161,6 @@ function sendPicksConfirmation(data) {
 
   } catch(err) {
     Logger.log('Email failed: ' + err.toString());
-  }
-}
-
-// ─── PICKS REMINDER ──────────────────────────────────────────────────────────
-
-function sendPicksReminderEmail(data) {
-  try {
-    const week       = data.week       || 'this week';
-    const recipients = data.recipients || [];
-    const allPlayers = data.allPlayers || [];
-
-    recipients.forEach(recipient => {
-      const toEmail = typeof recipient === 'string' ? recipient : (recipient.email || '');
-      const name    = typeof recipient === 'string' ? recipient : (recipient.teamName || recipient.name || recipient.email || 'there');
-      if (!toEmail) return;
-
-      const htmlBody = `
-<div style="background:#0a0c10;padding:36px 20px;font-family:Arial,sans-serif;max-width:520px;margin:0 auto;">
-  <div style="text-align:center;margin-bottom:28px;">
-    <div style="font-size:32px;margin-bottom:6px;">🏈</div>
-    <h1 style="color:#c8a94a;font-size:26px;letter-spacing:2px;margin:0;text-transform:uppercase;">Pick 5</h1>
-  </div>
-  <div style="background:#13171f;border:1px solid #2a3040;border-radius:8px;padding:24px;margin-bottom:20px;">
-    <p style="color:#6b7588;font-size:13px;letter-spacing:1px;text-transform:uppercase;margin:0 0 8px;">Hey ${name},</p>
-    <p style="color:#f0f2f5;font-size:16px;margin:0 0 12px;">You haven't submitted your picks for <strong style="color:#c8a94a;">${week}</strong> yet!</p>
-    <p style="color:#6b7588;font-size:14px;margin:0;">Log in and lock in your picks before the games kick off. Don't miss out! 🏆</p>
-  </div>
-  <div style="text-align:center;margin-bottom:20px;">
-    <a href="${APP_URL}" style="background:#c8a94a;color:#0a0c10;padding:12px 28px;border-radius:6px;font-weight:bold;font-size:15px;text-decoration:none;display:inline-block;">Submit My Picks →</a>
-  </div>
-  <p style="color:#6b7588;font-size:12px;text-align:center;margin:0;">Good luck this week!</p>
-</div>`;
-
-      MailApp.sendEmail({
-        to: toEmail,
-        subject: '⏰ Pick 5 — Don\'t forget your ' + week + ' picks!',
-        htmlBody: htmlBody
-      });
-    });
-
-    Logger.log('Reminder sent to ' + recipients.length + ' players for ' + week);
-
-    // Send admin summary (recipients = no picks, no partial data available from web trigger)
-    var noPicksUsers = recipients.map(function(r) {
-      return { email: typeof r === 'string' ? r : (r.email || ''), teamName: typeof r === 'string' ? r : (r.teamName || r.email || ''), phone: '', count: 0 };
-    });
-    var allUsers = allPlayers.map(function(p) {
-      return { email: typeof p === 'string' ? p : (p.email || ''), teamName: typeof p === 'string' ? p : (p.teamName || p.email || '') };
-    });
-    sendAdminSummaryEmail(week, noPicksUsers, [], allUsers.length ? allUsers : noPicksUsers);
-
-  } catch(err) {
-    Logger.log('Reminder failed: ' + err.toString());
-    throw err;
   }
 }
 
@@ -644,13 +590,6 @@ function testConfirmation() {
     pick3: 'BUF', spread3: '-1.5', pick4: 'DET', spread4: '-7',
     pick5: 'PIT', spread5: '-3.5',
     tiebreaker: 44, tiebreakerGame: 'DEN @ KC'
-  });
-}
-
-function testReminder() {
-  sendPicksReminderEmail({
-    week: 'Week 2',
-    recipients: [{ teamName: 'Iksokawon', email: 'jenowakoski@gmail.com' }]
   });
 }
 
