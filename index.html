@@ -3113,7 +3113,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.8.1</div>
+    <div class="version-badge">v1.8.2</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -3398,7 +3398,6 @@
         </div>
       </div>
       <div class="spreads-action-row">
-        <button class="btn-clear" onclick="clearSpreadsPicks()">Clear</button>
         <div class="picks-counter" id="picksCounter">0 / 5 picked</div>
         <button class="btn-submit" id="spreadsSubmitBtn" onclick="submitSpreadsPicks()" disabled>Lock In Picks</button>
       </div>
@@ -5527,14 +5526,6 @@ function updatePicksCounter() {
   counter.textContent = selectedPicks.length + ' / 5 picked';
   counter.classList.toggle('full', selectedPicks.length === 5);
   if (submitBtn) submitBtn.disabled = selectedPicks.length === 0;
-}
-
-function clearSpreadsPicks() {
-  selectedPicks = [];
-  renderPickSelections();
-  updatePicksCounter();
-  const tb = document.getElementById('tiebreakerInput');
-  if (tb) tb.value = '';
 }
 
 // ── Submit Picks ──
