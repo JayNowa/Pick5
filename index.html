@@ -1723,6 +1723,9 @@
     margin-top: 20px;
     display: flex;
     justify-content: flex-end;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
   }
   .spreads-save-status {
     text-align: right;
@@ -3110,7 +3113,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.7.9</div>
+    <div class="version-badge">v1.8.0</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -3375,7 +3378,6 @@
           <span class="spreads-title" id="spreadsTitle">Week — Matchups &amp; Spreads</span>
           <div class="spreads-subtitle">Pick up to 5 teams against the spread</div>
         </div>
-        <div class="picks-counter" id="picksCounter">0 / 5 picked</div>
       </div>
       <div id="spreadsLoading" class="spreads-loading-state" style="display:none;">
         <div class="loading-spinner"></div>
@@ -3397,6 +3399,7 @@
       </div>
       <div class="spreads-action-row">
         <button class="btn-clear" onclick="clearSpreadsPicks()">Clear</button>
+        <div class="picks-counter" id="picksCounter">0 / 5 picked</div>
         <button class="btn-submit" id="spreadsSubmitBtn" onclick="submitSpreadsPicks()" disabled>Lock In Picks</button>
       </div>
       <div class="spreads-save-status" id="spreadsSaveStatus"></div>
@@ -7829,35 +7832,54 @@ async function loadMissingPicks() {
 
     loadingEl.style.display = 'none';
 
-    // Build set of emails that have picked
-    const pickedEmails = new Set(weekPicks.map(function(d) { return (d.email || '').toLowerCase(); }));
-
-    // Find users who haven't picked
-    const missing = allUsers.filter(function(u) {
-      return u.isActive !== false && !pickedEmails.has((u.email || '').toLowerCase());
+    // Count picks in each user's latest submission for the week
+    const latestByEmail = {};
+    weekPicks.forEach(function(d) {
+      const e = (d.email || '').toLowerCase();
+      if (!e) return;
+      if (!latestByEmail[e] || (d.timestamp || 0) > (latestByEmail[e].timestamp || 0)) latestByEmail[e] = d;
     });
+    function countPicks(d) {
+      if (!d) return 0;
+      return [d.pick1, d.pick2, d.pick3, d.pick4, d.pick5].filter(function(p) { return p && String(p).trim(); }).length;
+    }
+
+    // Users with no picks or fewer than 5
+    const missing = allUsers.filter(function(u) {
+      return u.isActive !== false && countPicks(latestByEmail[(u.email || '').toLowerCase()]) < 5;
+    }).map(function(u) {
+      return { user: u, count: countPicks(latestByEmail[(u.email || '').toLowerCase()]) };
+    }).sort(function(a, b) { return a.count - b.count; });
 
     if (missing.length === 0) {
-      listEl.innerHTML = '<div class="pending-none" style="color:#4caf7d;">✓ Everyone has submitted picks for ' + weekLabel + '!</div>';
+      listEl.innerHTML = '<div class="pending-none" style="color:#4caf7d;">✓ Everyone has submitted all 5 picks for ' + weekLabel + '!</div>';
       return;
     }
+
+    const noneCount    = missing.filter(function(m) { return m.count === 0; }).length;
+    const partialCount = missing.length - noneCount;
 
     // Header
     const header = document.createElement('div');
     header.style.cssText = 'font-size:14px;color:var(--muted);margin-bottom:10px;letter-spacing:0.06em;';
-    header.textContent = missing.length + ' user' + (missing.length !== 1 ? 's' : '') + ' missing picks for ' + weekLabel;
+    header.textContent = missing.length + ' user' + (missing.length !== 1 ? 's' : '') + ' need picks for ' + weekLabel +
+      ' (' + noneCount + ' none, ' + partialCount + ' partial)';
     listEl.appendChild(header);
 
-    missing.forEach(function(user) {
+    missing.forEach(function(m) {
+      const user = m.user;
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06);';
 
+      const badgeColor = m.count === 0 ? '#e05555' : '#c8a94a';
       row.innerHTML =
         '<div style="flex:1;min-width:160px;">' +
           '<div style="font-size:17px;font-weight:600;color:var(--accent);">' + (user.teamName || '—') + '</div>' +
           '<div style="font-size:15px;color:#fff;margin-top:1px;">' + user.email + '</div>' +
           (user.phone ? '<div style="font-size:15px;color:var(--muted);">' + user.phone + '</div>' : '') +
-        '</div>';
+        '</div>' +
+        '<div style="font-size:15px;font-weight:700;color:' + badgeColor + ';border:1px solid ' + badgeColor + ';border-radius:4px;padding:4px 10px;white-space:nowrap;">' +
+          m.count + ' / 5 picks</div>';
 
       listEl.appendChild(row);
     });
