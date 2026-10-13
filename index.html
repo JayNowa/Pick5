@@ -3113,7 +3113,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.8.3</div>
+    <div class="version-badge">v1.8.4</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -9489,14 +9489,13 @@ async function loadResultsPage() {
       let tbWeeksCount = 0;
       allWeeks.forEach(function(week) {
         const doc = userWeekMap[email][week];
-        if (!doc || doc.tiebreaker === undefined || doc.tiebreaker === '') return;
         const weekScores = scoresByWeek[week] || {};
-        // Build a fake scoresMap for getActualTiebreaker
         const actual = getActualTiebreakerFromWeek(weekScores);
-        if (actual !== null) {
-          totalTbDiff += Math.abs(parseInt(doc.tiebreaker) - actual);
-          tbWeeksCount++;
-        }
+        if (actual === null) return;
+        // Missing submission or blank tiebreaker counts as a guess of 0 (matches leaderboard)
+        const guess = (doc && doc.tiebreaker !== undefined && doc.tiebreaker !== '') ? parseInt(doc.tiebreaker) : 0;
+        totalTbDiff += Math.abs(guess - actual);
+        tbWeeksCount++;
       });
 
       const tbTotalTd = document.createElement('td');
