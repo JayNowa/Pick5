@@ -3113,7 +3113,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.8.2</div>
+    <div class="version-badge">v1.8.3</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -9426,7 +9426,14 @@ async function loadResultsPage() {
         const td = document.createElement('td');
         const doc = userWeekMap[email][week];
         if (!doc) {
-          td.innerHTML = '<span class="result-badge">—</span>';
+          if (isWeekFullyFinal(scoresByWeek[week] || {})) {
+            totalLosses      += 5;
+            weekLosses[week] += 5;
+            grandLosses      += 5;
+            td.innerHTML = '<span class="result-badge bad">0-5</span>';
+          } else {
+            td.innerHTML = '<span class="result-badge">—</span>';
+          }
           tr.appendChild(td);
           return;
         }
