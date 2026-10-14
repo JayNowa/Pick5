@@ -3114,7 +3114,7 @@
 </nav>
 <div id="utilityBar">
   <div class="utility-left">
-    <div class="version-badge">v1.8.5</div>
+    <div class="version-badge">v1.8.6</div>
     <div class="settings-btn-wrap">
       <button id="settingsBtn" onclick="toggleSettingsPanel()">⚙ Settings</button>
       <div id="settingsPanel" class="settings-panel">
@@ -4351,7 +4351,7 @@ function getPickAllResult(team, scoresMap) {
   const oppScore = isHome ? game.awayScore : game.homeScore;
   if (myScore > oppScore) return 'W';
   if (myScore < oppScore) return 'L';
-  return 'T';
+  return 'W'; // a tie counts as a win
 }
 
 // Shared card builder used by renderPickAllTable and renderOurTeamSpotlight
